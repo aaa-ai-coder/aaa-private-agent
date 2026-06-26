@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'ai_service.dart';
 import 'screen_automation_service.dart';
 import 'app_launcher_service.dart';
+import 'notification_service.dart';
 
 /// Executes multi-step UI automation tasks using LLM-guided screen reading.
 /// 
@@ -11,11 +12,10 @@ class TaskExecutor {
   final AiService _aiService;
   final ScreenAutomationService _screenService;
   final AppLauncherService _appLauncher;
+  final NotificationService _notificationService = NotificationService();
 
   /// Callback to report progress messages to the UI
   final void Function(String message)? onProgress;
-
-  static const int _maxSteps = 15;
 
   TaskExecutor({
     required AiService aiService,
@@ -71,7 +71,7 @@ Rules:
     results.add('Starting task: $userGoal');
     _report('Starting task: $userGoal');
 
-    for (int step = 0; step < _maxSteps; step++) {
+    for (int step = 0; step < _aiService.maxSteps; step++) {
       // Small delay to let UI settle
       await Future.delayed(const Duration(milliseconds: 500));
 
@@ -92,12 +92,12 @@ TASK: $userGoal
 CURRENT SCREEN TEXT DUMP:
 $screenContent
 
-Step ${step + 1}/$_maxSteps. Look at the text dump and coordinates. What is the next action?'''
+Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. What is the next action?'''
           : '''TASK: $userGoal
 
 CURRENT SCREEN TEXT DUMP:
 $screenContent$prevResultStr
-Step ${step + 1}/$_maxSteps. Look at the text dump and coordinates. What is the next action?''';
+Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. What is the next action?''';
 
       String response;
       try {
@@ -191,6 +191,7 @@ Step ${step + 1}/$_maxSteps. Look at the text dump and coordinates. What is the 
         case 'done':
           results.add('Task complete: $reasoning');
           _report('Task complete: $reasoning');
+          _notificationService.showTaskCompleteNotification('Task Completed', reasoning ?? 'Agent finished its goal.');
           return results.join('\n');
 
         default:
@@ -202,12 +203,14 @@ Step ${step + 1}/$_maxSteps. Look at the text dump and coordinates. What is the 
       if (isComplete) {
         results.add('Task complete.');
         _report('Task complete.');
+        _notificationService.showTaskCompleteNotification('Task Completed', 'Agent finished its goal.');
         return results.join('\n');
       }
     }
 
-    results.add('Reached maximum steps ($_maxSteps). Task may be incomplete.');
+    results.add('Reached maximum steps (${_aiService.maxSteps}). Task may be incomplete.');
     _report('Reached maximum steps.');
+    _notificationService.showTaskCompleteNotification('Task Stopped', 'Reached maximum steps (${_aiService.maxSteps}).');
     return results.join('\n');
   }
 

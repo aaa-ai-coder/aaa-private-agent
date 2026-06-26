@@ -19,6 +19,10 @@ The system operates on a continuous feedback loop:
 - **Remote Access:** Integrates with the Telegram Bot API via background polling, allowing users to issue commands and monitor task execution progress remotely.
 - **Voice Control:** Native speech-to-text integration for hands-free operation.
 
+## Installation
+
+Download the latest APK directly from the [Releases Page](https://github.com/orailnoor/private-agent/releases).
+
 ## Setup Instructions
 
 1. Clone the repository.

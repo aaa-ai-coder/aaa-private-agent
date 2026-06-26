@@ -10,6 +10,7 @@ class AiService {
   String? _apiKey;
   String _baseUrl = _defaultBaseUrl;
   String _model = _defaultModel;
+  int _maxSteps = 15;
   final List<Map<String, String>> _conversationHistory = [];
 
   static const String _systemPrompt = '''
@@ -57,6 +58,7 @@ For normal conversation (questions, chat, info requests), just respond with plai
     _apiKey = prefs.getString('api_key');
     _baseUrl = prefs.getString('api_base_url') ?? _defaultBaseUrl;
     _model = prefs.getString('api_model') ?? _defaultModel;
+    _maxSteps = prefs.getInt('api_max_steps') ?? 15;
   }
 
   Future<void> saveSettings({
@@ -78,10 +80,17 @@ For normal conversation (questions, chat, info requests), just respond with plai
     }
   }
 
+  Future<void> saveMaxSteps(int steps) async {
+    final prefs = await SharedPreferences.getInstance();
+    _maxSteps = steps;
+    await prefs.setInt('api_max_steps', steps);
+  }
+
   bool get isConfigured => _apiKey != null && _apiKey!.isNotEmpty;
   String get baseUrl => _baseUrl;
   String get model => _model;
   String get apiKey => _apiKey ?? '';
+  int get maxSteps => _maxSteps;
 
   void clearHistory() {
     _conversationHistory.clear();
@@ -174,5 +183,37 @@ For normal conversation (questions, chat, info requests), just respond with plai
       // Not JSON, it's plain text conversation
     }
     return null;
+  }
+
+  /// Fetches available models from the provider's /models endpoint
+  Future<List<String>> fetchAvailableModels(String baseUrl, String apiKey) async {
+    try {
+      String cleanBaseUrl = baseUrl;
+      // Many providers host it at /models, but some require the base URL without /chat/completions logic
+      if (cleanBaseUrl.endsWith('/chat/completions')) {
+        cleanBaseUrl = cleanBaseUrl.replaceAll('/chat/completions', '');
+      }
+
+      final response = await http.get(
+        Uri.parse('$cleanBaseUrl/models'),
+        headers: {
+          'Authorization': 'Bearer $apiKey',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data is Map && data.containsKey('data')) {
+          final modelsList = data['data'] as List;
+          return modelsList.map((m) => m['id'].toString()).toList();
+        } else if (data is List) {
+          return data.map((m) => m['id'].toString()).toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      print('Error fetching models: $e');
+      return [];
+    }
   }
 }
