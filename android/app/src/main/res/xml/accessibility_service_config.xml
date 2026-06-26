@@ -8,4 +8,4 @@
     android:canTakeScreenshot="true"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:notificationTimeout="100"
-    android:settingsActivity="com.privateagent.private_agent.MainActivity" />
+    android:settingsActivity="com.orailnoor.privateagent.MainActivity" />

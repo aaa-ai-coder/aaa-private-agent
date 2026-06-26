@@ -4,6 +4,7 @@ import '../services/ai_service.dart';
 import '../services/shizuku_service.dart';
 import '../services/screen_automation_service.dart';
 import '../services/telegram_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatefulWidget {
   final AiService aiService;
@@ -23,7 +24,8 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObserver {
+class _SettingsScreenState extends State<SettingsScreen>
+    with WidgetsBindingObserver {
   late TextEditingController _apiKeyController;
   late TextEditingController _baseUrlController;
   late TextEditingController _modelController;
@@ -40,7 +42,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     _apiKeyController = TextEditingController(text: widget.aiService.apiKey);
     _baseUrlController = TextEditingController(text: widget.aiService.baseUrl);
     _modelController = TextEditingController(text: widget.aiService.model);
-    _telegramTokenController = TextEditingController(text: widget.telegramService.botToken);
+    _telegramTokenController = TextEditingController(
+      text: widget.telegramService.botToken,
+    );
     _telegramEnabled = widget.telegramService.isEnabled;
     _checkPermissions();
   }
@@ -96,9 +100,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
     );
 
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Settings saved!')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Settings saved!')));
     }
   }
 
@@ -112,9 +116,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           // API Settings
           Text(
             'AI Configuration',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -124,8 +128,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
               hintText: 'sk-...',
               border: const OutlineInputBorder(),
               suffixIcon: IconButton(
-                icon:
-                    Icon(_obscureKey ? Icons.visibility_off : Icons.visibility),
+                icon: Icon(
+                  _obscureKey ? Icons.visibility_off : Icons.visibility,
+                ),
                 onPressed: () => setState(() => _obscureKey = !_obscureKey),
               ),
             ),
@@ -155,9 +160,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           // Telegram Settings
           Text(
             'Telegram Remote Access',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -189,9 +194,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           // Permissions
           Text(
             'Permissions',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           ..._buildPermissionTiles(),
@@ -201,9 +206,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           // Accessibility Service
           Text(
             'Screen Control (Accessibility)',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
@@ -218,9 +223,9 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           // Shizuku
           Text(
             'Shizuku (Optional)',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
@@ -229,6 +234,39 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
           ),
           const SizedBox(height: 12),
           _buildShizukuCard(),
+
+          const Divider(height: 32),
+
+          // About / Links
+          Text(
+            'About',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 8),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Project Repository'),
+            subtitle: const Text('View the official source code on GitHub'),
+            onTap: () {
+              launchUrl(
+                Uri.parse('https://github.com/orailnoor/private-agent'),
+                mode: LaunchMode.externalApplication,
+              );
+            },
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Orailnoor on YouTube'),
+            subtitle: const Text('Subscribe for project updates and tutorials'),
+            onTap: () {
+              launchUrl(
+                Uri.parse('https://www.youtube.com/orailnoor'),
+                mode: LaunchMode.externalApplication,
+              );
+            },
+          ),
 
           const SizedBox(height: 32),
         ],
@@ -263,12 +301,15 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
         trailing: isGranted
             ? const Icon(Icons.check_circle, color: Colors.green)
             : TextButton(
-                onPressed: () =>
-                    _requestPermission(entry.key, entry.value),
+                onPressed: () => _requestPermission(entry.key, entry.value),
                 child: const Text('Grant'),
               ),
         subtitle: Text(
-          isGranted ? 'Granted' : (status?.isDenied ?? true ? 'Not granted' : 'Denied permanently'),
+          isGranted
+              ? 'Granted'
+              : (status?.isDenied ?? true
+                    ? 'Not granted'
+                    : 'Denied permanently'),
           style: TextStyle(
             color: isGranted ? Colors.green : Colors.orange,
             fontSize: 12,
@@ -340,10 +381,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                   const SizedBox(width: 4),
                   Text(
                     'Permission granted — ADB commands available',
-                    style: TextStyle(
-                      color: Colors.green[700],
-                      fontSize: 13,
-                    ),
+                    style: TextStyle(color: Colors.green[700], fontSize: 13),
                   ),
                 ],
               ),
@@ -353,6 +391,7 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
       ),
     );
   }
+
   Widget _buildAccessibilityCard() {
     return FutureBuilder<bool>(
       future: widget.screenAutomationService.isServiceRunning(),
@@ -401,8 +440,11 @@ class _SettingsScreenState extends State<SettingsScreen> with WidgetsBindingObse
                 ] else ...[
                   Row(
                     children: [
-                      const Icon(Icons.check_circle,
-                          color: Colors.green, size: 16),
+                      const Icon(
+                        Icons.check_circle,
+                        color: Colors.green,
+                        size: 16,
+                      ),
                       const SizedBox(width: 4),
                       Text(
                         'Can read screen, tap, scroll, and type in other apps',

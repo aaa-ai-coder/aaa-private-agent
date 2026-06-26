@@ -1,4 +1,4 @@
-package com.privateagent.private_agent
+package com.orailnoor.privateagent
 
 import android.content.Intent
 import android.provider.Settings

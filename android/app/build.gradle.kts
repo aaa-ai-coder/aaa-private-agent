@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.privateagent.private_agent"
+    namespace = "com.orailnoor.privateagent"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -22,7 +22,7 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.privateagent.private_agent"
+        applicationId = "com.orailnoor.privateagent"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = 26
