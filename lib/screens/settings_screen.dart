@@ -32,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   late TextEditingController _telegramTokenController;
   bool _obscureKey = true;
   bool _telegramEnabled = false;
+  double _maxSteps = 15;
 
   final Map<String, PermissionStatus> _permissions = {};
 
@@ -46,6 +47,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       text: widget.telegramService.botToken,
     );
     _telegramEnabled = widget.telegramService.isEnabled;
+    _maxSteps = widget.aiService.maxSteps.toDouble();
     _checkPermissions();
   }
 
@@ -99,10 +101,78 @@ class _SettingsScreenState extends State<SettingsScreen>
       isEnabled: _telegramEnabled,
     );
 
+    await widget.aiService.saveMaxSteps(_maxSteps.toInt());
+
     if (mounted) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Settings saved!')));
+    }
+  }
+
+  Future<void> _fetchModels() async {
+    final baseUrl = _baseUrlController.text.trim();
+    final apiKey = _apiKeyController.text.trim();
+
+    if (baseUrl.isEmpty || apiKey.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter Base URL and API Key first.')),
+      );
+      return;
+    }
+
+    // Show loading
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    final models = await widget.aiService.fetchAvailableModels(baseUrl, apiKey);
+
+    // Hide loading
+    if (mounted) Navigator.pop(context);
+
+    if (models.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No models found or error fetching models.')),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Select a Model'),
+          content: SizedBox(
+            width: double.maxFinite,
+            height: 300,
+            child: ListView.builder(
+              itemCount: models.length,
+              itemBuilder: (context, index) {
+                return ListTile(
+                  title: Text(models[index]),
+                  onTap: () {
+                    setState(() {
+                      _modelController.text = models[index];
+                    });
+                    Navigator.pop(context);
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      );
     }
   }
 
@@ -146,20 +216,51 @@ class _SettingsScreenState extends State<SettingsScreen>
             ),
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: _modelController,
-            decoration: const InputDecoration(
-              labelText: 'Model',
-              hintText: 'deepseek-chat',
-              border: OutlineInputBorder(),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _modelController,
+                  decoration: const InputDecoration(
+                    labelText: 'Model',
+                    hintText: 'deepseek-chat',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                onPressed: _fetchModels,
+                icon: const Icon(Icons.cloud_download),
+                label: const Text('Fetch'),
+              ),
+            ],
           ),
+          const SizedBox(height: 24),
+          
+          Text(
+            'Maximum Steps Per Task: ${_maxSteps.toInt()}',
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+          Slider(
+            value: _maxSteps,
+            min: 5,
+            max: 50,
+            divisions: 45,
+            label: _maxSteps.toInt().toString(),
+            onChanged: (value) {
+              setState(() {
+                _maxSteps = value;
+              });
+            },
+          ),
+          
           const SizedBox(height: 12),
           const Divider(height: 32),
 
           // Telegram Settings
           Text(
-            'Telegram Remote Access',
+            'Telegram Remote Access (Optional)',
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
