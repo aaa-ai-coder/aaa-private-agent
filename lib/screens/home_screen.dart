@@ -56,8 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
               '• "Open YouTube"\n'
               '• "Call Mom"\n'
               '• "Set volume to 50%"\n'
-              '• "What\'s on my screen?"\n'
-              '• "Open Instagram and search techjarves"\n\n'
+              '• "What\'s on my screen?"\n\n'
               'Type or tap the mic to get started!',
         ));
       });

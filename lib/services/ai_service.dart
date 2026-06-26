@@ -39,7 +39,7 @@ CRITICAL RULES:
 2. execute_task handles everything: opening apps, finding elements, clicking, typing, scrolling.
 
 Examples of when to use execute_task:
-- "Open Instagram and search techjarves" → execute_task with goal "Open Instagram and search for techjarves"
+- "Create a new alarm for 7 AM" → execute_task with goal "Create a new alarm for 7 AM"
 - "Go to YouTube and search for cats" → execute_task
 - "Open WhatsApp and send hello to John" → execute_task
 - "Open Settings and turn on WiFi" → execute_task
