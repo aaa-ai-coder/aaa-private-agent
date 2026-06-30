@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'ai_service.dart';
 import 'screen_automation_service.dart';
 import 'app_launcher_service.dart';
@@ -77,6 +78,7 @@ Rules:
 
       // 1. Read the current screen text
       final screenContent = await _screenService.getScreenDescription();
+      developer.log('=== SCREEN DUMP (Step ${step + 1}) ===\n$screenContent', name: 'PrivateAgent');
 
       // Determine previous result string
       final prevResultStr = step > 0 && results.isNotEmpty 
@@ -99,39 +101,46 @@ CURRENT SCREEN TEXT DUMP:
 $screenContent$prevResultStr
 Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. What is the next action?''';
 
+      developer.log('=== AI PROMPT ===\n$prompt', name: 'PrivateAgent');
+
       String response;
       try {
         response = await _aiService.sendMessage(prompt);
+        developer.log('=== RAW AI RESPONSE ===\n$response', name: 'PrivateAgent');
       } catch (e) {
         results.add('AI error: $e');
         _report('Error: $e');
-        break;
+        _notificationService.showTaskCompleteNotification('Task Error', 'AI encountered an error.');
+        return results.join('\n');
       }
 
       // 3. Parse the action
       Map<String, dynamic>? actionJson;
       try {
         String jsonStr = response.trim();
-        if (jsonStr.startsWith('```')) {
-          final lines = jsonStr.split('\n');
-          lines.removeAt(0);
-          if (lines.isNotEmpty && lines.last.trim() == '```') {
-            lines.removeLast();
-          }
-          jsonStr = lines.join('\n').trim();
+        
+        // Use Regex to find the first JSON-like block (anything between { and })
+        // This is robust against conversational fluff like "Here is your JSON:"
+        final jsonMatch = RegExp(r'\{[\s\S]*\}').firstMatch(jsonStr);
+        if (jsonMatch != null) {
+          jsonStr = jsonMatch.group(0)!;
         }
+        
         actionJson = jsonDecode(jsonStr) as Map<String, dynamic>;
       } catch (_) {
         // LLM didn't return valid JSON
-        results.add('Step ${step + 1}: $response');
-        _report(response);
-        break;
+        results.add('Step ${step + 1}: Invalid JSON response');
+        _report('Error: AI did not return valid JSON code.');
+        _notificationService.showTaskCompleteNotification('Task Error', 'AI formatting error.');
+        return results.join('\n');
       }
 
       final action = actionJson['action'] as String? ?? 'done';
       final params = actionJson['params'] as Map<String, dynamic>? ?? {};
       final reasoning = actionJson['reasoning'] as String? ?? '';
       final isComplete = actionJson['is_complete'] == true;
+
+      developer.log('=== PARSED ACTION ===\nAction: $action\nParams: $params\nReasoning: $reasoning\nIs Complete: $isComplete', name: 'PrivateAgent');
 
       _report('Step ${step + 1}: $reasoning');
 
@@ -197,6 +206,8 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
         default:
           actionResult = 'Unknown action: $action';
       }
+
+      developer.log('=== NATIVE EXECUTION RESULT ===\n$actionResult', name: 'PrivateAgent');
 
       results.add('Step ${step + 1}: $actionResult ($reasoning)');
 

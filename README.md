@@ -23,14 +23,18 @@ The system operates on a continuous feedback loop:
 
 Download the latest APK directly from the [Releases Page](https://github.com/orailnoor/private-agent/releases).
 
-## Setup Instructions
+## Setup Instructions (How to use for FREE)
 
-1. Clone the repository.
-2. Build the application using `flutter build apk`.
-3. Install the APK on an Android device (API 30+ recommended).
-4. Launch the application and navigate to Settings.
-5. Provide a valid DeepSeek API key (or any OpenAI-compatible endpoint).
-6. Enable the `PrivateAgent Screen Control` service within Android Accessibility Settings.
+This app requires an AI brain to operate. You can use it **100% for free** by using OpenRouter's free models.
+
+1. Install the APK on your Android device (API 30+ recommended).
+2. Go to [OpenRouter.ai](https://openrouter.ai/) and create a free account.
+3. Generate a free API Key.
+4. Launch PrivateAgent and go to the **Settings** screen.
+5. Tap the **"OpenRouter"** quick-select chip under Base URL.
+6. Paste your API Key.
+7. Type `openai/gpt-oss-120b:free` (or any other free model) into the Model field.
+8. Enable the **"PrivateAgent Screen Control"** service in your Android Accessibility Settings.
 
 ## Telegram Integration
 

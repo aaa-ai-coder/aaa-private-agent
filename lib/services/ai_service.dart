@@ -11,6 +11,7 @@ class AiService {
   String _baseUrl = _defaultBaseUrl;
   String _model = _defaultModel;
   int _maxSteps = 15;
+  bool _disableMaxSteps = false;
   final List<Map<String, String>> _conversationHistory = [];
 
   static const String _systemPrompt = '''
@@ -59,6 +60,7 @@ For normal conversation (questions, chat, info requests), just respond with plai
     _baseUrl = prefs.getString('api_base_url') ?? _defaultBaseUrl;
     _model = prefs.getString('api_model') ?? _defaultModel;
     _maxSteps = prefs.getInt('api_max_steps') ?? 15;
+    _disableMaxSteps = prefs.getBool('api_disable_max_steps') ?? false;
   }
 
   Future<void> saveSettings({
@@ -67,8 +69,15 @@ For normal conversation (questions, chat, info requests), just respond with plai
     String? model,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    _apiKey = apiKey;
-    await prefs.setString('api_key', apiKey);
+    
+    // Clean up the API key in case the user pasted "Bearer sk-..."
+    String cleanApiKey = apiKey.trim();
+    if (cleanApiKey.toLowerCase().startsWith('bearer ')) {
+      cleanApiKey = cleanApiKey.substring(7).trim();
+    }
+    
+    _apiKey = cleanApiKey;
+    await prefs.setString('api_key', cleanApiKey);
 
     if (baseUrl != null && baseUrl.isNotEmpty) {
       _baseUrl = baseUrl;
@@ -86,11 +95,19 @@ For normal conversation (questions, chat, info requests), just respond with plai
     await prefs.setInt('api_max_steps', steps);
   }
 
+  Future<void> saveDisableMaxSteps(bool disable) async {
+    final prefs = await SharedPreferences.getInstance();
+    _disableMaxSteps = disable;
+    await prefs.setBool('api_disable_max_steps', disable);
+  }
+
   bool get isConfigured => _apiKey != null && _apiKey!.isNotEmpty;
   String get baseUrl => _baseUrl;
   String get model => _model;
   String get apiKey => _apiKey ?? '';
-  int get maxSteps => _maxSteps;
+  int get maxSteps => _disableMaxSteps ? 999 : _maxSteps;
+  int get rawMaxSteps => _maxSteps; // For the slider UI
+  bool get disableMaxSteps => _disableMaxSteps;
 
   void clearHistory() {
     _conversationHistory.clear();
@@ -120,11 +137,24 @@ For normal conversation (questions, chat, info requests), just respond with plai
         ..._conversationHistory,
       ];
 
+      String requestUrl = _baseUrl;
+      if (requestUrl.endsWith('/chat/completions')) {
+        requestUrl = requestUrl; // User already included it
+      } else {
+        if (requestUrl.endsWith('/')) {
+          requestUrl = '${requestUrl}chat/completions';
+        } else {
+          requestUrl = '$requestUrl/chat/completions';
+        }
+      }
+
       final response = await http.post(
-        Uri.parse('$_baseUrl/chat/completions'),
+        Uri.parse(requestUrl),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $_apiKey',
+          'HTTP-Referer': 'https://github.com/orailnoor/private-agent',
+          'X-Title': 'PrivateAgent',
         },
         body: jsonEncode({
           'model': _model,

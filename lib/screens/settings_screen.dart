@@ -33,6 +33,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _obscureKey = true;
   bool _telegramEnabled = false;
   double _maxSteps = 15;
+  bool _disableMaxSteps = false;
 
   final Map<String, PermissionStatus> _permissions = {};
 
@@ -47,7 +48,8 @@ class _SettingsScreenState extends State<SettingsScreen>
       text: widget.telegramService.botToken,
     );
     _telegramEnabled = widget.telegramService.isEnabled;
-    _maxSteps = widget.aiService.maxSteps.toDouble();
+    _maxSteps = widget.aiService.rawMaxSteps.toDouble();
+    _disableMaxSteps = widget.aiService.disableMaxSteps;
     _checkPermissions();
   }
 
@@ -102,6 +104,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     );
 
     await widget.aiService.saveMaxSteps(_maxSteps.toInt());
+    await widget.aiService.saveDisableMaxSteps(_disableMaxSteps);
 
     if (mounted) {
       ScaffoldMessenger.of(
@@ -215,6 +218,28 @@ class _SettingsScreenState extends State<SettingsScreen>
               border: OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            children: [
+              ActionChip(
+                label: const Text('DeepSeek', style: TextStyle(fontSize: 12)),
+                onPressed: () => _baseUrlController.text = 'https://api.deepseek.com',
+              ),
+              ActionChip(
+                label: const Text('OpenRouter', style: TextStyle(fontSize: 12)),
+                onPressed: () => _baseUrlController.text = 'https://openrouter.ai/api/v1',
+              ),
+              ActionChip(
+                label: const Text('Groq', style: TextStyle(fontSize: 12)),
+                onPressed: () => _baseUrlController.text = 'https://api.groq.com/openai/v1',
+              ),
+              ActionChip(
+                label: const Text('Local', style: TextStyle(fontSize: 12)),
+                onPressed: () => _baseUrlController.text = 'http://10.0.2.2:1234/v1',
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           Row(
             children: [
@@ -238,22 +263,37 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           const SizedBox(height: 24),
           
-          Text(
-            'Maximum Steps Per Task: ${_maxSteps.toInt()}',
-            style: const TextStyle(fontWeight: FontWeight.w500),
-          ),
-          Slider(
-            value: _maxSteps,
-            min: 5,
-            max: 50,
-            divisions: 45,
-            label: _maxSteps.toInt().toString(),
-            onChanged: (value) {
+          SwitchListTile(
+            title: const Text('Disable Maximum Steps'),
+            subtitle: const Text(
+              '⚠️ Warning: Can cause infinite loops.',
+              style: TextStyle(color: Colors.orange),
+            ),
+            value: _disableMaxSteps,
+            onChanged: (bool value) {
               setState(() {
-                _maxSteps = value;
+                _disableMaxSteps = value;
               });
             },
           ),
+          if (!_disableMaxSteps) ...[
+            Text(
+              'Maximum Steps Per Task: ${_maxSteps.toInt()}',
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            Slider(
+              value: _maxSteps,
+              min: 5,
+              max: 50,
+              divisions: 45,
+              label: _maxSteps.toInt().toString(),
+              onChanged: (value) {
+                setState(() {
+                  _maxSteps = value;
+                });
+              },
+            ),
+          ],
           
           const SizedBox(height: 12),
           const Divider(height: 32),
