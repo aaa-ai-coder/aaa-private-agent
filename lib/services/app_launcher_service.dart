@@ -5,9 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 class AppLauncherService {
   List<AppInfo>? _cachedApps;
 
-  /// Get all installed apps (cached)
+  /// Get all installed apps (cached), including system apps!
   Future<List<AppInfo>> getInstalledApps() async {
-    _cachedApps ??= await InstalledApps.getInstalledApps();
+    _cachedApps ??= await InstalledApps.getInstalledApps(false, false);
     return _cachedApps!;
   }
 

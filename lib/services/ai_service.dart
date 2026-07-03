@@ -1,7 +1,13 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/agent_action.dart';
+class AiResponse {
+  final String content;
+  final int totalTokens;
+  AiResponse(this.content, this.totalTokens);
+}
 
 class AiService {
   static const String _defaultBaseUrl = 'https://api.deepseek.com';
@@ -12,6 +18,10 @@ class AiService {
   String _model = _defaultModel;
   int _maxSteps = 15;
   bool _disableMaxSteps = false;
+  double _temperature = 1.0;
+  int _maxTokens = 1024;
+  bool _useScreenCompression = true;
+  bool _useSystemPrompt = true;
   final List<Map<String, String>> _conversationHistory = [];
 
   static const String _systemPrompt = '''
@@ -61,6 +71,10 @@ For normal conversation (questions, chat, info requests), just respond with plai
     _model = prefs.getString('api_model') ?? _defaultModel;
     _maxSteps = prefs.getInt('api_max_steps') ?? 15;
     _disableMaxSteps = prefs.getBool('api_disable_max_steps') ?? false;
+    _temperature = prefs.getDouble('api_temperature') ?? 1.0;
+    _maxTokens = prefs.getInt('api_max_tokens') ?? 1024;
+    _useScreenCompression = prefs.getBool('api_use_screen_compression') ?? true;
+    _useSystemPrompt = prefs.getBool('api_use_system_prompt') ?? true;
   }
 
   Future<void> saveSettings({
@@ -101,6 +115,23 @@ For normal conversation (questions, chat, info requests), just respond with plai
     await prefs.setBool('api_disable_max_steps', disable);
   }
 
+  Future<void> saveAdvancedSettings({
+    required double temperature,
+    required int maxTokens,
+    required bool useScreenCompression,
+    required bool useSystemPrompt,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    _temperature = temperature;
+    _maxTokens = maxTokens;
+    _useScreenCompression = useScreenCompression;
+    _useSystemPrompt = useSystemPrompt;
+    await prefs.setDouble('api_temperature', temperature);
+    await prefs.setInt('api_max_tokens', maxTokens);
+    await prefs.setBool('api_use_screen_compression', useScreenCompression);
+    await prefs.setBool('api_use_system_prompt', useSystemPrompt);
+  }
+
   bool get isConfigured => _apiKey != null && _apiKey!.isNotEmpty;
   String get baseUrl => _baseUrl;
   String get model => _model;
@@ -108,6 +139,10 @@ For normal conversation (questions, chat, info requests), just respond with plai
   int get maxSteps => _disableMaxSteps ? 999 : _maxSteps;
   int get rawMaxSteps => _maxSteps; // For the slider UI
   bool get disableMaxSteps => _disableMaxSteps;
+  double get temperature => _temperature;
+  int get maxTokens => _maxTokens;
+  bool get useScreenCompression => _useScreenCompression;
+  bool get useSystemPrompt => _useSystemPrompt;
 
   void clearHistory() {
     _conversationHistory.clear();
@@ -133,7 +168,7 @@ For normal conversation (questions, chat, info requests), just respond with plai
     try {
       // Build the prompt including system instructions
       final messages = [
-        {'role': 'system', 'content': _systemPrompt},
+        if (_useSystemPrompt) {'role': 'system', 'content': _systemPrompt},
         ..._conversationHistory,
       ];
 
@@ -159,21 +194,39 @@ For normal conversation (questions, chat, info requests), just respond with plai
         body: jsonEncode({
           'model': _model,
           'messages': messages,
-          'temperature': 0.7,
-          'max_tokens': 1024,
+          'temperature': _temperature,
+          'max_tokens': _maxTokens,
         }),
-      );
+      ).timeout(const Duration(seconds: 45));
 
       if (response.statusCode != 200) {
-        final errorBody = jsonDecode(response.body);
-        throw Exception(
-          'API error (${response.statusCode}): ${errorBody['error']?['message'] ?? response.body}',
-        );
+        String errorMessage = response.body;
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            if (decoded['error'] is Map<String, dynamic>) {
+              errorMessage = decoded['error']['message']?.toString() ?? response.body;
+            } else if (decoded['error'] is String) {
+              errorMessage = decoded['error'];
+            }
+          }
+        } catch (_) {
+          // ignore parsing errors, use raw body
+        }
+        throw Exception('API error (${response.statusCode}): $errorMessage');
       }
 
       final data = jsonDecode(response.body);
+      if (data is! Map<String, dynamic> || !data.containsKey('choices')) {
+        throw Exception('Unexpected API response format: $data');
+      }
+
       final assistantMessage =
           data['choices'][0]['message']['content'] as String;
+
+      if (assistantMessage.trim().isEmpty) {
+        throw Exception('API returned an empty response. This may be due to rate limits or API instability.');
+      }
 
       _conversationHistory.add({
         'role': 'assistant',
@@ -184,6 +237,93 @@ For normal conversation (questions, chat, info requests), just respond with plai
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Network error: $e');
+    }
+  }
+
+  /// Send a task execution message — no conversation history, low temperature, limited tokens.
+  /// This is much faster and cheaper than sendMessage.
+  Future<AiResponse> sendTaskMessage(String systemPrompt, String prompt) async {
+    if (_apiKey == null || _apiKey!.isEmpty) {
+      throw Exception('API Key is not configured. Please go to Settings.');
+    }
+
+    int maxRetries = 4;
+    int currentTry = 0;
+
+    while (true) {
+      try {
+        currentTry++;
+      final messages = [
+        if (_useSystemPrompt) {'role': 'system', 'content': systemPrompt},
+        {'role': 'user', 'content': prompt},
+      ];
+
+      String requestUrl = _baseUrl;
+      if (!requestUrl.endsWith('/chat/completions')) {
+        if (requestUrl.endsWith('/')) {
+          requestUrl = '${requestUrl}chat/completions';
+        } else {
+          requestUrl = '$requestUrl/chat/completions';
+        }
+      }
+
+      final response = await http.post(
+        Uri.parse(requestUrl),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $_apiKey',
+          'HTTP-Referer': 'https://github.com/orailnoor/private-agent',
+          'X-Title': 'PrivateAgent',
+        },
+        body: jsonEncode({
+          'model': _model,
+          'messages': messages,
+          'temperature': _temperature,
+          'max_tokens': _maxTokens,
+        }),
+      ).timeout(const Duration(seconds: 45));
+
+      if (response.statusCode != 200) {
+        String errorMessage = response.body;
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            if (decoded['error'] is Map<String, dynamic>) {
+              errorMessage = decoded['error']['message'] ?? response.body;
+            } else if (decoded['error'] is String) {
+              errorMessage = decoded['error'];
+            }
+          }
+        } catch (_) {
+          // ignore parsing errors, use raw body
+        }
+        throw Exception('API error (${response.statusCode}): $errorMessage');
+      }
+
+      final data = jsonDecode(response.body);
+      if (data is! Map<String, dynamic> || !data.containsKey('choices')) {
+        throw Exception('Unexpected API response format: $data');
+      }
+      final content = data['choices'][0]['message']['content'] as String;
+      
+      if (content.trim().isEmpty) {
+        throw Exception('API returned an empty response. This may be due to strict rate limits or safety filters.');
+      }
+
+      int tokens = 0;
+      if (data.containsKey('usage') && data['usage']['total_tokens'] != null) {
+        tokens = data['usage']['total_tokens'] as int;
+      }
+      return AiResponse(content, tokens);
+    } catch (e) {
+      if (currentTry > maxRetries) {
+        if (e is Exception) rethrow;
+        throw Exception('Network error after $maxRetries retries: $e');
+      }
+      int delaySeconds = 3 * currentTry;
+      developer.log('API call failed ($e), retrying $currentTry/$maxRetries in $delaySeconds seconds...', name: 'PrivateAgent');
+      await Future.delayed(Duration(seconds: delaySeconds));
+    }
     }
   }
 
@@ -203,10 +343,26 @@ For normal conversation (questions, chat, info requests), just respond with plai
         jsonStr = lines.join('\n').trim();
       }
 
+      // If it looks like JSON but is missing a closing brace (common with some local models)
+      if (jsonStr.startsWith('{') && !jsonStr.endsWith('}')) {
+        jsonStr += '\n}';
+      }
+
       if (jsonStr.startsWith('{') && jsonStr.contains('"action"')) {
-        final json = jsonDecode(jsonStr) as Map<String, dynamic>;
-        if (json.containsKey('action')) {
-          return AgentAction.fromJson(json);
+        try {
+          final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+          if (json.containsKey('action')) {
+            return AgentAction.fromJson(json);
+          }
+        } catch (e) {
+          // If it still fails, it might be deeply truncated, try adding another brace
+          if (e.toString().contains('Unexpected end of input')) {
+            jsonStr += '\n}';
+            final json = jsonDecode(jsonStr) as Map<String, dynamic>;
+            if (json.containsKey('action')) {
+              return AgentAction.fromJson(json);
+            }
+          }
         }
       }
     } catch (_) {

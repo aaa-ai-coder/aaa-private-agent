@@ -43,3 +43,11 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Python model training pipeline
+*.py
+*.jsonl
+venv/
+__pycache__/
+training_tasks.md
+enrich_dataset_prompt.md

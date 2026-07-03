@@ -22,6 +22,9 @@ class ActionHandler {
   ShizukuService get shizuku => _shizuku;
   ScreenAutomationService get screenAutomation => _screenAutomation;
 
+  /// The currently running task executor, if any
+  TaskExecutor? _currentExecutor;
+
   /// Execute an action and return the result
   Future<AgentActionResult> execute(
     AgentAction action, {
@@ -144,13 +147,15 @@ class ActionHandler {
             result = 'AI service not available for task execution.';
             break;
           }
-          final executor = TaskExecutor(
+          _currentExecutor = TaskExecutor(
             aiService: aiService,
             screenService: _screenAutomation,
             appLauncher: _appLauncher,
+            shizukuService: _shizuku,
             onProgress: onProgress,
           );
-          result = await executor.executeTask(goal);
+          result = await _currentExecutor!.executeTask(goal);
+          _currentExecutor = null;
           break;
 
         default:
@@ -169,5 +174,10 @@ class ActionHandler {
         details: 'Error: $e',
       );
     }
+  }
+
+  /// Cancel the currently running task
+  void cancelTask() {
+    _currentExecutor?.cancel();
   }
 }

@@ -20,6 +20,8 @@ class AgentAccessibilityService : AccessibilityService() {
     companion object {
         var instance: AgentAccessibilityService? = null
             private set
+            
+        var eventListener: ((Map<String, Any>) -> Unit)? = null
 
         fun isRunning(): Boolean = instance != null
     }
@@ -30,7 +32,42 @@ class AgentAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // We don't need to react to events — we query on demand
+        if (event == null) return
+        val listener = eventListener ?: return
+        
+        // Filter out events from our own app so we don't record the Stop Overlay button clicks
+        if (event.packageName?.toString() == "com.orailnoor.privateagent") return
+        
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_VIEW_CLICKED -> {
+                val node = event.source
+                var text = node?.text?.toString() ?: node?.contentDescription?.toString() ?: ""
+                if (text.isEmpty() && event.text.isNotEmpty()) {
+                    text = event.text.joinToString(" ")
+                }
+                
+                val rect = Rect()
+                node?.getBoundsInScreen(rect)
+                val cx = rect.centerX()
+                val cy = rect.centerY()
+                
+                // Only record if we have valid text or valid coordinates
+                if (text.isNotEmpty() || (cx != 0 || cy != 0)) {
+                    val map = mapOf(
+                        "type" to "click",
+                        "text" to text,
+                        "x" to cx,
+                        "y" to cy
+                    )
+                    listener(map)
+                }
+                node?.recycle()
+            }
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> {
+                val map = mapOf("type" to "scroll")
+                listener(map)
+            }
+        }
     }
 
     override fun onInterrupt() {}
@@ -44,10 +81,20 @@ class AgentAccessibilityService : AccessibilityService() {
 
     /** Dump the current screen as a flat list of UI elements */
     fun dumpScreen(): List<Map<String, Any?>> {
-        val root = rootInActiveWindow ?: return emptyList()
         val nodes = mutableListOf<Map<String, Any?>>()
-        traverseNode(root, nodes, 0)
-        root.recycle()
+        val allWindows = windows
+        if (allWindows == null || allWindows.isEmpty()) {
+            val root = rootInActiveWindow ?: return emptyList()
+            traverseNode(root, nodes, 0)
+            root.recycle()
+            return nodes
+        }
+        
+        for (window in allWindows) {
+            val root = window.root ?: continue
+            traverseNode(root, nodes, 0)
+            root.recycle()
+        }
         return nodes
     }
 
@@ -63,6 +110,17 @@ class AgentAccessibilityService : AccessibilityService() {
         val contentDesc = node.contentDescription?.toString() ?: ""
         val className = node.className?.toString() ?: ""
         val viewId = node.viewIdResourceName ?: ""
+
+        // Filter out completely hidden or zero-size nodes (like scrolled-out WebView elements)
+        val isZeroSize = rect.width() <= 0 || rect.height() <= 0
+        if (!node.isVisibleToUser || isZeroSize) {
+            for (i in 0 until node.childCount) {
+                val child = node.getChild(i) ?: continue
+                traverseNode(child, nodes, depth + 1)
+                child.recycle()
+            }
+            return
+        }
 
         // Only include nodes that have text/description or are interactive
         if (text.isNotEmpty() || contentDesc.isNotEmpty() ||
@@ -158,7 +216,14 @@ class AgentAccessibilityService : AccessibilityService() {
             }
             if (clickTarget != null) {
                 val success = clickTarget.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                return success
+                if (success) return true
+            }
+            
+            // Fallback: If no clickable parent or performAction failed, use gesture on bounds
+            val rect = Rect()
+            node.getBoundsInScreen(rect)
+            if (!rect.isEmpty) {
+                return clickAtCoordinates(rect.centerX().toFloat(), rect.centerY().toFloat())
             }
         }
 
@@ -183,10 +248,15 @@ class AgentAccessibilityService : AccessibilityService() {
         return dispatchGesture(gesture, null, null)
     }
 
-    /** Find an editable field (optionally by hint/nearby text) and type into it */
     fun typeText(text: String, fieldHint: String? = null): Boolean {
         val root = rootInActiveWindow ?: return false
-        val editNode = findEditableNode(root, fieldHint)
+        var editNode = findEditableNode(root, fieldHint)
+        
+        // Fallback: If hint didn't match anything, just grab the first editable node
+        if (editNode == null && !fieldHint.isNullOrEmpty()) {
+            editNode = findEditableNode(root, null)
+        }
+        
         if (editNode != null) {
             editNode.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
             val args = Bundle()
@@ -197,6 +267,26 @@ class AgentAccessibilityService : AccessibilityService() {
         }
         root.recycle()
         return false
+    }
+
+    /** Simulates pressing the Enter/Search key on the keyboard by tapping the bottom right corner of the screen */
+    fun pressEnter(): Boolean {
+        val displayMetrics = resources.displayMetrics
+        val width = displayMetrics.widthPixels.toFloat()
+        val height = displayMetrics.heightPixels.toFloat()
+        
+        // The Enter/Search key is almost universally at the bottom right corner of the keyboard.
+        // We tap at 92% width and 96% height.
+        val x = width * 0.92f
+        val y = height * 0.96f
+        
+        val path = Path().apply {
+            moveTo(x, y)
+        }
+        val gesture = GestureDescription.Builder()
+            .addStroke(GestureDescription.StrokeDescription(path, 0, 100))
+            .build()
+        return dispatchGesture(gesture, null, null)
     }
 
     private fun findEditableNode(

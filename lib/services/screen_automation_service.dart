@@ -57,6 +57,9 @@ class ScreenAutomationService {
     }
     buffer.writeln('Screen elements:');
 
+    int count = 0;
+    // Limit removed as requested by user. Kotlin now filters invisibles, so this is safe.
+
     for (final node in nodes) {
       final index = node['index'];
       final text = node['text'] ?? '';
@@ -66,9 +69,14 @@ class ScreenAutomationService {
       final isEditable = node['isEditable'] == true;
       final isScrollable = node['isScrollable'] == true;
 
-      final displayText = text.isNotEmpty ? text : desc;
+      String displayText = text.isNotEmpty ? text : desc;
       if (displayText.isEmpty && !isClickable && !isEditable && !isScrollable) {
         continue; // Skip empty non-interactive nodes
+      }
+
+      // Truncate very long text to save tokens
+      if (displayText.length > 200) {
+        displayText = '${displayText.substring(0, 200)}...';
       }
 
       final tags = <String>[];
@@ -89,6 +97,101 @@ class ScreenAutomationService {
       }
 
       buffer.writeln('  [$index] $type $label $tagStr$boundsStr');
+      count++;
+    }
+
+    return buffer.toString();
+  }
+
+  /// Get a highly compressed text description of the screen for the LLM
+  Future<String> getCompressedScreenDescription(String task) async {
+    final nodes = await dumpScreen();
+    if (nodes.isEmpty) {
+      return 'Could not read screen. Make sure accessibility service is enabled.';
+    }
+
+    final buffer = StringBuffer();
+    final pkg = await getCurrentPackage();
+    if (pkg != null) {
+      buffer.writeln('APP: $pkg');
+    }
+    
+    // Extract task keywords for highlighting
+    final stopWords = {'to', 'and', 'the', 'a', 'in', 'of', 'for', 'on', 'with', 'at', 'by', 'from', 'go', 'turn', 'open'};
+    final keywords = task.toLowerCase().replaceAll(RegExp(r'[^a-z0-9\s]'), '').split(RegExp(r'\s+')).where((w) => w.isNotEmpty && !stopWords.contains(w)).toList();
+
+    for (final node in nodes) {
+      final index = node['index'];
+      final text = node['text'] ?? '';
+      final desc = node['contentDescription'] ?? '';
+      final className = node['className'] ?? '';
+      final isClickable = node['isClickable'] == true;
+      final isEditable = node['isEditable'] == true;
+      final isScrollable = node['isScrollable'] == true;
+
+      String displayText = text.isNotEmpty ? text : desc;
+      final lowerText = displayText.toLowerCase();
+      
+      // Skip status bar items and internal controls
+      if (lowerText.contains('battery') || 
+          lowerText.contains('percent') ||
+          lowerText.contains('do not disturb') ||
+          lowerText.contains('three bars') ||
+          lowerText == '🛑 stop macro' ||
+          lowerText == 'stop macro' ||
+          RegExp(r'^\d{1,2}:\d{2}$').hasMatch(lowerText)) { // time
+        continue;
+      }
+
+      if (displayText.isEmpty && !isClickable && !isEditable && !isScrollable) {
+        continue; // Skip empty non-interactive nodes
+      }
+
+      // Truncate very long text to save tokens
+      if (displayText.length > 50) {
+        displayText = '${displayText.substring(0, 50)}...';
+      }
+
+      final tags = <String>[];
+      if (isClickable) tags.add('tap');
+      if (isEditable) tags.add('edit');
+      if (isScrollable) tags.add('scroll');
+
+      // Simplify type
+      String type = className.split('.').last;
+      if (type == 'TextView') type = 'text';
+      else if (type == 'Button') type = 'btn';
+      else if (type == 'Switch') type = 'toggle';
+      else if (type == 'ImageView') type = 'img';
+      else if (type == 'EditText') type = 'input';
+      else if (type == 'FrameLayout' || type == 'LinearLayout') type = 'view';
+      else type = type.toLowerCase();
+
+      final label = displayText.isNotEmpty ? '"$displayText"' : '';
+      final tagStr = tags.isNotEmpty ? '[${tags.join(",")}]' : '';
+      
+      // Highlight if matches task
+      bool isTarget = false;
+      if (displayText.isNotEmpty) {
+        for (var kw in keywords) {
+          if (lowerText.contains(kw)) {
+            isTarget = true;
+            break;
+          }
+        }
+      }
+      
+      final targetMark = isTarget ? '*' : '';
+
+      String boundsStr = '';
+      if (node['bounds'] != null) {
+        final b = node['bounds'];
+        final centerX = (b['left'] + b['right']) / 2;
+        final centerY = (b['top'] + b['bottom']) / 2;
+        boundsStr = ' center:(${centerX.round()},${centerY.round()})';
+      }
+
+      buffer.writeln('[$index]$targetMark $type $label $tagStr$boundsStr'.trim().replaceAll(RegExp(r'\s+'), ' '));
     }
 
     return buffer.toString();
@@ -121,6 +224,15 @@ class ScreenAutomationService {
       return await _channel.invokeMethod<bool>(
               'typeText', {'text': text, 'fieldHint': fieldHint}) ??
           false;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  /// Press the Enter/Search key on the keyboard
+  Future<bool> pressEnter() async {
+    try {
+      return await _channel.invokeMethod<bool>('pressEnter') ?? false;
     } catch (e) {
       return false;
     }
@@ -168,6 +280,15 @@ class ScreenAutomationService {
       return await _channel.invokeMethod<bool>('pressHome') ?? false;
     } catch (e) {
       return false;
+    }
+  }
+
+  /// Show a native Android Toast message
+  Future<void> showToast(String message) async {
+    try {
+      await _channel.invokeMethod('showToast', {'message': message});
+    } catch (e) {
+      // ignore
     }
   }
 

@@ -5,12 +5,41 @@ import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import io.flutter.plugin.common.EventChannel
+import android.graphics.PixelFormat
+import android.graphics.Color
+import android.view.Gravity
+import android.view.WindowManager
+import android.view.View
+import android.widget.Button
+import android.net.Uri
 
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.privateagent/accessibility"
+    private val EVENT_CHANNEL = "com.privateagent/accessibility_events"
+    private var eventSink: EventChannel.EventSink? = null
+    private var overlayView: View? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL).setStreamHandler(
+            object : EventChannel.StreamHandler {
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    eventSink = events
+                    AgentAccessibilityService.eventListener = { eventMap ->
+                        runOnUiThread {
+                            eventSink?.success(eventMap)
+                        }
+                    }
+                }
+
+                override fun onCancel(arguments: Any?) {
+                    eventSink = null
+                    AgentAccessibilityService.eventListener = null
+                }
+            }
+        )
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
@@ -18,6 +47,63 @@ class MainActivity : FlutterActivity() {
 
                     "isServiceRunning" -> {
                         result.success(AgentAccessibilityService.isRunning())
+                    }
+
+                    "checkOverlayPermission" -> {
+                        result.success(Settings.canDrawOverlays(this@MainActivity))
+                    }
+
+                    "requestOverlayPermission" -> {
+                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                        result.success(true)
+                    }
+
+                    "showMacroOverlay" -> {
+                        if (Settings.canDrawOverlays(this@MainActivity)) {
+                            if (overlayView == null) {
+                                val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+                                val params = WindowManager.LayoutParams(
+                                    WindowManager.LayoutParams.WRAP_CONTENT,
+                                    WindowManager.LayoutParams.WRAP_CONTENT,
+                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O)
+                                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                                    else
+                                        WindowManager.LayoutParams.TYPE_PHONE,
+                                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
+                                    PixelFormat.TRANSLUCENT
+                                )
+                                params.gravity = Gravity.BOTTOM or Gravity.END
+                                params.x = 50
+                                params.y = 200
+
+                                val btn = Button(this@MainActivity).apply {
+                                    text = "🛑 Stop Macro"
+                                    setBackgroundColor(Color.RED)
+                                    setTextColor(Color.WHITE)
+                                    setPadding(40, 20, 40, 20)
+                                    setOnClickListener {
+                                        // Broadcast stop event
+                                        eventSink?.success(mapOf("type" to "stop_macro"))
+                                    }
+                                }
+                                overlayView = btn
+                                windowManager.addView(overlayView, params)
+                            }
+                            result.success(true)
+                        } else {
+                            result.error("PERMISSION_DENIED", "Overlay permission not granted", null)
+                        }
+                    }
+
+                    "hideMacroOverlay" -> {
+                        if (overlayView != null) {
+                            val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+                            windowManager.removeView(overlayView)
+                            overlayView = null
+                        }
+                        result.success(true)
                     }
 
                     "openAccessibilitySettings" -> {
@@ -88,6 +174,15 @@ class MainActivity : FlutterActivity() {
                         }
                     }
 
+                    "pressEnter" -> {
+                        val service = AgentAccessibilityService.instance
+                        if (service == null) {
+                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                        } else {
+                            result.success(service.pressEnter())
+                        }
+                    }
+
                     "scroll" -> {
                         val direction = call.argument<String>("direction") ?: "down"
                         val target = call.argument<String>("target")
@@ -97,6 +192,12 @@ class MainActivity : FlutterActivity() {
                         } else {
                             result.success(service.scroll(direction, target))
                         }
+                    }
+
+                    "showToast" -> {
+                        val message = call.argument<String>("message") ?: ""
+                        android.widget.Toast.makeText(this@MainActivity, message, android.widget.Toast.LENGTH_SHORT).show()
+                        result.success(true)
                     }
 
                     "swipe" -> {

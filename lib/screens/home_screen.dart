@@ -45,13 +45,38 @@ class _HomeScreenState extends State<HomeScreen> {
       // Check accessibility service
       final accessibilityEnabled =
           await _actionHandler.screenAutomation.isServiceRunning();
+          
+      if (!accessibilityEnabled) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Accessibility Required'),
+              content: const Text('To perform multi-step tasks like opening and navigating apps, PrivateAgent needs Accessibility permission to see the screen and click buttons.'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _actionHandler.screenAutomation.openAccessibilitySettings();
+                  },
+                  child: const Text('Enable Now'),
+                ),
+              ],
+            ),
+          );
+        });
+      }
 
       setState(() {
         _messages.add(ChatMessage(
           role: 'assistant',
           content:
               'Hi! I\'m PrivateAgent. I can help you control your phone.\n\n'
-              '${accessibilityEnabled ? '✅ Screen Control is ACTIVE — I can read and control other apps!' : '⚠️ Screen Control is OFF — Go to Settings to enable it for multi-step tasks.'}\n\n'
+              '${accessibilityEnabled ? '✅ Screen Control is ACTIVE — I can read and control other apps!' : '⚠️ Screen Control is OFF — Enable it for multi-step tasks.'}\n\n'
               'Try saying:\n'
               '• "Open YouTube"\n'
               '• "Call Mom"\n'
@@ -125,8 +150,12 @@ class _HomeScreenState extends State<HomeScreen> {
         ));
       });
     } finally {
-      setState(() => _isLoading = false);
-      _scrollToBottom();
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
     }
   }
 
@@ -178,70 +207,23 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: const Text('PrivateAgent'),
         actions: [
-          // Screen control test button
+          // New Chat
           IconButton(
-            icon: const Icon(Icons.visibility),
-            tooltip: 'Test screen reading',
-            onPressed: () async {
-              final isRunning = await _actionHandler.screenAutomation
-                  .isServiceRunning();
-              if (!isRunning) {
-                setState(() {
-                  _messages.add(ChatMessage(
-                    role: 'assistant',
-                    content:
-                        '❌ Screen Control is not enabled!\n\n'
-                        'To enable it:\n'
-                        '1. Go to Settings (⚙️ icon)\n'
-                        '2. Find "Screen Control (Accessibility)"\n'
-                        '3. Tap "Open Accessibility Settings"\n'
-                        '4. Find "PrivateAgent Screen Control"\n'
-                        '5. Toggle it ON',
-                  ));
-                });
-                _scrollToBottom();
-                return;
-              }
-              setState(() {
-                _messages.add(ChatMessage(
-                  role: 'assistant',
-                  content: '🔍 Reading screen...',
-                ));
-              });
-              _scrollToBottom();
-              final description = await _actionHandler.screenAutomation
-                  .getScreenDescription();
-              setState(() {
-                _messages.add(ChatMessage(
-                  role: 'assistant',
-                  content: '📱 Screen Content:\n\n$description',
-                ));
-              });
-              _scrollToBottom();
-            },
-          ),
-          // Shizuku status indicator
-          if (_actionHandler.shizuku.isAvailable)
-            Padding(
-              padding: const EdgeInsets.only(right: 4),
-              child: Icon(
-                Icons.link,
-                size: 18,
-                color: _actionHandler.shizuku.hasPermission
-                    ? Colors.green
-                    : Colors.orange,
-              ),
-            ),
-          IconButton(
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Clear chat',
+            icon: const Icon(Icons.add_comment),
+            tooltip: 'New Chat',
             onPressed: () {
               setState(() {
                 _messages.clear();
                 _aiService.clearHistory();
+                _messages.add(ChatMessage(
+                  role: 'assistant',
+                  content: '🧹 Context erased. Starting a new chat!',
+                ));
               });
+              _scrollToBottom();
             },
           ),
+          // Settings
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () async {
@@ -269,7 +251,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (!_aiService.isConfigured)
             MaterialBanner(
               content: const Text(
-                'API key not set. Go to Settings to add your DeepSeek API key.',
+                'API not configured. Go to Settings to add your server URL and API key.',
               ),
               leading: const Icon(Icons.warning, color: Colors.orange),
               actions: [
@@ -312,20 +294,32 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
           ),
 
-          // Loading indicator
+          // Loading indicator with Stop button
           if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.all(8),
+            Padding(
+              padding: const EdgeInsets.all(8),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  SizedBox(
+                  const SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  SizedBox(width: 8),
-                  Text('Thinking...', style: TextStyle(color: Colors.grey)),
+                  const SizedBox(width: 8),
+                  const Text('Thinking...', style: TextStyle(color: Colors.grey)),
+                  const SizedBox(width: 12),
+                  TextButton.icon(
+                    onPressed: () {
+                      _actionHandler.cancelTask();
+                    },
+                    icon: const Icon(Icons.stop_circle, size: 18, color: Colors.red),
+                    label: const Text('Stop', style: TextStyle(color: Colors.red)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -335,12 +329,13 @@ class _HomeScreenState extends State<HomeScreen> {
             padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
             decoration: BoxDecoration(
               color: Theme.of(context).colorScheme.surface,
-              border: Border(
-                top: BorderSide(
-                  color: Theme.of(context).dividerColor,
-                  width: 0.5,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, -2),
                 ),
-              ),
+              ],
             ),
             child: SafeArea(
               child: Row(

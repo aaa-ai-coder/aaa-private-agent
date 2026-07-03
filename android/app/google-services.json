@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "55346279602",
+    "project_id": "privateagent-dd445",
+    "storage_bucket": "privateagent-dd445.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:55346279602:android:06569b110a674659a805ab",
+        "android_client_info": {
+          "package_name": "com.orailnoor.privateagent"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB66md05nhluWEQTo-fanxQ5I51Fz-Jcvc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

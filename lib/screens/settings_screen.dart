@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../main.dart';
 import '../services/ai_service.dart';
 import '../services/shizuku_service.dart';
 import '../services/screen_automation_service.dart';
 import '../services/telegram_service.dart';
+import 'task_history_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -34,6 +37,10 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _telegramEnabled = false;
   double _maxSteps = 15;
   bool _disableMaxSteps = false;
+  late TextEditingController _maxTokensController;
+  double _temperature = 1.0;
+  bool _useScreenCompression = true;
+  bool _useSystemPrompt = true;
 
   final Map<String, PermissionStatus> _permissions = {};
 
@@ -50,6 +57,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     _telegramEnabled = widget.telegramService.isEnabled;
     _maxSteps = widget.aiService.rawMaxSteps.toDouble();
     _disableMaxSteps = widget.aiService.disableMaxSteps;
+    _temperature = widget.aiService.temperature;
+    _maxTokensController = TextEditingController(
+      text: widget.aiService.maxTokens.toString(),
+    );
+    _useScreenCompression = widget.aiService.useScreenCompression;
+    _useSystemPrompt = widget.aiService.useSystemPrompt;
     _checkPermissions();
   }
 
@@ -60,6 +73,7 @@ class _SettingsScreenState extends State<SettingsScreen>
     _baseUrlController.dispose();
     _modelController.dispose();
     _telegramTokenController.dispose();
+    _maxTokensController.dispose();
     super.dispose();
   }
 
@@ -105,6 +119,12 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     await widget.aiService.saveMaxSteps(_maxSteps.toInt());
     await widget.aiService.saveDisableMaxSteps(_disableMaxSteps);
+    await widget.aiService.saveAdvancedSettings(
+      temperature: _temperature,
+      maxTokens: int.tryParse(_maxTokensController.text) ?? 1024,
+      useScreenCompression: _useScreenCompression,
+      useSystemPrompt: _useSystemPrompt,
+    );
 
     if (mounted) {
       ScaffoldMessenger.of(
@@ -119,7 +139,9 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     if (baseUrl.isEmpty || apiKey.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter Base URL and API Key first.')),
+        const SnackBar(
+          content: Text('Please enter Base URL and API Key first.'),
+        ),
       );
       return;
     }
@@ -139,7 +161,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     if (models.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No models found or error fetching models.')),
+          const SnackBar(
+            content: Text('No models found or error fetching models.'),
+          ),
         );
       }
       return;
@@ -186,6 +210,47 @@ class _SettingsScreenState extends State<SettingsScreen>
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          // Appearance Settings
+          Text(
+            'Appearance',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          ValueListenableBuilder<ThemeMode>(
+            valueListenable: themeNotifier,
+            builder: (context, currentMode, _) {
+              return SegmentedButton<ThemeMode>(
+                segments: const [
+                  ButtonSegment(
+                    value: ThemeMode.system,
+                    label: Text('System'),
+                    icon: Icon(Icons.brightness_auto),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.light,
+                    label: Text('Light'),
+                    icon: Icon(Icons.light_mode),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.dark,
+                    label: Text('Dark'),
+                    icon: Icon(Icons.dark_mode),
+                  ),
+                ],
+                selected: {currentMode},
+                onSelectionChanged: (Set<ThemeMode> newSelection) async {
+                  final mode = newSelection.first;
+                  themeNotifier.value = mode;
+                  final prefs = await SharedPreferences.getInstance();
+                  await prefs.setString('themeMode', mode.name);
+                },
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+
           // API Settings
           Text(
             'AI Configuration',
@@ -193,13 +258,23 @@ class _SettingsScreenState extends State<SettingsScreen>
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
+          const SizedBox(height: 4),
+          const Text(
+            'PrivateAgent supports ANY OpenAI-compatible API. You can use local models (like Llama/Qwen via LM Studio), DeepSeek, Together AI (for Llama 3), Groq, or OpenRouter.',
+            style: TextStyle(fontSize: 13, color: Colors.grey),
+          ),
           const SizedBox(height: 12),
           TextField(
             controller: _apiKeyController,
             decoration: InputDecoration(
               labelText: 'API Key',
               hintText: 'sk-...',
-              border: const OutlineInputBorder(),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscureKey ? Icons.visibility_off : Icons.visibility,
@@ -212,31 +287,55 @@ class _SettingsScreenState extends State<SettingsScreen>
           const SizedBox(height: 12),
           TextField(
             controller: _baseUrlController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'API Base URL',
               hintText: 'https://api.deepseek.com',
-              border: OutlineInputBorder(),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
             ),
           ),
-          const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             children: [
               ActionChip(
-                label: const Text('DeepSeek', style: TextStyle(fontSize: 12)),
-                onPressed: () => _baseUrlController.text = 'https://api.deepseek.com',
+                label: const Text(
+                  'Local Server',
+                  style: TextStyle(fontSize: 12),
+                ),
+                tooltip: 'For local Llama.cpp or LM Studio',
+                onPressed: () =>
+                    _baseUrlController.text = 'http://192.168.1.X:8080/v1',
               ),
               ActionChip(
-                label: const Text('OpenRouter', style: TextStyle(fontSize: 12)),
-                onPressed: () => _baseUrlController.text = 'https://openrouter.ai/api/v1',
+                label: const Text(
+                  'Together (Llama)',
+                  style: TextStyle(fontSize: 12),
+                ),
+                onPressed: () =>
+                    _baseUrlController.text = 'https://api.together.xyz/v1',
+              ),
+              ActionChip(
+                label: const Text('DeepSeek', style: TextStyle(fontSize: 12)),
+                onPressed: () =>
+                    _baseUrlController.text = 'https://api.deepseek.com',
               ),
               ActionChip(
                 label: const Text('Groq', style: TextStyle(fontSize: 12)),
-                onPressed: () => _baseUrlController.text = 'https://api.groq.com/openai/v1',
+                onPressed: () =>
+                    _baseUrlController.text = 'https://api.groq.com/openai/v1',
               ),
               ActionChip(
-                label: const Text('Local', style: TextStyle(fontSize: 12)),
-                onPressed: () => _baseUrlController.text = 'http://10.0.2.2:1234/v1',
+                label: const Text('Custom', style: TextStyle(fontSize: 12)),
+                tooltip: 'Clear fields to enter custom API details',
+                onPressed: () {
+                  _baseUrlController.clear();
+                  _apiKeyController.clear();
+                  _modelController.clear();
+                },
               ),
             ],
           ),
@@ -246,10 +345,17 @@ class _SettingsScreenState extends State<SettingsScreen>
               Expanded(
                 child: TextField(
                   controller: _modelController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: 'Model',
                     hintText: 'deepseek-chat',
-                    border: OutlineInputBorder(),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide.none,
+                    ),
+                    filled: true,
+                    fillColor: Theme.of(
+                      context,
+                    ).colorScheme.surfaceContainerHighest,
                   ),
                 ),
               ),
@@ -262,7 +368,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
           ),
           const SizedBox(height: 24),
-          
+
           SwitchListTile(
             title: const Text('Disable Maximum Steps'),
             subtitle: const Text(
@@ -294,8 +400,85 @@ class _SettingsScreenState extends State<SettingsScreen>
               },
             ),
           ],
-          
+
+          const Divider(height: 32),
+          Text(
+            'Advanced Model Settings',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 12),
+          SwitchListTile(
+            title: const Text('Use Screen Compression'),
+            subtitle: const Text('Removes unnecessary elements to save tokens'),
+            value: _useScreenCompression,
+            onChanged: (bool value) {
+              setState(() {
+                _useScreenCompression = value;
+              });
+            },
+            contentPadding: EdgeInsets.zero,
+          ),
+          SwitchListTile(
+            title: const Text('Send System Prompt'),
+            subtitle: const Text(
+              'Turn OFF for custom LoRA models trained without it',
+            ),
+            value: _useSystemPrompt,
+            onChanged: (bool value) {
+              setState(() {
+                _useSystemPrompt = value;
+              });
+            },
+            contentPadding: EdgeInsets.zero,
+          ),
+          TextField(
+            controller: _maxTokensController,
+            keyboardType: TextInputType.number,
+            decoration: InputDecoration(
+              labelText: 'Context Limit (Max Tokens)',
+              hintText: '1024',
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Temperature: ${_temperature.toStringAsFixed(2)}',
+            style: const TextStyle(fontWeight: FontWeight.w500),
+          ),
+          Slider(
+            value: _temperature,
+            min: 0.0,
+            max: 2.0,
+            divisions: 20,
+            label: _temperature.toStringAsFixed(2),
+            onChanged: (value) {
+              setState(() {
+                _temperature = value;
+              });
+            },
+          ),
+
+          ListTile(
+            title: const Text('Task History'),
+            subtitle: const Text('View past tasks and their outcomes'),
+            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+            leading: const Icon(Icons.history),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const TaskHistoryScreen(),
+                ),
+              );
+            },
+          ),
           const Divider(height: 32),
 
           // Telegram Settings
@@ -308,10 +491,15 @@ class _SettingsScreenState extends State<SettingsScreen>
           const SizedBox(height: 12),
           TextField(
             controller: _telegramTokenController,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Telegram Bot Token',
               hintText: '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11',
-              border: OutlineInputBorder(),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+              filled: true,
+              fillColor: Theme.of(context).colorScheme.surfaceContainerHighest,
             ),
           ),
           SwitchListTile(
@@ -361,22 +549,23 @@ class _SettingsScreenState extends State<SettingsScreen>
 
           const Divider(height: 32),
 
-          // Shizuku
-          Text(
-            'Shizuku (Optional)',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Shizuku allows extra features like toggling WiFi, force-stopping apps, and running ADB commands without root.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 12),
-          _buildShizukuCard(),
-
-          const Divider(height: 32),
+          // Shizuku (Hidden per user request)
+          if (false) ...[
+            Text(
+              'Shizuku (Optional)',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Shizuku allows extra features like toggling WiFi, force-stopping apps, and running ADB commands without root.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            _buildShizukuCard(),
+            const Divider(height: 32),
+          ],
 
           // About / Links
           Text(
@@ -579,22 +768,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                     label: const Text('Open Accessibility Settings'),
                   ),
                 ] else ...[
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.check_circle,
-                        color: Colors.green,
-                        size: 16,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        'Can read screen, tap, scroll, and type in other apps',
-                        style: TextStyle(
-                          color: Colors.green[700],
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
+                  Text(
+                    'Can read screen, tap, scroll, and type in other apps',
+                    style: TextStyle(color: Colors.green[700], fontSize: 13),
                   ),
                 ],
               ],
