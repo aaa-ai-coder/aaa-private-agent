@@ -25,43 +25,22 @@ class AiService {
   final List<Map<String, String>> _conversationHistory = [];
 
   static const String _systemPrompt = '''
-You are PrivateAgent, a helpful AI assistant that controls an Android phone. You can perform device actions and also have normal conversations.
+You are an AI that controls an Android phone.
+Reply ONLY with a raw JSON object. Do NOT add extra text.
 
-When the user wants to perform a device action, you MUST respond with ONLY a JSON object (no markdown, no code fences, no extra text) in this exact format:
-{"action": "action_name", "params": {"key": "value"}, "response": "What you say to the user"}
+Format: {"action": "action_name", "params": {"key": "value"}, "response": "Message to user"}
 
-Available actions and their params:
+Available actions:
+- launch_package: {"package_name": "com.package.name"}
+- macro_meet: {}
 
-SIMPLE ACTIONS (single step only):
-- open_app: {"app_name": "YouTube"} - ONLY use this when the user JUST wants to open an app and nothing else
-- make_call: {"contact_name": "Mom"} OR {"phone_number": "1234567890"} - Makes a phone call
-- send_sms: {"contact_name": "John", "message": "Hello"} OR {"phone_number": "123", "message": "Hi"} - Sends SMS
-- search_contact: {"query": "John"} - Searches contacts
-- set_alarm: {"hour": 7, "minute": 30, "label": "Wake up"} - Sets an alarm
-- set_volume: {"level": 50} - Sets volume (0-100)
-- set_brightness: {"level": 50} - Sets brightness (0-100)
-- read_screen: {} - Read what's currently on the screen
-- press_back: {} - Press the back button
+EXAMPLES:
 
-MULTI-STEP TASK (for anything that requires more than one action):
-- execute_task: {"goal": "description of the full task"} - Automatically reads screen, taps, scrolls, types step by step
+User: Set up a meeting with Orailnoor on Google Meet.
+{"action": "macro_meet", "params": {}, "response": "Setting up a Google Meet with Orailnoor."}
 
-CRITICAL RULES:
-1. If the user request contains "and" or involves MULTIPLE steps (open + search, open + send, open + find, etc.), you MUST use execute_task. NEVER use open_app for these.
-2. execute_task handles everything: opening apps, finding elements, clicking, typing, scrolling.
-
-Examples of when to use execute_task:
-- "Create a new alarm for 7 AM" → execute_task with goal "Create a new alarm for 7 AM"
-- "Go to YouTube and search for cats" → execute_task
-- "Open WhatsApp and send hello to John" → execute_task
-- "Open Settings and turn on WiFi" → execute_task
-- "Search for restaurants on Google Maps" → execute_task
-
-Examples of when to use open_app:
-- "Open YouTube" → open_app (just opening, no further action)
-- "Open Settings" → open_app (just opening)
-
-For normal conversation (questions, chat, info requests), just respond with plain text naturally.
+User: Open the PrivateLM app and say hi.
+{"action": "launch_package", "params": {"package_name": "com.orailnoor.privatelm"}, "response": "Hi there! Opening PrivateLM."}
 ''';
 
   Future<void> init() async {
@@ -197,7 +176,7 @@ For normal conversation (questions, chat, info requests), just respond with plai
           'temperature': _temperature,
           'max_tokens': _maxTokens,
         }),
-      ).timeout(const Duration(seconds: 45));
+      ).timeout(const Duration(minutes: 30));
 
       if (response.statusCode != 200) {
         String errorMessage = response.body;
@@ -221,8 +200,11 @@ For normal conversation (questions, chat, info requests), just respond with plai
         throw Exception('Unexpected API response format: $data');
       }
 
-      final assistantMessage =
+      String assistantMessage =
           data['choices'][0]['message']['content'] as String;
+
+      // Strip <think> blocks commonly produced by reasoning models
+      assistantMessage = assistantMessage.replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '').trim();
 
       if (assistantMessage.trim().isEmpty) {
         throw Exception('API returned an empty response. This may be due to rate limits or API instability.');
@@ -281,7 +263,7 @@ For normal conversation (questions, chat, info requests), just respond with plai
           'temperature': _temperature,
           'max_tokens': _maxTokens,
         }),
-      ).timeout(const Duration(seconds: 45));
+      ).timeout(const Duration(minutes: 30));
 
       if (response.statusCode != 200) {
         String errorMessage = response.body;
@@ -304,7 +286,10 @@ For normal conversation (questions, chat, info requests), just respond with plai
       if (data is! Map<String, dynamic> || !data.containsKey('choices')) {
         throw Exception('Unexpected API response format: $data');
       }
-      final content = data['choices'][0]['message']['content'] as String;
+      String content = data['choices'][0]['message']['content'] as String;
+      
+      // Strip <think> blocks commonly produced by reasoning models
+      content = content.replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '').trim();
       
       if (content.trim().isEmpty) {
         throw Exception('API returned an empty response. This may be due to strict rate limits or safety filters.');

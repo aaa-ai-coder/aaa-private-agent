@@ -1,11 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'dart:developer';
 import 'screens/home_screen.dart';
+import 'overlay_main.dart';
+
+// Overlay entry point — must be in main.dart for flutter_overlay_window to find it
+@pragma("vm:entry-point")
+void overlayMain() {
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(
+    const MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: OverlayApp(),
+    ),
+  );
+}
 
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
+/// Global callback for overlay tasks — HomeScreen registers its handler here
+void Function(String task)? onOverlayTask;
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Set up overlay listener ASAP so we never miss tasks from the bubble
+  FlutterOverlayWindow.overlayListener.listen((event) {
+    log("Main app received from overlay: $event");
+    if (event is String && event.trim().isNotEmpty) {
+      if (onOverlayTask != null) {
+        onOverlayTask!(event.trim());
+      } else {
+        log("Warning: overlay task received but no handler registered yet");
+      }
+    }
+  });
+
   final prefs = await SharedPreferences.getInstance();
   final themeStr = prefs.getString('themeMode');
   if (themeStr == 'light') {
@@ -18,6 +49,7 @@ void main() async {
 
   runApp(const PrivateAgentApp());
 }
+
 
 class PrivateAgentApp extends StatelessWidget {
   const PrivateAgentApp({super.key});

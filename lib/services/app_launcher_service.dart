@@ -51,6 +51,16 @@ class AppLauncherService {
     }
   }
 
+  /// Open an app by exact package name
+  Future<String> openPackage(String packageName) async {
+    try {
+      await InstalledApps.startApp(packageName);
+      return 'Launched $packageName';
+    } catch (e) {
+      return 'Error launching $packageName: $e';
+    }
+  }
+
   /// Open a URL
   Future<String> openUrl(String url) async {
     try {

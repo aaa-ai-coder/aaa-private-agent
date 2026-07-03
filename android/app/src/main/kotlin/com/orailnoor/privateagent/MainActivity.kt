@@ -41,216 +41,194 @@ class MainActivity : FlutterActivity() {
             }
         )
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
+        registerAccessibilityChannel(flutterEngine, this)
+    }
 
-                    "isServiceRunning" -> {
-                        result.success(AgentAccessibilityService.isRunning())
-                    }
+    companion object {
+        fun registerAccessibilityChannel(flutterEngine: FlutterEngine, context: android.content.Context) {
+            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.privateagent/accessibility")
+                .setMethodCallHandler { call, result ->
+                    when (call.method) {
 
-                    "checkOverlayPermission" -> {
-                        result.success(Settings.canDrawOverlays(this@MainActivity))
-                    }
+                        "isServiceRunning" -> {
+                            result.success(AgentAccessibilityService.isRunning())
+                        }
 
-                    "requestOverlayPermission" -> {
-                        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        startActivity(intent)
-                        result.success(true)
-                    }
+                        "checkOverlayPermission" -> {
+                            result.success(Settings.canDrawOverlays(context))
+                        }
 
-                    "showMacroOverlay" -> {
-                        if (Settings.canDrawOverlays(this@MainActivity)) {
-                            if (overlayView == null) {
-                                val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-                                val params = WindowManager.LayoutParams(
-                                    WindowManager.LayoutParams.WRAP_CONTENT,
-                                    WindowManager.LayoutParams.WRAP_CONTENT,
-                                    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O)
-                                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                                    else
-                                        WindowManager.LayoutParams.TYPE_PHONE,
-                                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL,
-                                    PixelFormat.TRANSLUCENT
-                                )
-                                params.gravity = Gravity.BOTTOM or Gravity.END
-                                params.x = 50
-                                params.y = 200
-
-                                val btn = Button(this@MainActivity).apply {
-                                    text = "🛑 Stop Macro"
-                                    setBackgroundColor(Color.RED)
-                                    setTextColor(Color.WHITE)
-                                    setPadding(40, 20, 40, 20)
-                                    setOnClickListener {
-                                        // Broadcast stop event
-                                        eventSink?.success(mapOf("type" to "stop_macro"))
-                                    }
-                                }
-                                overlayView = btn
-                                windowManager.addView(overlayView, params)
-                            }
+                        "requestOverlayPermission" -> {
+                            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
                             result.success(true)
-                        } else {
-                            result.error("PERMISSION_DENIED", "Overlay permission not granted", null)
                         }
-                    }
 
-                    "hideMacroOverlay" -> {
-                        if (overlayView != null) {
-                            val windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-                            windowManager.removeView(overlayView)
-                            overlayView = null
+                        "showMacroOverlay" -> {
+                            // Macro overlay requires an Activity context, so we just ignore or return error if called from background
+                            result.error("NOT_SUPPORTED", "Macro overlay not supported from background", null)
                         }
-                        result.success(true)
-                    }
 
-                    "openAccessibilitySettings" -> {
-                        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        startActivity(intent)
-                        result.success(true)
-                    }
-
-                    "dumpScreen" -> {
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            val nodes = service.dumpScreen()
-                            result.success(nodes)
+                        "hideMacroOverlay" -> {
+                            result.success(true)
                         }
-                    }
 
-                    "takeScreenshot" -> {
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                                service.takeScreenshot { base64 ->
-                                    if (base64 != null) {
-                                        result.success(base64)
-                                    } else {
-                                        result.error("SCREENSHOT_FAILED", "Failed to capture screenshot", null)
-                                    }
-                                }
+                        "openAccessibilitySettings" -> {
+                            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                            result.success(true)
+                        }
+
+                        "dumpScreen" -> {
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
                             } else {
-                                result.error("UNSUPPORTED_VERSION", "Screenshot requires Android 11 (API 30) or higher", null)
+                                val nodes = service.dumpScreen()
+                                result.success(nodes)
                             }
                         }
-                    }
 
-                    "clickByText" -> {
-                        val text = call.argument<String>("text") ?: ""
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            result.success(service.clickByText(text))
+                        "takeScreenshot" -> {
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            } else {
+                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                                    service.takeScreenshot { base64 ->
+                                        if (base64 != null) {
+                                            result.success(base64)
+                                        } else {
+                                            result.error("SCREENSHOT_FAILED", "Failed to capture screenshot", null)
+                                        }
+                                    }
+                                } else {
+                                    result.error("UNSUPPORTED_VERSION", "Screenshot requires Android 11 (API 30) or higher", null)
+                                }
+                            }
                         }
-                    }
 
-                    "clickAt" -> {
-                        val x = call.argument<Double>("x")?.toFloat() ?: 0f
-                        val y = call.argument<Double>("y")?.toFloat() ?: 0f
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            result.success(service.clickAtCoordinates(x, y))
+                        "clickByText" -> {
+                            val text = call.argument<String>("text") ?: ""
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            } else {
+                                result.success(service.clickByText(text))
+                            }
                         }
-                    }
 
-                    "typeText" -> {
-                        val text = call.argument<String>("text") ?: ""
-                        val hint = call.argument<String>("fieldHint")
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            result.success(service.typeText(text, hint))
+                        "clickAt" -> {
+                            val x = call.argument<Double>("x")?.toFloat() ?: 0f
+                            val y = call.argument<Double>("y")?.toFloat() ?: 0f
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            } else {
+                                result.success(service.clickAtCoordinates(x, y))
+                            }
                         }
-                    }
 
-                    "pressEnter" -> {
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            result.success(service.pressEnter())
+                        "typeText" -> {
+                            val text = call.argument<String>("text") ?: ""
+                            val hint = call.argument<String>("fieldHint")
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            } else {
+                                result.success(service.typeText(text, hint))
+                            }
                         }
-                    }
 
-                    "scroll" -> {
-                        val direction = call.argument<String>("direction") ?: "down"
-                        val target = call.argument<String>("target")
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            result.success(service.scroll(direction, target))
+                        "pressEnter" -> {
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            } else {
+                                result.success(service.pressEnter())
+                            }
                         }
-                    }
 
-                    "showToast" -> {
-                        val message = call.argument<String>("message") ?: ""
-                        android.widget.Toast.makeText(this@MainActivity, message, android.widget.Toast.LENGTH_SHORT).show()
-                        result.success(true)
-                    }
-
-                    "swipe" -> {
-                        val startX = call.argument<Double>("startX")?.toFloat() ?: 0f
-                        val startY = call.argument<Double>("startY")?.toFloat() ?: 0f
-                        val endX = call.argument<Double>("endX")?.toFloat() ?: 0f
-                        val endY = call.argument<Double>("endY")?.toFloat() ?: 0f
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            result.success(service.swipe(startX, startY, endX, endY))
+                        "scroll" -> {
+                            val direction = call.argument<String>("direction") ?: "down"
+                            val target = call.argument<String>("target")
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            } else {
+                                result.success(service.scroll(direction, target))
+                            }
                         }
-                    }
 
-                    "pressBack" -> {
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            result.success(service.pressBack())
+                        "showToast" -> {
+                            val message = call.argument<String>("message") ?: ""
+                            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
+                            result.success(true)
                         }
-                    }
 
-                    "pressHome" -> {
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            result.success(service.pressHome())
+                        "swipe" -> {
+                            val startX = call.argument<Double>("startX")?.toFloat() ?: 0f
+                            val startY = call.argument<Double>("startY")?.toFloat() ?: 0f
+                            val endX = call.argument<Double>("endX")?.toFloat() ?: 0f
+                            val endY = call.argument<Double>("endY")?.toFloat() ?: 0f
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            } else {
+                                result.success(service.swipe(startX, startY, endX, endY))
+                            }
                         }
-                    }
 
-                    "openNotifications" -> {
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            result.success(service.openNotifications())
+                        "pressBack" -> {
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            } else {
+                                result.success(service.pressBack())
+                            }
                         }
-                    }
 
-                    "getCurrentPackage" -> {
-                        val service = AgentAccessibilityService.instance
-                        if (service == null) {
-                            result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                        } else {
-                            result.success(service.getCurrentPackage())
+                        "pressHome" -> {
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            } else {
+                                result.success(service.pressHome())
+                            }
                         }
-                    }
 
-                    else -> result.notImplemented()
+                        "openNotifications" -> {
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            } else {
+                                result.success(service.openNotifications())
+                            }
+                        }
+
+                        "getCurrentPackage" -> {
+                            val service = AgentAccessibilityService.instance
+                            if (service == null) {
+                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            } else {
+                                result.success(service.getCurrentPackage())
+                            }
+                        }
+
+                        else -> result.notImplemented()
+                    }
                 }
-            }
+        }
+    }
+}
+
+class BackgroundEngineReceiver : android.content.BroadcastReceiver() {
+    override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+        val engine = io.flutter.embedding.engine.FlutterEngineCache.getInstance().get("myCachedEngine")
+        if (engine != null) {
+            MainActivity.registerAccessibilityChannel(engine, context)
+        }
     }
 }

@@ -8,6 +8,7 @@ import '../services/screen_automation_service.dart';
 import '../services/telegram_service.dart';
 import 'task_history_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 class SettingsScreen extends StatefulWidget {
   final AiService aiService;
@@ -41,6 +42,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   double _temperature = 1.0;
   bool _useScreenCompression = true;
   bool _useSystemPrompt = true;
+  bool _floatingIconEnabled = false;
 
   final Map<String, PermissionStatus> _permissions = {};
 
@@ -64,6 +66,16 @@ class _SettingsScreenState extends State<SettingsScreen>
     _useScreenCompression = widget.aiService.useScreenCompression;
     _useSystemPrompt = widget.aiService.useSystemPrompt;
     _checkPermissions();
+    _checkOverlayStatus();
+  }
+
+  Future<void> _checkOverlayStatus() async {
+    bool isActive = await FlutterOverlayWindow.isActive();
+    if (mounted) {
+      setState(() {
+        _floatingIconEnabled = isActive;
+      });
+    }
   }
 
   @override
@@ -479,6 +491,58 @@ class _SettingsScreenState extends State<SettingsScreen>
               );
             },
           ),
+          const Divider(height: 32),
+
+          // Floating Assistant Settings
+          Text(
+            'Floating Assistant',
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 12),
+          SwitchListTile(
+            title: const Text('Enable Floating Agent Icon'),
+            subtitle: const Text('Assign tasks without opening the app'),
+            value: _floatingIconEnabled,
+            onChanged: (val) async {
+              if (val) {
+                bool? isGranted = await FlutterOverlayWindow.isPermissionGranted();
+                if (isGranted != true) {
+                  bool? result = await FlutterOverlayWindow.requestPermission();
+                  if (result != true) {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Permission to draw over other apps is required.')),
+                      );
+                    }
+                    return;
+                  }
+                }
+                
+                if (await FlutterOverlayWindow.isActive() == false) {
+                  await FlutterOverlayWindow.showOverlay(
+                    enableDrag: true,
+                    overlayTitle: "PrivateAgent",
+                    overlayContent: "Floating Assistant",
+                    flag: OverlayFlag.focusPointer,
+                    alignment: OverlayAlignment.centerRight,
+                    visibility: NotificationVisibility.visibilitySecret,
+                    positionGravity: PositionGravity.auto,
+                    width: 56,
+                    height: 56,
+                  );
+                }
+              } else {
+                if (await FlutterOverlayWindow.isActive() == true) {
+                  await FlutterOverlayWindow.closeOverlay();
+                }
+              }
+              setState(() => _floatingIconEnabled = val);
+            },
+            contentPadding: EdgeInsets.zero,
+          ),
+
           const Divider(height: 32),
 
           // Telegram Settings

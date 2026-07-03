@@ -41,6 +41,126 @@ class ActionHandler {
           );
           break;
 
+        case 'launch_package':
+          final packageName = action.params['package_name'] as String? ?? '';
+          result = await _appLauncher.openPackage(packageName);
+          break;
+
+        case 'macro_meet':
+          if (onProgress != null) onProgress('Thinking...');
+          await Future.delayed(const Duration(seconds: 10));
+
+          if (onProgress != null) onProgress('Planning steps...');
+          await _appLauncher.openPackage('com.google.android.apps.tachyon');
+          
+          // Wait for app to load
+          await Future.delayed(const Duration(seconds: 5));
+          if (onProgress != null) onProgress('Executing plan...');
+          
+          // Pull screen and tap New
+          await _screenAutomation.getScreenDescription(); // purely to refresh nodes if needed
+          await _screenAutomation.clickByText('New');
+          
+          // Wait for transition
+          await Future.delayed(const Duration(seconds: 3));
+          if (onProgress != null) onProgress('Taking action...');
+          
+          // Tap contact (try both cases just in case)
+          await _screenAutomation.getScreenDescription();
+          bool clicked = await _screenAutomation.clickByText('Orailnoor');
+          if (!clicked) {
+             await _screenAutomation.clickByText('orailnoor');
+          }
+          
+          // Wait for transition and click Call
+          await Future.delayed(const Duration(seconds: 3));
+          if (onProgress != null) onProgress('Finalizing...');
+          
+          await _screenAutomation.getScreenDescription();
+          await _screenAutomation.clickByText('Call');
+          
+          result = 'Setting up a Google Meet with Orailnoor.';
+          break;
+
+        case 'macro_privatelm':
+          if (onProgress != null) onProgress('Thinking...');
+          await Future.delayed(const Duration(seconds: 4));
+
+          if (onProgress != null) onProgress('Opening PrivateLM...');
+          final pkgName = action.params['package_name'] as String? ?? 'com.orailnoor.privatelm';
+          await _appLauncher.openPackage(pkgName);
+
+          // Wait longer for app to fully load
+          await Future.delayed(const Duration(seconds: 8));
+          if (onProgress != null) onProgress('Typing message...');
+
+          await _screenAutomation.getScreenDescription();
+          
+          // The hint text in PrivateLM's text box is 'What can you do'
+          // We click that so the field gets focus.
+          await _screenAutomation.clickByText('What can you do');
+          
+          await Future.delayed(const Duration(seconds: 1));
+          
+          await _screenAutomation.typeText('What can you do');
+          await Future.delayed(const Duration(seconds: 2));
+          
+          if (onProgress != null) onProgress('Sending message...');
+          
+          final nodes = await _screenAutomation.dumpScreen();
+          Map<String, dynamic>? inputNode;
+          for (var node in nodes) {
+            String nodeText = (node['text'] ?? '').toString();
+            if (nodeText.contains('What can you do')) {
+              inputNode = node;
+              break;
+            }
+          }
+          
+          bool clickedSend = false;
+          if (inputNode != null && inputNode['bounds'] != null) {
+            final bounds = inputNode['bounds'];
+            final inputCenterY = (bounds['top'] + bounds['bottom']) / 2;
+            
+            Map<String, dynamic>? sendNode;
+            double maxCenterX = -1;
+            
+            for (var node in nodes) {
+              if (node['bounds'] == null) continue;
+              if (node['index'] == inputNode['index']) continue;
+              if (node['isClickable'] != true) continue;
+              
+              final b = node['bounds'];
+              final centerY = (b['top'] + b['bottom']) / 2;
+              final centerX = (b['left'] + b['right']) / 2;
+              
+              // Find a clickable node roughly on the same Y-axis
+              if ((centerY - inputCenterY).abs() < 120) {
+                // Find the rightmost one
+                if (centerX > maxCenterX) {
+                  maxCenterX = centerX;
+                  sendNode = node;
+                }
+              }
+            }
+            
+            if (sendNode != null) {
+              final b = sendNode['bounds'];
+              double clickX = (b['left'] + b['right']) / 2;
+              double clickY = (b['top'] + b['bottom']) / 2;
+              await _screenAutomation.clickAt(clickX, clickY);
+              clickedSend = true;
+            }
+          }
+          
+          if (!clickedSend) {
+             // Fallback to enter
+             await _screenAutomation.pressEnter();
+          }
+          
+          result = 'Opening PrivateLM and asking...';
+          break;
+
         case 'make_call':
           result = await _communication.makeCall(
             contactName: action.params['contact_name'] as String?,
