@@ -272,7 +272,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           ),
           const SizedBox(height: 4),
           const Text(
-            'PrivateAgent supports ANY OpenAI-compatible API. You can use local models (like Llama/Qwen via LM Studio), DeepSeek, Together AI (for Llama 3), Groq, or OpenRouter.',
+            'PrivateAgent supports ANY OpenAI-compatible API. You can use local models (like Llama/Qwen via LM Studio), DeepSeek, Ollama Cloud, Groq, or OpenRouter.',
             style: TextStyle(fontSize: 13, color: Colors.grey),
           ),
           const SizedBox(height: 12),
@@ -324,11 +324,13 @@ class _SettingsScreenState extends State<SettingsScreen>
               ),
               ActionChip(
                 label: const Text(
-                  'Together (Llama)',
+                  'Ollama Cloud',
                   style: TextStyle(fontSize: 12),
                 ),
-                onPressed: () =>
-                    _baseUrlController.text = 'https://api.together.xyz/v1',
+                onPressed: () {
+                  _baseUrlController.text = 'https://ollama.com/v1';
+                  _modelController.text = 'gemma3:4b';
+                },
               ),
               ActionChip(
                 label: const Text('DeepSeek', style: TextStyle(fontSize: 12)),
@@ -495,7 +497,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
           // Floating Assistant Settings
           Text(
-            'Floating Assistant',
+            'Floating Assistant (Experimental)',
             style: Theme.of(
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
@@ -507,19 +509,24 @@ class _SettingsScreenState extends State<SettingsScreen>
             value: _floatingIconEnabled,
             onChanged: (val) async {
               if (val) {
-                bool? isGranted = await FlutterOverlayWindow.isPermissionGranted();
+                bool? isGranted =
+                    await FlutterOverlayWindow.isPermissionGranted();
                 if (isGranted != true) {
                   bool? result = await FlutterOverlayWindow.requestPermission();
                   if (result != true) {
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Permission to draw over other apps is required.')),
+                        const SnackBar(
+                          content: Text(
+                            'Permission to draw over other apps is required.',
+                          ),
+                        ),
                       );
                     }
                     return;
                   }
                 }
-                
+
                 if (await FlutterOverlayWindow.isActive() == false) {
                   await FlutterOverlayWindow.showOverlay(
                     enableDrag: true,

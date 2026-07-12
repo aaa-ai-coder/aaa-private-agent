@@ -25,22 +25,43 @@ class AiService {
   final List<Map<String, String>> _conversationHistory = [];
 
   static const String _systemPrompt = '''
-You are an AI that controls an Android phone.
-Reply ONLY with a raw JSON object. Do NOT add extra text.
+You are PrivateAgent, a helpful AI assistant that controls an Android phone. You can perform device actions and also have normal conversations.
 
-Format: {"action": "action_name", "params": {"key": "value"}, "response": "Message to user"}
+When the user wants to perform a device action, you MUST respond with ONLY a JSON object (no markdown, no code fences, no extra text) in this exact format:
+{"action": "action_name", "params": {"key": "value"}, "response": "What you say to the user"}
 
-Available actions:
-- launch_package: {"package_name": "com.package.name"}
-- macro_meet: {}
+Available actions and their params:
 
-EXAMPLES:
+SIMPLE ACTIONS (single step only):
+- open_app: {"app_name": "YouTube"} - ONLY use this when the user JUST wants to open an app and nothing else
+- make_call: {"contact_name": "Mom"} OR {"phone_number": "1234567890"} - Makes a phone call
+- send_sms: {"contact_name": "John", "message": "Hello"} OR {"phone_number": "123", "message": "Hi"} - Sends SMS
+- search_contact: {"query": "John"} - Searches contacts
+- set_alarm: {"hour": 7, "minute": 30, "label": "Wake up"} - Sets an alarm
+- set_volume: {"level": 50} - Sets volume (0-100)
+- set_brightness: {"level": 50} - Sets brightness (0-100)
+- read_screen: {} - Read what's currently on the screen
+- press_back: {} - Press the back button
 
-User: Set up a meeting with Orailnoor on Google Meet.
-{"action": "macro_meet", "params": {}, "response": "Setting up a Google Meet with Orailnoor."}
+MULTI-STEP TASK (for anything that requires more than one action):
+- execute_task: {"goal": "description of the full task"} - Automatically reads screen, taps, scrolls, types step by step
 
-User: Open the PrivateLM app and say hi.
-{"action": "launch_package", "params": {"package_name": "com.orailnoor.privatelm"}, "response": "Hi there! Opening PrivateLM."}
+CRITICAL RULES:
+1. If the user request contains "and" or involves MULTIPLE steps (open + search, open + send, open + find, etc.), you MUST use execute_task. NEVER use open_app for these.
+2. execute_task handles everything: opening apps, finding elements, clicking, typing, scrolling.
+
+Examples of when to use execute_task:
+- "Create a new alarm for 7 AM" → execute_task with goal "Create a new alarm for 7 AM"
+- "Go to YouTube and search for cats" → execute_task
+- "Open WhatsApp and send hello to John" → execute_task
+- "Open Settings and turn on WiFi" → execute_task
+- "Search for restaurants on Google Maps" → execute_task
+
+Examples of when to use open_app:
+- "Open YouTube" → open_app (just opening, no further action)
+- "Open Settings" → open_app (just opening)
+
+For normal conversation (questions, chat, info requests), just respond with plain text naturally.
 ''';
 
   Future<void> init() async {
@@ -162,6 +183,15 @@ User: Open the PrivateLM app and say hi.
         }
       }
 
+      final requestBody = jsonEncode({
+        'model': _model,
+        'messages': messages,
+        'temperature': _temperature,
+        'max_tokens': _maxTokens,
+      });
+
+      developer.log('API Request: $requestUrl\n$requestBody', name: 'AiService');
+
       final response = await http.post(
         Uri.parse(requestUrl),
         headers: {
@@ -170,13 +200,10 @@ User: Open the PrivateLM app and say hi.
           'HTTP-Referer': 'https://github.com/orailnoor/private-agent',
           'X-Title': 'PrivateAgent',
         },
-        body: jsonEncode({
-          'model': _model,
-          'messages': messages,
-          'temperature': _temperature,
-          'max_tokens': _maxTokens,
-        }),
+        body: requestBody,
       ).timeout(const Duration(minutes: 30));
+
+      developer.log('API Response [${response.statusCode}]: ${response.body}', name: 'AiService');
 
       if (response.statusCode != 200) {
         String errorMessage = response.body;

@@ -1,4 +1,5 @@
 import 'package:flutter/services.dart';
+import 'dart:developer' as developer;
 
 /// Dart bridge to the native AccessibilityService.
 /// Provides screen reading, UI element interaction, and gesture control.
@@ -194,7 +195,9 @@ class ScreenAutomationService {
       buffer.writeln('[$index]$targetMark $type $label $tagStr$boundsStr'.trim().replaceAll(RegExp(r'\s+'), ' '));
     }
 
-    return buffer.toString();
+    final screenString = buffer.toString();
+    developer.log('Screen Dump Extracted:\n$screenString', name: 'ScreenAutomation');
+    return screenString;
   }
 
   /// Click an element by its visible text
