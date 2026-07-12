@@ -51,3 +51,4 @@ venv/
 __pycache__/
 training_tasks.md
 enrich_dataset_prompt.md
+google-services.json
