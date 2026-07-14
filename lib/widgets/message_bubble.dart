@@ -25,15 +25,36 @@ class MessageBubble extends StatelessWidget {
         ),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isUser
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.surfaceContainerHighest,
+          color: isUser ? null : Theme.of(context).colorScheme.surface,
+          gradient: isUser
+              ? LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(20),
             topRight: const Radius.circular(20),
-            bottomLeft: Radius.circular(isUser ? 20 : 6),
-            bottomRight: Radius.circular(isUser ? 6 : 20),
+            bottomLeft: Radius.circular(isUser ? 20 : 4),
+            bottomRight: Radius.circular(isUser ? 4 : 20),
           ),
+          border: isUser
+              ? null
+              : Border.all(
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+                  width: 1.2,
+                ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(Theme.of(context).brightness == Brightness.dark ? 0.15 : 0.02),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -41,35 +62,42 @@ class MessageBubble extends StatelessWidget {
             // Action result badge
             if (message.actionResult != null) ...[
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 margin: const EdgeInsets.only(bottom: 8),
                 decoration: BoxDecoration(
                   color: message.actionResult!.success
-                      ? Colors.green.withValues(alpha: 0.15)
-                      : Colors.red.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(12),
+                      ? Colors.green.withOpacity(0.12)
+                      : Colors.red.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: message.actionResult!.success
+                        ? Colors.green.withOpacity(0.3)
+                        : Colors.red.withOpacity(0.3),
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
                       message.actionResult!.success
-                          ? Icons.check_circle_outline
-                          : Icons.error_outline,
+                          ? Icons.check_circle_rounded
+                          : Icons.error_rounded,
                       size: 14,
                       color: message.actionResult!.success
                           ? Colors.green
                           : Colors.red,
                     ),
-                    const SizedBox(width: 4),
+                    const SizedBox(width: 6),
                     Text(
-                      message.actionResult!.actionType.replaceAll('_', ' '),
+                      message.actionResult!.actionType.toUpperCase().replaceAll('_', ' '),
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 10,
                         color: message.actionResult!.success
                             ? Colors.green
                             : Colors.red,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.5,
                       ),
                     ),
                   ],

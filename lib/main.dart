@@ -61,12 +61,16 @@ class PrivateAgentApp extends StatelessWidget {
           themeMode: currentMode,
           theme: ThemeData(
             brightness: Brightness.light,
-            primaryColor: Colors.black,
-            scaffoldBackgroundColor: const Color(0xFFFFFFFF),
+            primaryColor: const Color(0xFF4F46E5), // Indigo-600
+            scaffoldBackgroundColor: const Color(
+              0xFFF8FAFC,
+            ), // Slate-50 background
             colorScheme: const ColorScheme.light(
-              primary: Colors.black,
-              secondary: Colors.black,
+              primary: Color(0xFF4F46E5), // Indigo-600
+              secondary: Color(0xFF0EA5E9), // Sky-500
               surface: Color(0xFFFFFFFF),
+              onSurface: Color(0xFF1E293B), // Slate-800
+              surfaceContainerHighest: Color(0xFFF1F5F9), // Slate-100
               error: Colors.redAccent,
             ),
             useMaterial3: true,
@@ -74,9 +78,9 @@ class PrivateAgentApp extends StatelessWidget {
               centerTitle: true,
               elevation: 0,
               scrolledUnderElevation: 0,
-              backgroundColor: Color(0xFFFFFFFF),
-              foregroundColor: Colors.black,
-              iconTheme: IconThemeData(color: Colors.black),
+              backgroundColor: Colors.transparent,
+              foregroundColor: Color(0xFF1E293B),
+              iconTheme: IconThemeData(color: Color(0xFF1E293B)),
               systemOverlayStyle: SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
                 statusBarIconBrightness: Brightness.dark,
@@ -87,21 +91,36 @@ class PrivateAgentApp extends StatelessWidget {
               elevation: 0,
               color: const Color(0xFFFFFFFF),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: const BorderSide(color: Color(0xFFE2E2E8), width: 1.5),
+                borderRadius: BorderRadius.circular(20),
+                side: const BorderSide(
+                  color: Color(0xFFE2E8F0),
+                  width: 1.2,
+                ), // Slate-200
               ),
             ),
           ),
           darkTheme: ThemeData(
-            colorScheme: ColorScheme.fromSeed(
-              seedColor: Colors.indigo,
-              brightness: Brightness.dark,
+            brightness: Brightness.dark,
+            primaryColor: const Color(0xFF6366F1), // Indigo-500
+            scaffoldBackgroundColor: const Color(
+              0xFF0B0F19,
+            ), // Midnight deep slate
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF6366F1), // Indigo-500
+              secondary: Color(0xFF38BDF8), // Sky-400
+              surface: Color(0xFF151D30), // Midnight gray-blue card background
+              onSurface: Color(0xFFF8FAFC), // Slate-50 text
+              surfaceContainerHighest: Color(0xFF1E293B), // Slate-800
+              error: Colors.redAccent,
             ),
             useMaterial3: true,
             appBarTheme: const AppBarTheme(
               centerTitle: true,
               elevation: 0,
               scrolledUnderElevation: 0,
+              backgroundColor: Colors.transparent,
+              foregroundColor: Color(0xFFF8FAFC),
+              iconTheme: IconThemeData(color: Color(0xFFF8FAFC)),
               systemOverlayStyle: SystemUiOverlayStyle(
                 statusBarColor: Colors.transparent,
                 statusBarIconBrightness: Brightness.light,
@@ -110,17 +129,19 @@ class PrivateAgentApp extends StatelessWidget {
             ),
             cardTheme: CardThemeData(
               elevation: 0,
+              color: const Color(0xFF151D30),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: Colors.white.withValues(alpha: 0.05)),
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: const Color(0xFF243049).withOpacity(0.4),
+                  width: 1.2,
+                ),
               ),
-              color: const Color(
-                0xFF1E1E24,
-              ), // Slightly lighter than pure black for depth
             ),
-            scaffoldBackgroundColor: const Color(0xFF121212),
           ),
-          home: onboardingCompleted ? const HomeScreen() : const OnboardingScreen(),
+          home: onboardingCompleted
+              ? const HomeScreen()
+              : const OnboardingScreen(),
         );
       },
     );

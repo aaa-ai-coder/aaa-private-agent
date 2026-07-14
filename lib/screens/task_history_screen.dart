@@ -102,17 +102,17 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
                   children: [
                     if (_analytics != null && _analytics!['totalTasks'] > 0)
                       Padding(
-                        padding: const EdgeInsets.all(8.0),
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                         child: Card(
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
                               children: [
-                                _buildStatColumn('Total', _analytics!['totalTasks'].toString()),
-                                _buildStatColumn('Success', _analytics!['successCount'].toString(), color: Colors.green),
-                                _buildStatColumn('Failed', _analytics!['failedCount'].toString(), color: Colors.red),
-                                _buildStatColumn('Rate', '${(_analytics!['successRate'] * 100).toStringAsFixed(1)}%'),
+                                _buildStatColumn('Total', _analytics!['totalTasks'].toString(), isDark: Theme.of(context).brightness == Brightness.dark),
+                                _buildStatColumn('Success', _analytics!['successCount'].toString(), color: Colors.green, isDark: Theme.of(context).brightness == Brightness.dark),
+                                _buildStatColumn('Failed', _analytics!['failedCount'].toString(), color: Colors.red, isDark: Theme.of(context).brightness == Brightness.dark),
+                                _buildStatColumn('Rate', '${(_analytics!['successRate'] * 100).toStringAsFixed(1)}%', isDark: Theme.of(context).brightness == Brightness.dark),
                               ],
                             ),
                           ),
@@ -133,10 +133,17 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
                           return Card(
                             margin: const EdgeInsets.only(bottom: 16),
                             child: ExpansionTile(
-                              leading: Icon(
-                                _getStatusIcon(status),
-                                color: _getStatusColor(status),
-                                size: 32,
+                              leading: Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: _getStatusColor(status).withOpacity(0.12),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Icon(
+                                  _getStatusIcon(status),
+                                  color: _getStatusColor(status),
+                                  size: 24,
+                                ),
                               ),
                               title: Text(
                                 task['goal'] ?? 'Unknown Goal',
@@ -156,28 +163,65 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
                                       ),
                                       child: Text(
                                         '${task['total_tokens'] ?? 0} tokens',
-                                        style: const TextStyle(fontSize: 12),
+                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
                                       ),
                                     ),
                                   ],
                                 ),
                               ),
                               children: [
-                                const Divider(),
                                 Padding(
                                   padding: const EdgeInsets.all(16.0),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
-                                      Text('Status: $status', style: TextStyle(color: _getStatusColor(status), fontWeight: FontWeight.bold)),
+                                      Row(
+                                        children: [
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: _getStatusColor(status).withOpacity(0.12),
+                                              borderRadius: BorderRadius.circular(8),
+                                              border: Border.all(color: _getStatusColor(status).withOpacity(0.3)),
+                                            ),
+                                            child: Text(
+                                              status.toUpperCase(),
+                                              style: TextStyle(
+                                                color: _getStatusColor(status),
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 10,
+                                                letterSpacing: 0.5,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Text(
+                                            'Steps taken: ${task['steps_taken'] ?? 0}',
+                                            style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(height: 20),
+                                      const Text(
+                                        'Execution Trace:',
+                                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      ),
                                       const SizedBox(height: 8),
-                                      Text('Steps taken: ${task['steps_taken'] ?? 0}'),
-                                      const SizedBox(height: 16),
-                                      const Text('Execution Trace:', style: TextStyle(fontWeight: FontWeight.bold)),
-                                      const SizedBox(height: 8),
-                                      ...((task['trace'] as List<dynamic>?) ?? []).map((t) => Padding(
-                                        padding: const EdgeInsets.only(bottom: 4.0),
-                                        child: Text('• $t', style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+                                      ...((task['trace'] as List<dynamic>?) ?? []).map((t) => Container(
+                                        margin: const EdgeInsets.only(bottom: 6),
+                                        padding: const EdgeInsets.all(10),
+                                        decoration: BoxDecoration(
+                                          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          '• $t',
+                                          style: TextStyle(
+                                            fontFamily: 'monospace',
+                                            fontSize: 12,
+                                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.85),
+                                          ),
+                                        ),
                                       )),
                                     ],
                                   ),
@@ -193,12 +237,38 @@ class _TaskHistoryScreenState extends State<TaskHistoryScreen> {
     );
   }
 
-  Widget _buildStatColumn(String label, String value, {Color? color}) {
-    return Column(
-      children: [
-        Text(value, style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-      ],
+  Widget _buildStatColumn(String label, String value, {Color? color, required bool isDark}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.06),
+        ),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: color ?? (isDark ? Colors.white : const Color(0xFF1E293B)),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(
+              fontSize: 9,
+              fontWeight: FontWeight.w800,
+              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              letterSpacing: 0.5,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -362,9 +362,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ? const Color(0xFF0C0A15)
           : const Color(0xFFFFFFFF),
       appBar: AppBar(
-        title: const Text(
-          'PrivateAgent',
-          style: TextStyle(fontWeight: FontWeight.bold),
+        title: RichText(
+          text: TextSpan(
+            style: TextStyle(
+              fontSize: 20,
+              color: isDark ? Colors.white : const Color(0xFF1E293B),
+            ),
+            children: [
+              TextSpan(
+                text: 'Private',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: Theme.of(context).colorScheme.primary,
+                  letterSpacing: -0.5,
+                ),
+              ),
+              const TextSpan(
+                text: 'Agent',
+                style: TextStyle(
+                  fontWeight: FontWeight.w400,
+                  letterSpacing: -0.5,
+                ),
+              ),
+            ],
+          ),
         ),
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
@@ -376,12 +397,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ),
         actions: [
-          // New Chat Action
-          IconButton(
-            icon: const Icon(Icons.add_comment_rounded),
-            tooltip: 'New Chat',
-            onPressed: _startNewChat,
-          ),
           // Settings Action
           IconButton(
             icon: const Icon(Icons.settings_rounded),
@@ -567,14 +582,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildDrawer(BuildContext context, bool isDark) {
-    final drawerBg = isDark ? const Color(0xFF0C0A15) : const Color(0xFFF5F6FC);
+    final drawerBg = isDark ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFC);
     final textStyle = TextStyle(
-      color: isDark ? const Color(0xFFC7C5D5) : const Color(0xFF4C4A5A),
+      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
       fontWeight: FontWeight.w600,
       fontSize: 13.5,
     );
     final headerStyle = TextStyle(
-      color: isDark ? Colors.white : Colors.black87,
+      color: isDark ? Colors.white : const Color(0xFF1E293B),
       fontSize: 17,
       fontWeight: FontWeight.w900,
       letterSpacing: -0.5,
@@ -595,9 +610,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             alignment: Alignment.centerLeft,
             child: Row(
               children: [
-                const Icon(
+                Icon(
                   Icons.smart_toy_rounded,
-                  color: Colors.indigoAccent,
+                  color: Theme.of(context).primaryColor,
                   size: 26,
                 ),
                 const SizedBox(width: 12),
@@ -612,13 +627,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                color: isDark ? Colors.white : Colors.black,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.08)
-                      : Colors.black.withOpacity(0.08),
+                gradient: LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
                 ),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  )
+                ],
               ),
               child: Material(
                 color: Colors.transparent,
@@ -628,21 +650,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     _startNewChat();
                   },
                   borderRadius: BorderRadius.circular(16),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(
                           Icons.add_comment_rounded,
-                          color: isDark ? Colors.black : Colors.white,
+                          color: Colors.white,
                           size: 16,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           'New Chat',
                           style: TextStyle(
-                            color: isDark ? Colors.black : Colors.white,
+                            color: Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 13.5,
                           ),
@@ -667,7 +689,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  color: isDark ? Colors.indigoAccent : Colors.indigo,
+                  color: Theme.of(context).primaryColor,
                   letterSpacing: 1.5,
                 ),
               ),
@@ -706,11 +728,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                       decoration: BoxDecoration(
                         color: isCurrent
-                            ? (isDark
-                                  ? Colors.white.withOpacity(0.04)
-                                  : Colors.black.withOpacity(0.03))
+                            ? Theme.of(context).colorScheme.primary.withOpacity(0.08)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(12),
+                        border: isCurrent
+                            ? Border.all(color: Theme.of(context).colorScheme.primary.withOpacity(0.15))
+                            : null,
                       ),
                       child: ListTile(
                         contentPadding: const EdgeInsets.symmetric(
@@ -722,7 +745,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           Icons.chat_bubble_outline_rounded,
                           size: 15,
                           color: isCurrent
-                              ? Colors.indigoAccent
+                              ? Theme.of(context).colorScheme.primary
                               : (isDark ? Colors.grey[600] : Colors.grey[500]),
                         ),
                         title: Text(
@@ -734,7 +757,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 ? FontWeight.bold
                                 : FontWeight.w500,
                             color: isCurrent
-                                ? (isDark ? Colors.white : Colors.black87)
+                                ? (isDark ? Colors.white : const Color(0xFF1E293B))
                                 : null,
                           ),
                         ),
@@ -814,11 +837,50 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _buildBackgroundGlows(bool isDark) {
-    return const SizedBox.shrink();
+    return Positioned.fill(
+      child: Stack(
+        children: [
+          Positioned(
+            top: -150,
+            left: -50,
+            child: Container(
+              width: 400,
+              height: 400,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    isDark ? const Color(0xFF6366F1).withOpacity(0.24) : const Color(0xFF4F46E5).withOpacity(0.12),
+                    isDark ? const Color(0xFF6366F1).withOpacity(0) : const Color(0xFF4F46E5).withOpacity(0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 50,
+            right: -100,
+            child: Container(
+              width: 350,
+              height: 350,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    isDark ? const Color(0xFF38BDF8).withOpacity(0.18) : const Color(0xFF0EA5E9).withOpacity(0.09),
+                    isDark ? const Color(0xFF38BDF8).withOpacity(0) : const Color(0xFF0EA5E9).withOpacity(0),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildModeSelector(bool isDark) {
-    final activeBg = isDark ? const Color(0xFF1A1A22) : const Color(0xFFF1F1F5);
+    final activeBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
 
     return Center(
       child: Container(
@@ -828,9 +890,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           color: activeBg,
           borderRadius: BorderRadius.circular(30),
           border: Border.all(
-            color: isDark
-                ? Colors.white.withOpacity(0.06)
-                : Colors.black.withOpacity(0.04),
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.06),
           ),
         ),
         child: Row(
@@ -873,17 +933,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(26),
-          color: isSelected
-              ? (isDark ? Colors.white : Colors.black)
-              : Colors.transparent,
+          color: isSelected ? null : Colors.transparent,
+          gradient: isSelected
+              ? LinearGradient(
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: isDark
-                        ? Colors.black.withOpacity(0.15)
-                        : Colors.black.withOpacity(0.06),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.20),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
                   ),
                 ]
               : null,
@@ -894,20 +960,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               icon,
               size: 15,
               color: isSelected
-                  ? (isDark ? Colors.black : Colors.white)
+                  ? Colors.white
                   : (isDark
-                        ? const Color(0xFF9E9BAC)
-                        : const Color(0xFF6C6A7C)),
+                        ? const Color(0xFF94A3B8)
+                        : const Color(0xFF475569)),
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
                 color: isSelected
-                    ? (isDark ? Colors.black : Colors.white)
+                    ? Colors.white
                     : (isDark
-                          ? const Color(0xFF9E9BAC)
-                          : const Color(0xFF6C6A7C)),
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF475569)),
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
               ),
@@ -922,13 +988,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final time = DateTime.now();
     String greeting = 'Hello';
     if (time.hour >= 5 && time.hour < 12) {
-      greeting = 'Good morning ☀️';
+      greeting = 'Good morning';
     } else if (time.hour >= 12 && time.hour < 17) {
-      greeting = 'Good afternoon 🌤️';
+      greeting = 'Good afternoon';
     } else if (time.hour >= 17 && time.hour < 22) {
-      greeting = 'Good evening 🌙';
+      greeting = 'Good evening';
     } else {
-      greeting = 'Hello 🌌';
+      greeting = 'Hello';
     }
 
     final suggestions = _mode == 'chat'
@@ -952,27 +1018,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         child: Column(
           children: [
             const SizedBox(height: 30),
-            // Custom Gradient Greeting Header Card
+            // Custom Gradient Greeting Header Card (No Divider)
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF161329).withOpacity(0.8)
-                    : Colors.white.withOpacity(0.85),
+                gradient: LinearGradient(
+                  colors: isDark
+                      ? [
+                          const Color(0xFF1E293B),
+                          const Color(0xFF0F172A),
+                        ]
+                      : [
+                          Colors.white,
+                          const Color(0xFFF8FAFC),
+                        ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: isDark
-                      ? Colors.white.withOpacity(0.06)
-                      : Colors.black.withOpacity(0.04),
-                  width: 1.5,
+                      ? const Color(0xFF334155).withOpacity(0.3)
+                      : const Color(0xFFE2E8F0),
+                  width: 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: isDark
-                        ? Colors.black.withOpacity(0.15)
-                        : Colors.black.withOpacity(0.02),
-                    blurRadius: 18,
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.04),
+                    blurRadius: 20,
                     offset: const Offset(0, 8),
                   ),
                 ],
@@ -980,23 +1054,57 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    greeting,
-                    style: TextStyle(
-                      color: isDark ? Colors.white : Colors.black87,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.5,
-                    ),
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Icon(
+                          _mode == 'chat'
+                              ? Icons.chat_bubble_outline_rounded
+                              : Icons.smart_toy_outlined,
+                          color: Theme.of(context).primaryColor,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              greeting,
+                              style: TextStyle(
+                                color: isDark ? Colors.white : const Color(0xFF1E293B),
+                                fontSize: 24,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: -0.5,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              'PrivateAgent • ${_mode.toUpperCase()} MODE',
+                              style: TextStyle(
+                                color: Theme.of(context).primaryColor,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 24),
                   Text(
                     'What would you like to work on today?',
                     style: TextStyle(
-                      color: isDark
-                          ? const Color(0xFF9E9BAC)
-                          : const Color(0xFF6C6A7C),
-                      fontSize: 14,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                      fontSize: 14.5,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -1012,15 +1120,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   color: isDark
-                      ? const Color(0xFF9E9BAC)
-                      : const Color(0xFF6C6A7C),
+                      ? const Color(0xFF94A3B8)
+                      : const Color(0xFF475569),
                   letterSpacing: 1.5,
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             SizedBox(
-              height: 45,
+              height: 52,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
                 physics: const BouncingScrollPhysics(),
@@ -1028,30 +1136,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 itemBuilder: (context, index) {
                   final suggestion = suggestions[index];
                   return Container(
-                    margin: const EdgeInsets.only(right: 10),
-                    child: ActionChip(
-                      label: Text(
-                        suggestion,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: isDark
-                              ? const Color(0xFFC7C5D5)
-                              : const Color(0xFF4C4A5A),
+                    margin: const EdgeInsets.only(right: 12),
+                    child: InkWell(
+                      onTap: () => _sendMessage(suggestion),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF151D30) : Colors.white,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFF243049).withOpacity(0.4) : const Color(0xFFE2E8F0),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(isDark ? 0.1 : 0.02),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Center(
+                          child: Text(
+                            suggestion,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                            ),
+                          ),
                         ),
                       ),
-                      backgroundColor: isDark
-                          ? const Color(0xFF1E1C30).withOpacity(0.6)
-                          : Colors.white.withOpacity(0.8),
-                      side: BorderSide(
-                        color: isDark
-                            ? Colors.white.withOpacity(0.05)
-                            : Colors.black.withOpacity(0.04),
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      onPressed: () => _sendMessage(suggestion),
                     ),
                   );
                 },
@@ -1070,26 +1186,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       child: Row(
         children: [
           // Glowing Voice Mic button
-          Container(
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: _isListening
-                  ? Colors.redAccent.withOpacity(0.15)
-                  : (isDark
-                        ? const Color(0xFF1E1C30).withOpacity(0.6)
-                        : Colors.white.withOpacity(0.8)),
+                  ? Colors.redAccent
+                  : Theme.of(context).cardTheme.color,
               border: Border.all(
                 color: _isListening
-                    ? Colors.redAccent.withOpacity(0.4)
-                    : (isDark
-                          ? Colors.white.withOpacity(0.05)
-                          : Colors.black.withOpacity(0.04)),
+                    ? Colors.redAccent
+                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+                width: 1.2,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+                if (_isListening)
+                  BoxShadow(
+                    color: Colors.redAccent.withOpacity(0.4),
+                    blurRadius: 12,
+                    spreadRadius: 2,
+                  ),
+              ],
             ),
             child: IconButton(
               icon: Icon(
                 _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                color: _isListening ? Colors.redAccent : Colors.indigoAccent,
+                color: _isListening ? Colors.white : Theme.of(context).colorScheme.primary,
               ),
               onPressed: _isLoading ? null : _toggleVoice,
             ),
@@ -1100,20 +1227,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF1E1C30).withOpacity(0.6)
-                    : Colors.white.withOpacity(0.8),
+                color: Theme.of(context).cardTheme.color,
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: isDark
-                      ? Colors.white.withOpacity(0.05)
-                      : Colors.black.withOpacity(0.04),
+                  color: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+                  width: 1.2,
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: isDark
-                        ? Colors.black.withOpacity(0.1)
-                        : Colors.indigo.withOpacity(0.01),
+                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -1131,7 +1253,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             : 'Type a command...',
                         hintStyle: TextStyle(
                           fontSize: 13,
-                          color: isDark ? Colors.grey[700] : Colors.grey[400],
+                          color: isDark ? Colors.grey[600] : Colors.grey[400],
                         ),
                         contentPadding: const EdgeInsets.symmetric(
                           horizontal: 20,
@@ -1151,13 +1273,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     margin: const EdgeInsets.only(right: 6),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isDark ? Colors.white : Colors.black,
+                      gradient: LinearGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.primary,
+                          Theme.of(context).colorScheme.secondary,
+                        ],
+                      ),
                     ),
                     child: IconButton(
-                      icon: Icon(
+                      icon: const Icon(
                         Icons.send_rounded,
-                        size: 18,
-                        color: isDark ? Colors.black : Colors.white,
+                        size: 16,
+                        color: Colors.white,
                       ),
                       onPressed: _isLoading
                           ? null
