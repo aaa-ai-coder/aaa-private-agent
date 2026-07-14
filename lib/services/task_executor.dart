@@ -108,10 +108,14 @@ Rules:
 
   /// Execute a multi-step task with LLM guidance
   Future<String> executeTask(String userGoal) async {
+    await ScreenAutomationService.logToNative("[TaskExecutor] executeTask() CALLED with goal: $userGoal");
     _cancelled = false;
 
+    await ScreenAutomationService.logToNative("[TaskExecutor] Checking if accessibility service is running...");
     final isRunning = await _screenService.isServiceRunning();
+    await ScreenAutomationService.logToNative("[TaskExecutor] Accessibility service isRunning = $isRunning");
     if (!isRunning) {
+      await ScreenAutomationService.logToNative("[TaskExecutor] Accessibility service not running, returning early.");
       return 'Accessibility service is not enabled. Go to Settings \u2192 Accessibility \u2192 PrivateAgent Screen Control and enable it.';
     }
 

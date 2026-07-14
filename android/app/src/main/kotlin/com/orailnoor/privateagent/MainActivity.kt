@@ -48,7 +48,15 @@ class MainActivity : FlutterActivity() {
         fun registerAccessibilityChannel(flutterEngine: FlutterEngine, context: android.content.Context) {
             MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.privateagent/accessibility")
                 .setMethodCallHandler { call, result ->
+                    android.util.Log.d("PrivateAgentKotlin", "Received method call: ${call.method}")
                     when (call.method) {
+                        "ping" -> result.success(true)
+
+                        "logToNative" -> {
+                            val msg = call.argument<String>("message") ?: ""
+                            android.util.Log.d("PrivateAgentDart", msg)
+                            result.success(true)
+                        }
 
                         "isServiceRunning" -> {
                             result.success(AgentAccessibilityService.isRunning())
@@ -226,9 +234,20 @@ class MainActivity : FlutterActivity() {
 
 class BackgroundEngineReceiver : android.content.BroadcastReceiver() {
     override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
-        val engine = io.flutter.embedding.engine.FlutterEngineCache.getInstance().get("myCachedEngine")
-        if (engine != null) {
-            MainActivity.registerAccessibilityChannel(engine, context)
+        val engine = io.flutter.embedding.engine.FlutterEngineCache
+            .getInstance()
+            .get("myCachedEngine")
+        if (engine == null) {
+            android.util.Log.e("PrivateAgent", "Background engine myCachedEngine was not found")
+            return
         }
+
+        android.util.Log.d(
+            "PrivateAgent",
+            "Registering accessibility channel on myCachedEngine " +
+                "(engine=${System.identityHashCode(engine)}, " +
+                "dartExecuting=${engine.dartExecutor.isExecutingDart})"
+        )
+        MainActivity.registerAccessibilityChannel(engine, context.applicationContext)
     }
 }

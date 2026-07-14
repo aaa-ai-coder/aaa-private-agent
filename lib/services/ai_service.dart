@@ -64,6 +64,13 @@ Examples of when to use open_app:
 For normal conversation (questions, chat, info requests), just respond with plain text naturally.
 ''';
 
+  static const String _chatSystemPrompt = '''
+You are PrivateAgent, a helpful conversational AI assistant. 
+Provide direct, natural, and friendly text responses. You cannot perform device actions or run tools. 
+Answer questions, explain concepts, brainstorm, write emails/messages, and chat with the user in plain text or markdown format.
+''';
+
+
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _apiKey = prefs.getString('api_key');
@@ -148,8 +155,18 @@ For normal conversation (questions, chat, info requests), just respond with plai
     _conversationHistory.clear();
   }
 
+  void addHistoryMessage(String role, String content) {
+    _conversationHistory.add({
+      'role': role,
+      'content': content,
+    });
+    if (_conversationHistory.length > 20) {
+      _conversationHistory.removeRange(0, _conversationHistory.length - 20);
+    }
+  }
+
   /// Send a message to the AI and get a response.
-  Future<String> sendMessage(String message) async {
+  Future<String> sendMessage(String message, {bool isAgentMode = true}) async {
     if (_apiKey == null || _apiKey!.isEmpty) {
       throw Exception('API Key is not configured. Please go to Settings.');
     }
@@ -167,8 +184,9 @@ For normal conversation (questions, chat, info requests), just respond with plai
 
     try {
       // Build the prompt including system instructions
+      final systemPrompt = isAgentMode ? _systemPrompt : _chatSystemPrompt;
       final messages = [
-        if (_useSystemPrompt) {'role': 'system', 'content': _systemPrompt},
+        if (_useSystemPrompt) {'role': 'system', 'content': systemPrompt},
         ..._conversationHistory,
       ];
 
@@ -243,6 +261,144 @@ For normal conversation (questions, chat, info requests), just respond with plai
       });
 
       return assistantMessage;
+    } catch (e) {
+      if (e is Exception) rethrow;
+      throw Exception('Network error: $e');
+    }
+  }
+
+  /// Send a message and stream the response chunk-by-chunk.
+  Stream<String> sendMessageStream(String message, {bool isAgentMode = true}) async* {
+    if (_apiKey == null || _apiKey!.isEmpty) {
+      throw Exception('API Key is not configured. Please go to Settings.');
+    }
+
+    _conversationHistory.add({
+      'role': 'user',
+      'content': message,
+    });
+
+    if (_conversationHistory.length > 20) {
+      _conversationHistory.removeRange(0, _conversationHistory.length - 20);
+    }
+
+    try {
+      final systemPrompt = isAgentMode ? _systemPrompt : _chatSystemPrompt;
+      final messages = [
+        if (_useSystemPrompt) {'role': 'system', 'content': systemPrompt},
+        ..._conversationHistory,
+      ];
+
+      String requestUrl = _baseUrl;
+      if (requestUrl.endsWith('/chat/completions')) {
+        requestUrl = requestUrl;
+      } else {
+        if (requestUrl.endsWith('/')) {
+          requestUrl = '${requestUrl}chat/completions';
+        } else {
+          requestUrl = '$requestUrl/chat/completions';
+        }
+      }
+
+      final client = http.Client();
+      final request = http.Request('POST', Uri.parse(requestUrl));
+      request.headers.addAll({
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $_apiKey',
+        'HTTP-Referer': 'https://github.com/orailnoor/private-agent',
+        'X-Title': 'PrivateAgent',
+      });
+
+      request.body = jsonEncode({
+        'model': _model,
+        'messages': messages,
+        'temperature': _temperature,
+        'max_tokens': _maxTokens,
+        'stream': true,
+      });
+
+      final response = await client.send(request).timeout(const Duration(minutes: 30));
+
+      if (response.statusCode != 200) {
+        final body = await response.stream.bytesToString();
+        String errorMessage = body;
+        try {
+          final decoded = jsonDecode(body);
+          if (decoded is Map<String, dynamic>) {
+            if (decoded['error'] is Map<String, dynamic>) {
+              errorMessage = decoded['error']['message']?.toString() ?? body;
+            } else if (decoded['error'] is String) {
+              errorMessage = decoded['error'];
+            }
+          }
+        } catch (_) {}
+        client.close();
+        throw Exception('API error (${response.statusCode}): $errorMessage');
+      }
+
+      final accumulatedContent = StringBuffer();
+      bool inThinkBlock = false;
+
+      // Listen to response stream
+      final lineStream = response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter());
+
+      await for (final line in lineStream) {
+        final trimmedLine = line.trim();
+        if (trimmedLine.isEmpty) continue;
+        if (trimmedLine.startsWith('data: ')) {
+          final dataStr = trimmedLine.substring(6).trim();
+          if (dataStr == '[DONE]') break;
+          try {
+            final json = jsonDecode(dataStr);
+            if (json is Map && json.containsKey('choices')) {
+              final choices = json['choices'] as List;
+              if (choices.isNotEmpty) {
+                final delta = choices[0]['delta'] as Map;
+                if (delta.containsKey('content')) {
+                  String content = delta['content'] as String;
+                  accumulatedContent.write(content);
+
+                  // Handle <think> block stripping on the fly for better stream styling
+                  if (content.contains('<think>')) {
+                    inThinkBlock = true;
+                    // If there is text before <think>, yield it
+                    final parts = content.split('<think>');
+                    if (parts[0].isNotEmpty) {
+                      yield parts[0];
+                    }
+                  } else if (content.contains('</think>')) {
+                    inThinkBlock = false;
+                    // If there is text after </think>, yield it
+                    final parts = content.split('</think>');
+                    if (parts.length > 1 && parts[1].isNotEmpty) {
+                      yield parts[1];
+                    }
+                  } else if (!inThinkBlock) {
+                    yield content;
+                  }
+                }
+              }
+            }
+          } catch (_) {
+            // Ignore incomplete chunks
+          }
+        }
+      }
+
+      client.close();
+
+      // Clean up final accumulated response and add to history
+      String finalResponse = accumulatedContent.toString().trim();
+      finalResponse = finalResponse.replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '').trim();
+      
+      if (finalResponse.isNotEmpty) {
+        _conversationHistory.add({
+          'role': 'assistant',
+          'content': finalResponse,
+        });
+      }
     } catch (e) {
       if (e is Exception) rethrow;
       throw Exception('Network error: $e');

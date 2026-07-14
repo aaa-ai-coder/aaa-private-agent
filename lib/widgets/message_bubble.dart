@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/chat_message.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -76,16 +77,31 @@ class MessageBubble extends StatelessWidget {
               ),
             ],
             // Message text
-            SelectableText(
-              message.content,
-              style: TextStyle(
-                color: isUser
-                    ? Theme.of(context).colorScheme.onPrimary
-                    : Theme.of(context).colorScheme.onSurface,
-                fontSize: 15,
-                height: 1.4,
+            if (isUser)
+              SelectableText(
+                message.content,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onPrimary,
+                  fontSize: 15,
+                  height: 1.4,
+                ),
+              )
+            else
+              MarkdownBody(
+                data: message.content,
+                selectable: true,
+                styleSheet: MarkdownStyleSheet.fromTheme(Theme.of(context)).copyWith(
+                  p: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 15,
+                    height: 1.45,
+                  ),
+                  listBullet: TextStyle(
+                    color: Theme.of(context).colorScheme.onSurface,
+                    fontSize: 15,
+                  ),
+                ),
               ),
-            ),
             // Timestamp
             const SizedBox(height: 4),
             Text(

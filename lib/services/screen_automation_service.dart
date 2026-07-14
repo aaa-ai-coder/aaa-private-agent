@@ -1,16 +1,52 @@
 import 'package:flutter/services.dart';
+import 'dart:async';
 import 'dart:developer' as developer;
 
 /// Dart bridge to the native AccessibilityService.
 /// Provides screen reading, UI element interaction, and gesture control.
 class ScreenAutomationService {
   static const _channel = MethodChannel('com.privateagent/accessibility');
+  static const _channelTimeout = Duration(seconds: 3);
+
+  static Future<T?> _invoke<T>(String method, [Map<String, Object?>? arguments]) {
+    return _channel
+        .invokeMethod<T>(method, arguments)
+        .timeout(_channelTimeout, onTimeout: () {
+      throw TimeoutException(
+        'Accessibility channel did not reply to $method within '
+        '${_channelTimeout.inSeconds}s',
+      );
+    });
+  }
+
+  /// Verifies that this Flutter engine owns a responsive native channel.
+  Future<bool> waitUntilReady() async {
+    try {
+      return await _invoke<bool>('ping') ?? false;
+    } catch (e) {
+      developer.log('Accessibility channel readiness check failed: $e',
+          name: 'PrivateAgent');
+      return false;
+    }
+  }
+
+  /// Log a message to Android's native Log system
+  static Future<void> logToNative(String message) async {
+    try {
+      await _invoke<bool>('logToNative', {'message': message});
+    } catch (_) {}
+  }
 
   /// Check if the accessibility service is running
   Future<bool> isServiceRunning() async {
+    await logToNative("[ScreenAutomationService] isServiceRunning() CALLED");
     try {
-      return await _channel.invokeMethod<bool>('isServiceRunning') ?? false;
+      await logToNative("[ScreenAutomationService] invoking method isServiceRunning...");
+      final result = await _invoke<bool>('isServiceRunning') ?? false;
+      await logToNative("[ScreenAutomationService] isServiceRunning result = $result");
+      return result;
     } catch (e) {
+      await logToNative("[ScreenAutomationService] isServiceRunning ERROR = $e");
       return false;
     }
   }

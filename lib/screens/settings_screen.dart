@@ -43,6 +43,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _useScreenCompression = true;
   bool _useSystemPrompt = true;
   bool _floatingIconEnabled = false;
+  bool _isOverlayPermissionGranted = false;
 
   final Map<String, PermissionStatus> _permissions = {};
 
@@ -71,9 +72,11 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   Future<void> _checkOverlayStatus() async {
     bool isActive = await FlutterOverlayWindow.isActive();
+    bool isGranted = await FlutterOverlayWindow.isPermissionGranted();
     if (mounted) {
       setState(() {
         _floatingIconEnabled = isActive;
+        _isOverlayPermissionGranted = isGranted;
       });
     }
   }
@@ -92,8 +95,8 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // Refresh the UI when coming back from Android Settings
-      setState(() {});
+      _checkPermissions();
+      _checkOverlayStatus();
     }
   }
 
@@ -109,7 +112,12 @@ class _SettingsScreenState extends State<SettingsScreen>
     for (final entry in perms.entries) {
       _permissions[entry.key] = await entry.value.status;
     }
-    if (mounted) setState(() {});
+    final overlayGranted = await FlutterOverlayWindow.isPermissionGranted();
+    if (mounted) {
+      setState(() {
+        _isOverlayPermissionGranted = overlayGranted;
+      });
+    }
   }
 
   Future<void> _requestPermission(String name, Permission permission) async {
@@ -217,6 +225,7 @@ class _SettingsScreenState extends State<SettingsScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(title: const Text('Settings')),
       body: ListView(
@@ -234,21 +243,75 @@ class _SettingsScreenState extends State<SettingsScreen>
             valueListenable: themeNotifier,
             builder: (context, currentMode, _) {
               return SegmentedButton<ThemeMode>(
-                segments: const [
+                style: SegmentedButton.styleFrom(
+                  selectedBackgroundColor: isDark ? Colors.white : Colors.black,
+                  selectedForegroundColor: isDark ? Colors.black : Colors.white,
+                  backgroundColor: isDark ? const Color(0xFF1E1E26) : Colors.white,
+                  foregroundColor: isDark ? Colors.white : Colors.black87,
+                  side: BorderSide(
+                    color: isDark ? Colors.white.withOpacity(0.12) : const Color(0xFFE2E2E8),
+                  ),
+                ),
+                segments: [
                   ButtonSegment(
                     value: ThemeMode.system,
-                    label: Text('System'),
-                    icon: Icon(Icons.brightness_auto),
+                    label: Text(
+                      'System',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: currentMode == ThemeMode.system
+                            ? (isDark ? Colors.black : Colors.white)
+                            : (isDark ? Colors.grey[300] : Colors.black87),
+                      ),
+                    ),
+                    icon: Icon(
+                      Icons.brightness_auto,
+                      size: 16,
+                      color: currentMode == ThemeMode.system
+                          ? (isDark ? Colors.black : Colors.white)
+                          : (isDark ? Colors.grey[400] : Colors.black54),
+                    ),
                   ),
                   ButtonSegment(
                     value: ThemeMode.light,
-                    label: Text('Light'),
-                    icon: Icon(Icons.light_mode),
+                    label: Text(
+                      'Light',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: currentMode == ThemeMode.light
+                            ? (isDark ? Colors.black : Colors.white)
+                            : (isDark ? Colors.grey[300] : Colors.black87),
+                      ),
+                    ),
+                    icon: Icon(
+                      Icons.light_mode,
+                      size: 16,
+                      color: currentMode == ThemeMode.light
+                          ? (isDark ? Colors.black : Colors.white)
+                          : (isDark ? Colors.grey[400] : Colors.black54),
+                    ),
                   ),
                   ButtonSegment(
                     value: ThemeMode.dark,
-                    label: Text('Dark'),
-                    icon: Icon(Icons.dark_mode),
+                    label: Text(
+                      'Dark',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                        color: currentMode == ThemeMode.dark
+                            ? (isDark ? Colors.black : Colors.white)
+                            : (isDark ? Colors.grey[300] : Colors.black87),
+                      ),
+                    ),
+                    icon: Icon(
+                      Icons.dark_mode,
+                      size: 16,
+                      color: currentMode == ThemeMode.dark
+                          ? (isDark ? Colors.black : Colors.white)
+                          : (isDark ? Colors.grey[400] : Colors.black54),
+                    ),
                   ),
                 ],
                 selected: {currentMode},
@@ -374,10 +437,29 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
               ),
               const SizedBox(width: 8),
-              FilledButton.tonalIcon(
+              ElevatedButton.icon(
                 onPressed: _fetchModels,
-                icon: const Icon(Icons.cloud_download),
-                label: const Text('Fetch'),
+                icon: Icon(
+                  Icons.cloud_download,
+                  size: 18,
+                  color: isDark ? Colors.black : Colors.white,
+                ),
+                label: Text(
+                  'Fetch',
+                  style: TextStyle(
+                    color: isDark ? Colors.black : Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isDark ? Colors.white : Colors.black,
+                  elevation: 0,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
               ),
             ],
           ),
@@ -583,10 +665,26 @@ class _SettingsScreenState extends State<SettingsScreen>
             contentPadding: EdgeInsets.zero,
           ),
           const SizedBox(height: 12),
-          FilledButton.icon(
+          ElevatedButton.icon(
             onPressed: _saveApiSettings,
-            icon: const Icon(Icons.save),
-            label: const Text('Save Settings'),
+            icon: Icon(
+              Icons.save,
+              color: isDark ? Colors.black : Colors.white,
+            ),
+            label: Text(
+              'Save Settings',
+              style: TextStyle(
+                color: isDark ? Colors.black : Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isDark ? Colors.white : Colors.black,
+              minimumSize: const Size(double.infinity, 48),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           ),
 
           const Divider(height: 32),
@@ -599,7 +697,15 @@ class _SettingsScreenState extends State<SettingsScreen>
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
-          ..._buildPermissionTiles(),
+          Card(
+            color: isDark ? const Color(0xFF1E1E26) : const Color(0xFFF9F9FB),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                children: _buildPermissionTiles(),
+              ),
+            ),
+          ),
 
           const Divider(height: 32),
 
@@ -692,7 +798,7 @@ class _SettingsScreenState extends State<SettingsScreen>
       'Notifications': Icons.notifications,
     };
 
-    return permissionMap.entries.map((entry) {
+    final list = permissionMap.entries.map((entry) {
       final status = _permissions[entry.key];
       final isGranted = status?.isGranted ?? false;
 
@@ -718,6 +824,35 @@ class _SettingsScreenState extends State<SettingsScreen>
         ),
       );
     }).toList();
+
+    // Add Overlay Permission tile
+    list.add(
+      ListTile(
+        leading: const Icon(Icons.layers),
+        title: const Text('Display Over Other Apps (Floating Bubble)'),
+        trailing: _isOverlayPermissionGranted
+            ? const Icon(Icons.check_circle, color: Colors.green)
+            : TextButton(
+                onPressed: () async {
+                  await FlutterOverlayWindow.requestPermission();
+                  final granted = await FlutterOverlayWindow.isPermissionGranted();
+                  setState(() {
+                    _isOverlayPermissionGranted = granted;
+                  });
+                },
+                child: const Text('Grant'),
+              ),
+        subtitle: Text(
+          _isOverlayPermissionGranted ? 'Granted' : 'Not granted',
+          style: TextStyle(
+            color: _isOverlayPermissionGranted ? Colors.green : Colors.orange,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+
+    return list;
   }
 
   Widget _buildShizukuCard() {

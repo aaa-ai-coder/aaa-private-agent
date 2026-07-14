@@ -2,6 +2,7 @@ package com.orailnoor.privateagent
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
+import android.content.Intent
 import android.graphics.Bitmap
 import android.hardware.HardwareBuffer
 import android.graphics.Path
@@ -16,6 +17,8 @@ import androidx.annotation.RequiresApi
 import java.io.ByteArrayOutputStream
 
 class AgentAccessibilityService : AccessibilityService() {
+
+    private val ownPackageName = "com.orailnoor.privateagent"
 
     companion object {
         var instance: AgentAccessibilityService? = null
@@ -85,13 +88,19 @@ class AgentAccessibilityService : AccessibilityService() {
         val allWindows = windows
         if (allWindows == null || allWindows.isEmpty()) {
             val root = rootInActiveWindow ?: return emptyList()
-            traverseNode(root, nodes, 0)
+            if (root.packageName?.toString() != ownPackageName) {
+                traverseNode(root, nodes, 0)
+            }
             root.recycle()
             return nodes
         }
         
         for (window in allWindows) {
             val root = window.root ?: continue
+            if (root.packageName?.toString() == ownPackageName) {
+                root.recycle()
+                continue
+            }
             traverseNode(root, nodes, 0)
             root.recycle()
         }
@@ -194,10 +203,17 @@ class AgentAccessibilityService : AccessibilityService() {
 
     /** Find and click a node by its text content */
     fun clickByText(targetText: String): Boolean {
-        val root = rootInActiveWindow ?: return false
-        val result = findAndClickNode(root, targetText)
-        root.recycle()
-        return result
+        for (window in windows) {
+            val root = window.root ?: continue
+            if (root.packageName?.toString() == ownPackageName) {
+                root.recycle()
+                continue
+            }
+            val result = findAndClickNode(root, targetText)
+            root.recycle()
+            if (result) return true
+        }
+        return false
     }
 
     private fun findAndClickNode(node: AccessibilityNodeInfo, targetText: String): Boolean {
@@ -249,23 +265,28 @@ class AgentAccessibilityService : AccessibilityService() {
     }
 
     fun typeText(text: String, fieldHint: String? = null): Boolean {
-        val root = rootInActiveWindow ?: return false
-        var editNode = findEditableNode(root, fieldHint)
-        
-        // Fallback: If hint didn't match anything, just grab the first editable node
-        if (editNode == null && !fieldHint.isNullOrEmpty()) {
-            editNode = findEditableNode(root, null)
-        }
-        
-        if (editNode != null) {
-            editNode.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
-            val args = Bundle()
-            args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
-            val success = editNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+        for (window in windows) {
+            val root = window.root ?: continue
+            if (root.packageName?.toString() == ownPackageName) {
+                root.recycle()
+                continue
+            }
+
+            var editNode = findEditableNode(root, fieldHint)
+            if (editNode == null && !fieldHint.isNullOrEmpty()) {
+                editNode = findEditableNode(root, null)
+            }
+
+            if (editNode != null) {
+                editNode.performAction(AccessibilityNodeInfo.ACTION_FOCUS)
+                val args = Bundle()
+                args.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text)
+                val success = editNode.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                root.recycle()
+                return success
+            }
             root.recycle()
-            return success
         }
-        root.recycle()
         return false
     }
 
@@ -319,19 +340,25 @@ class AgentAccessibilityService : AccessibilityService() {
 
     /** Scroll forward on the first scrollable element, or a specific one by text */
     fun scroll(direction: String, targetText: String? = null): Boolean {
-        val root = rootInActiveWindow ?: return false
-        val scrollNode = findScrollableNode(root, targetText)
-        if (scrollNode != null) {
-            val action = when (direction.lowercase()) {
-                "down", "forward" -> AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
-                "up", "backward" -> AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
-                else -> AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+        for (window in windows) {
+            val root = window.root ?: continue
+            if (root.packageName?.toString() == ownPackageName) {
+                root.recycle()
+                continue
             }
-            val success = scrollNode.performAction(action)
+            val scrollNode = findScrollableNode(root, targetText)
+            if (scrollNode != null) {
+                val action = when (direction.lowercase()) {
+                    "down", "forward" -> AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+                    "up", "backward" -> AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+                    else -> AccessibilityNodeInfo.ACTION_SCROLL_FORWARD
+                }
+                val success = scrollNode.performAction(action)
+                root.recycle()
+                return success
+            }
             root.recycle()
-            return success
         }
-        root.recycle()
         return false
     }
 
@@ -401,9 +428,12 @@ class AgentAccessibilityService : AccessibilityService() {
 
     /** Get the currently focused app's package name */
     fun getCurrentPackage(): String? {
-        val root = rootInActiveWindow ?: return null
-        val pkg = root.packageName?.toString()
-        root.recycle()
-        return pkg
+        for (window in windows) {
+            val root = window.root ?: continue
+            val pkg = root.packageName?.toString()
+            root.recycle()
+            if (pkg != null && pkg != ownPackageName) return pkg
+        }
+        return null
     }
 }
