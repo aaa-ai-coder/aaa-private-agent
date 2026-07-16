@@ -46,6 +46,10 @@ dependencies:
   flutter_overlay_window: ^0.5.0
   flutter_markdown: ^0.7.7+1
 
+dependency_overrides:
+  flutter_overlay_window:
+    path: ./local_plugins/flutter_overlay_window
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -62,3 +66,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+    - assets/local_config/

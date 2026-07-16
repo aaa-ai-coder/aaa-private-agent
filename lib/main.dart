@@ -11,7 +11,28 @@ import 'overlay_main.dart';
 void overlayMain() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
-    const MaterialApp(debugShowCheckedModeBanner: false, home: OverlayApp()),
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        canvasColor: Colors.transparent,
+        scaffoldBackgroundColor: Colors.transparent,
+        cardColor: Colors.white,
+        dialogBackgroundColor: Colors.transparent,
+        primaryColor: const Color(0xFF4F46E5),
+        useMaterial3: true,
+        colorScheme: const ColorScheme.light(
+          background: Colors.transparent,
+          primary: Color(0xFF4F46E5),
+          surface: Colors.white,
+          onSurface: Color(0xFF1E293B),
+          onPrimary: Colors.white,
+        ),
+      ),
+      builder: (context, child) {
+        return Container(color: Colors.transparent, child: child);
+      },
+      home: const OverlayApp(),
+    ),
   );
 }
 

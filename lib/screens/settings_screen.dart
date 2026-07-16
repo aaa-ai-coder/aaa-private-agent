@@ -276,7 +276,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                           subtitle,
                           style: TextStyle(
                             fontSize: 12,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                            color: isDark
+                                ? const Color(0xFF94A3B8)
+                                : const Color(0xFF475569),
                           ),
                         ),
                       ],
@@ -369,28 +371,52 @@ class _SettingsScreenState extends State<SettingsScreen>
                     width: double.infinity,
                     child: SegmentedButton<ThemeMode>(
                       style: SegmentedButton.styleFrom(
-                        selectedBackgroundColor: isDark ? Colors.white : Colors.black,
-                        selectedForegroundColor: isDark ? Colors.black : Colors.white,
-                        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        selectedBackgroundColor: Theme.of(
+                          context,
+                        ).colorScheme.primary,
+                        selectedForegroundColor: Colors.white,
+                        backgroundColor: isDark
+                            ? const Color(0xFF1E293B)
+                            : Colors.white,
                         foregroundColor: isDark ? Colors.white : Colors.black87,
                         side: BorderSide(
-                          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
                         ),
                       ),
                       segments: [
                         ButtonSegment(
                           value: ThemeMode.system,
-                          label: const Text('System', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          label: const Text(
+                            'System',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                           icon: const Icon(Icons.brightness_auto, size: 16),
                         ),
                         ButtonSegment(
                           value: ThemeMode.light,
-                          label: const Text('Light', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          label: const Text(
+                            'Light',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                           icon: const Icon(Icons.light_mode, size: 16),
                         ),
                         ButtonSegment(
                           value: ThemeMode.dark,
-                          label: const Text('Dark', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                          label: const Text(
+                            'Dark',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                            ),
+                          ),
                           icon: const Icon(Icons.dark_mode, size: 16),
                         ),
                       ],
@@ -446,24 +472,36 @@ class _SettingsScreenState extends State<SettingsScreen>
                 runSpacing: 4,
                 children: [
                   ActionChip(
-                    label: const Text('Local Server', style: TextStyle(fontSize: 11)),
+                    label: const Text(
+                      'Local Server',
+                      style: TextStyle(fontSize: 11),
+                    ),
                     tooltip: 'For local Llama.cpp or LM Studio',
-                    onPressed: () => _baseUrlController.text = 'http://192.168.1.X:8080/v1',
+                    onPressed: () =>
+                        _baseUrlController.text = 'http://192.168.1.X:8080/v1',
                   ),
                   ActionChip(
-                    label: const Text('Ollama Cloud', style: TextStyle(fontSize: 11)),
+                    label: const Text(
+                      'Ollama Cloud',
+                      style: TextStyle(fontSize: 11),
+                    ),
                     onPressed: () {
                       _baseUrlController.text = 'https://ollama.com/v1';
                       _modelController.text = 'gemma3:4b';
                     },
                   ),
                   ActionChip(
-                    label: const Text('DeepSeek', style: TextStyle(fontSize: 11)),
-                    onPressed: () => _baseUrlController.text = 'https://api.deepseek.com',
+                    label: const Text(
+                      'DeepSeek',
+                      style: TextStyle(fontSize: 11),
+                    ),
+                    onPressed: () =>
+                        _baseUrlController.text = 'https://api.deepseek.com',
                   ),
                   ActionChip(
                     label: const Text('Groq', style: TextStyle(fontSize: 11)),
-                    onPressed: () => _baseUrlController.text = 'https://api.groq.com/openai/v1',
+                    onPressed: () => _baseUrlController.text =
+                        'https://api.groq.com/openai/v1',
                   ),
                   ActionChip(
                     label: const Text('Custom', style: TextStyle(fontSize: 11)),
@@ -485,30 +523,36 @@ class _SettingsScreenState extends State<SettingsScreen>
                       decoration: _buildInputDecoration(
                         labelText: 'Model',
                         hintText: 'deepseek-chat',
-                        prefixIcon: const Icon(Icons.smart_toy_rounded, size: 18),
+                        prefixIcon: const Icon(
+                          Icons.smart_toy_rounded,
+                          size: 18,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
                     onPressed: _fetchModels,
-                    icon: Icon(
+                    icon: const Icon(
                       Icons.cloud_download,
                       size: 18,
-                      color: isDark ? Colors.black : Colors.white,
+                      color: Colors.white,
                     ),
-                    label: Text(
+                    label: const Text(
                       'Fetch',
                       style: TextStyle(
-                        color: isDark ? Colors.black : Colors.white,
+                        color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 12,
                       ),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isDark ? Colors.white : Colors.black,
+                      backgroundColor: Theme.of(context).colorScheme.primary,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 14,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
@@ -545,7 +589,10 @@ class _SettingsScreenState extends State<SettingsScreen>
                 const SizedBox(height: 8),
                 Text(
                   'Maximum Steps Per Task: ${_maxSteps.toInt()}',
-                  style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w500,
+                    fontSize: 13,
+                  ),
                 ),
                 Slider(
                   value: _maxSteps,
@@ -576,7 +623,10 @@ class _SettingsScreenState extends State<SettingsScreen>
               const SizedBox(height: 16),
               Text(
                 'Temperature: ${_temperature.toStringAsFixed(2)}',
-                style: const TextStyle(fontWeight: FontWeight.w500, fontSize: 13),
+                style: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 13,
+                ),
               ),
               Slider(
                 value: _temperature,
@@ -605,7 +655,9 @@ class _SettingsScreenState extends State<SettingsScreen>
             children: [
               SwitchListTile(
                 title: const Text('Use Screen Compression'),
-                subtitle: const Text('Removes duplicate elements to save tokens'),
+                subtitle: const Text(
+                  'Removes duplicate elements to save tokens',
+                ),
                 value: _useScreenCompression,
                 onChanged: (bool value) {
                   setState(() {
@@ -633,14 +685,18 @@ class _SettingsScreenState extends State<SettingsScreen>
                 value: _floatingIconEnabled,
                 onChanged: (val) async {
                   if (val) {
-                    bool? isGranted = await FlutterOverlayWindow.isPermissionGranted();
+                    bool? isGranted =
+                        await FlutterOverlayWindow.isPermissionGranted();
                     if (isGranted != true) {
-                      bool? result = await FlutterOverlayWindow.requestPermission();
+                      bool? result =
+                          await FlutterOverlayWindow.requestPermission();
                       if (result != true) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(
-                              content: Text('Permission to draw over other apps is required.'),
+                              content: Text(
+                                'Permission to draw over other apps is required.',
+                              ),
                             ),
                           );
                         }
@@ -656,6 +712,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                         alignment: OverlayAlignment.centerRight,
                         visibility: NotificationVisibility.visibilitySecret,
                         positionGravity: PositionGravity.auto,
+                        startPosition: const OverlayPosition(0, 200),
                         width: 56,
                         height: 56,
                       );
@@ -707,9 +764,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             title: 'Screen Control (Accessibility)',
             subtitle: 'Required to read screen and perform automated clicks',
             isDark: isDark,
-            children: [
-              _buildAccessibilityCard(),
-            ],
+            children: [_buildAccessibilityCard()],
           ),
 
           // 7. System Permissions Card
@@ -731,16 +786,10 @@ class _SettingsScreenState extends State<SettingsScreen>
               ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: const Text('View Task History'),
-                subtitle: const Text('Access complete trace of execution steps'),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                leading: Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(Icons.history_rounded, color: Colors.blue, size: 18),
+                subtitle: const Text(
+                  'Access complete trace of execution steps',
                 ),
+                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                 onTap: () {
                   Navigator.push(
                     context,
@@ -776,10 +825,28 @@ class _SettingsScreenState extends State<SettingsScreen>
                 contentPadding: EdgeInsets.zero,
                 title: const Text('Orailnoor on YouTube'),
                 subtitle: const Text('Subscribe for tutorials and updates'),
-                leading: const Icon(Icons.play_circle_fill_rounded, color: Colors.red),
+                leading: const Icon(
+                  Icons.play_circle_fill_rounded,
+                  color: Colors.red,
+                ),
                 onTap: () {
                   launchUrl(
                     Uri.parse('https://www.youtube.com/orailnoor'),
+                    mode: LaunchMode.externalApplication,
+                  );
+                },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Tech Jarves on YouTube'),
+                subtitle: const Text('Subscribe for tutorials and updates'),
+                leading: const Icon(
+                  Icons.play_circle_fill_rounded,
+                  color: Colors.red,
+                ),
+                onTap: () {
+                  launchUrl(
+                    Uri.parse('https://www.youtube.com/techjarves'),
                     mode: LaunchMode.externalApplication,
                   );
                 },
@@ -816,7 +883,10 @@ class _SettingsScreenState extends State<SettingsScreen>
         leading: Icon(icons[entry.key]),
         title: Text(entry.key),
         trailing: isGranted
-            ? const Icon(Icons.check_circle, color: Colors.green)
+            ? Icon(
+                Icons.check_circle,
+                color: Theme.of(context).colorScheme.primary,
+              )
             : TextButton(
                 onPressed: () => _requestPermission(entry.key, entry.value),
                 child: const Text('Grant'),
@@ -828,7 +898,9 @@ class _SettingsScreenState extends State<SettingsScreen>
                     ? 'Not granted'
                     : 'Denied permanently'),
           style: TextStyle(
-            color: isGranted ? Colors.green : Colors.orange,
+            color: isGranted
+                ? Theme.of(context).colorScheme.primary
+                : Colors.orange,
             fontSize: 12,
           ),
         ),
@@ -841,11 +913,15 @@ class _SettingsScreenState extends State<SettingsScreen>
         leading: const Icon(Icons.layers),
         title: const Text('Display Over Other Apps (Floating Bubble)'),
         trailing: _isOverlayPermissionGranted
-            ? const Icon(Icons.check_circle, color: Colors.green)
+            ? Icon(
+                Icons.check_circle,
+                color: Theme.of(context).colorScheme.primary,
+              )
             : TextButton(
                 onPressed: () async {
                   await FlutterOverlayWindow.requestPermission();
-                  final granted = await FlutterOverlayWindow.isPermissionGranted();
+                  final granted =
+                      await FlutterOverlayWindow.isPermissionGranted();
                   setState(() {
                     _isOverlayPermissionGranted = granted;
                   });
@@ -855,7 +931,9 @@ class _SettingsScreenState extends State<SettingsScreen>
         subtitle: Text(
           _isOverlayPermissionGranted ? 'Granted' : 'Not granted',
           style: TextStyle(
-            color: _isOverlayPermissionGranted ? Colors.green : Colors.orange,
+            color: _isOverlayPermissionGranted
+                ? Theme.of(context).colorScheme.primary
+                : Colors.orange,
             fontSize: 12,
           ),
         ),

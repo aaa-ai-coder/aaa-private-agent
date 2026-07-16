@@ -13,6 +13,7 @@ import android.util.Base64
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.annotation.RequiresApi
 import java.io.ByteArrayOutputStream
 
@@ -209,49 +210,64 @@ class AgentAccessibilityService : AccessibilityService() {
                 root.recycle()
                 continue
             }
-            val result = findAndClickNode(root, targetText)
+            // Prefer an actual suggestion/button over an editable search field
+            // that contains the same query. Editables remain the final fallback
+            // so the agent can still focus a search box by its label.
+            val result = findAndClickNode(root, targetText, true, true)
+                || findAndClickNode(root, targetText, false, true)
+                || findAndClickNode(root, targetText, true, false)
+                || findAndClickNode(root, targetText, false, false)
             root.recycle()
             if (result) return true
         }
         return false
     }
 
-    private fun findAndClickNode(node: AccessibilityNodeInfo, targetText: String): Boolean {
+    private fun findAndClickNode(
+        node: AccessibilityNodeInfo,
+        targetText: String,
+        exactOnly: Boolean,
+        skipEditable: Boolean
+    ): Boolean {
         val text = node.text?.toString() ?: ""
         val desc = node.contentDescription?.toString() ?: ""
 
-        if (text.equals(targetText, ignoreCase = true) ||
-            desc.equals(targetText, ignoreCase = true) ||
-            text.contains(targetText, ignoreCase = true) ||
-            desc.contains(targetText, ignoreCase = true)
-        ) {
-            // Click this node or its clickable parent
-            var clickTarget: AccessibilityNodeInfo? = node
-            while (clickTarget != null && !clickTarget.isClickable) {
-                clickTarget = clickTarget.parent
-            }
-            if (clickTarget != null) {
-                val success = clickTarget.performAction(AccessibilityNodeInfo.ACTION_CLICK)
-                if (success) return true
-            }
-            
-            // Fallback: If no clickable parent or performAction failed, use gesture on bounds
-            val rect = Rect()
-            node.getBoundsInScreen(rect)
-            if (!rect.isEmpty) {
-                return clickAtCoordinates(rect.centerX().toFloat(), rect.centerY().toFloat())
-            }
+        val exactMatch = text.equals(targetText, ignoreCase = true)
+            || desc.equals(targetText, ignoreCase = true)
+        val containsMatch = text.contains(targetText, ignoreCase = true)
+            || desc.contains(targetText, ignoreCase = true)
+        val matches = if (exactOnly) exactMatch else containsMatch
+
+        if (matches && (!skipEditable || !node.isEditable) && clickNodeOrParent(node)) {
+            return true
         }
 
         for (i in 0 until node.childCount) {
             val child = node.getChild(i) ?: continue
-            if (findAndClickNode(child, targetText)) {
+            if (findAndClickNode(child, targetText, exactOnly, skipEditable)) {
                 child.recycle()
                 return true
             }
             child.recycle()
         }
         return false
+    }
+
+    private fun clickNodeOrParent(node: AccessibilityNodeInfo): Boolean {
+        var clickTarget: AccessibilityNodeInfo? = node
+        while (clickTarget != null && !clickTarget.isClickable) {
+            clickTarget = clickTarget.parent
+        }
+        if (clickTarget?.performAction(AccessibilityNodeInfo.ACTION_CLICK) == true) {
+            return true
+        }
+
+        val rect = Rect()
+        node.getBoundsInScreen(rect)
+        return !rect.isEmpty && clickAtCoordinates(
+            rect.centerX().toFloat(),
+            rect.centerY().toFloat()
+        )
     }
 
     /** Click at specific coordinates using gesture */
@@ -290,24 +306,64 @@ class AgentAccessibilityService : AccessibilityService() {
         return false
     }
 
-    /** Simulates pressing the Enter/Search key on the keyboard by tapping the bottom right corner of the screen */
+    /** Submit the focused field through the IME, with keyboard-aware fallbacks. */
     fun pressEnter(): Boolean {
-        val displayMetrics = resources.displayMetrics
-        val width = displayMetrics.widthPixels.toFloat()
-        val height = displayMetrics.heightPixels.toFloat()
-        
-        // The Enter/Search key is almost universally at the bottom right corner of the keyboard.
-        // We tap at 92% width and 96% height.
-        val x = width * 0.92f
-        val y = height * 0.96f
-        
-        val path = Path().apply {
-            moveTo(x, y)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            for (window in windows) {
+                val root = window.root ?: continue
+                if (root.packageName?.toString() == ownPackageName) {
+                    root.recycle()
+                    continue
+                }
+                val focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                val submitted = focused?.performAction(
+                    AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id
+                ) == true
+                focused?.recycle()
+                root.recycle()
+                if (submitted) return true
+            }
         }
-        val gesture = GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0, 100))
-            .build()
-        return dispatchGesture(gesture, null, null)
+
+        for (window in windows) {
+            val root = window.root ?: continue
+            val actionNode = findKeyboardActionNode(root)
+            val submitted = actionNode != null && clickNodeOrParent(actionNode)
+            actionNode?.recycle()
+            root.recycle()
+            if (submitted) return true
+        }
+
+        // Tap inside the actual IME window, avoiding the navigation bar.
+        for (window in windows) {
+            if (window.type != AccessibilityWindowInfo.TYPE_INPUT_METHOD) continue
+            val bounds = Rect()
+            window.getBoundsInScreen(bounds)
+            if (!bounds.isEmpty) {
+                val x = bounds.right - (bounds.width() * 0.10f)
+                val y = bounds.bottom - (bounds.height() * 0.14f)
+                return clickAtCoordinates(x, y)
+            }
+        }
+        return false
+    }
+
+    private fun findKeyboardActionNode(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+        val label = (node.text?.toString().orEmpty().ifEmpty {
+            node.contentDescription?.toString().orEmpty()
+        }).trim().lowercase()
+        val actionLabels = setOf("search", "enter", "go", "done", "send", "next")
+        if (node.isClickable && (label in actionLabels || label.endsWith(" search"))) {
+            return AccessibilityNodeInfo.obtain(node)
+        }
+
+        for (i in 0 until node.childCount) {
+            val child = node.getChild(i) ?: continue
+            val found = findKeyboardActionNode(child)
+            child.recycle()
+            if (found != null) return found
+        }
+        return null
     }
 
     private fun findEditableNode(
@@ -428,12 +484,32 @@ class AgentAccessibilityService : AccessibilityService() {
 
     /** Get the currently focused app's package name */
     fun getCurrentPackage(): String? {
+        var ownApplicationSeen = false
+        var fallbackApplication: String? = null
+
         for (window in windows) {
             val root = window.root ?: continue
             val pkg = root.packageName?.toString()
             root.recycle()
-            if (pkg != null && pkg != ownPackageName) return pkg
+
+            if (pkg == null || window.type != AccessibilityWindowInfo.TYPE_APPLICATION) {
+                continue
+            }
+
+            // An active PrivateAgent application window is the main Flutter app.
+            // Return it so TaskExecutor can press Home before taking its first dump.
+            // The floating overlay is a system overlay, not an application window.
+            if (window.isActive || window.isFocused) {
+                return pkg
+            }
+
+            if (pkg == ownPackageName) {
+                ownApplicationSeen = true
+            } else if (fallbackApplication == null) {
+                fallbackApplication = pkg
+            }
         }
-        return null
+
+        return fallbackApplication ?: if (ownApplicationSeen) ownPackageName else null
     }
 }

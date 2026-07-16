@@ -52,3 +52,6 @@ __pycache__/
 training_tasks.md
 enrich_dataset_prompt.md
 google-services.json
+
+# Local credentials bundled only into developer test builds
+/assets/local_config/ai_test_config.json
