@@ -22,6 +22,9 @@ class ActionHandler {
   ShizukuService get shizuku => _shizuku;
   ScreenAutomationService get screenAutomation => _screenAutomation;
 
+  /// The currently running task executor, if any
+  TaskExecutor? _currentExecutor;
+
   /// Execute an action and return the result
   Future<AgentActionResult> execute(
     AgentAction action, {
@@ -36,6 +39,11 @@ class ActionHandler {
           result = await _appLauncher.openApp(
             action.params['app_name'] as String? ?? '',
           );
+          break;
+
+        case 'launch_package':
+          final packageName = action.params['package_name'] as String? ?? '';
+          result = await _appLauncher.openPackage(packageName);
           break;
 
         case 'make_call':
@@ -144,13 +152,15 @@ class ActionHandler {
             result = 'AI service not available for task execution.';
             break;
           }
-          final executor = TaskExecutor(
+          _currentExecutor = TaskExecutor(
             aiService: aiService,
             screenService: _screenAutomation,
             appLauncher: _appLauncher,
+            shizukuService: _shizuku,
             onProgress: onProgress,
           );
-          result = await executor.executeTask(goal);
+          result = await _currentExecutor!.executeTask(goal);
+          _currentExecutor = null;
           break;
 
         default:
@@ -169,5 +179,10 @@ class ActionHandler {
         details: 'Error: $e',
       );
     }
+  }
+
+  /// Cancel the currently running task
+  void cancelTask() {
+    _currentExecutor?.cancel();
   }
 }

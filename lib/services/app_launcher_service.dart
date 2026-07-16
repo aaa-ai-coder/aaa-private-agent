@@ -5,9 +5,9 @@ import 'package:url_launcher/url_launcher.dart';
 class AppLauncherService {
   List<AppInfo>? _cachedApps;
 
-  /// Get all installed apps (cached)
+  /// Get all installed apps (cached), including system apps!
   Future<List<AppInfo>> getInstalledApps() async {
-    _cachedApps ??= await InstalledApps.getInstalledApps();
+    _cachedApps ??= await InstalledApps.getInstalledApps(false, false);
     return _cachedApps!;
   }
 
@@ -48,6 +48,16 @@ class AppLauncherService {
       return 'Opened ${target.name}';
     } catch (e) {
       return 'Error opening ${target.name}: $e';
+    }
+  }
+
+  /// Open an app by exact package name
+  Future<String> openPackage(String packageName) async {
+    try {
+      await InstalledApps.startApp(packageName);
+      return 'Launched $packageName';
+    } catch (e) {
+      return 'Error launching $packageName: $e';
     }
   }
 
