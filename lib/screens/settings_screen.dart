@@ -9,6 +9,7 @@ import '../services/telegram_service.dart';
 import 'task_history_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import '../config/feature_flags.dart';
 
 class SettingsScreen extends StatefulWidget {
   final AiService aiService;
@@ -75,7 +76,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     _maxTokensController.addListener(_autoSave);
 
     _checkPermissions();
-    _checkOverlayStatus();
+    if (FeatureFlags.floatingOverlayEnabled) {
+      _checkOverlayStatus();
+    }
   }
 
   Future<void> _checkOverlayStatus() async {
@@ -109,7 +112,9 @@ class _SettingsScreenState extends State<SettingsScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       _checkPermissions();
-      _checkOverlayStatus();
+      if (FeatureFlags.floatingOverlayEnabled) {
+        _checkOverlayStatus();
+      }
     }
   }
 
@@ -125,7 +130,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     for (final entry in perms.entries) {
       _permissions[entry.key] = await entry.value.status;
     }
-    final overlayGranted = await FlutterOverlayWindow.isPermissionGranted();
+    final overlayGranted = FeatureFlags.floatingOverlayEnabled
+        ? await FlutterOverlayWindow.isPermissionGranted()
+        : false;
     if (mounted) {
       setState(() {
         _isOverlayPermissionGranted = overlayGranted;
@@ -197,10 +204,13 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
 
     if (mounted) {
+      final isNvidia = AiService.isNvidiaBaseUrl(baseUrl);
       showDialog(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Select a Model'),
+          title: Text(
+            isNvidia ? 'Select a Free NVIDIA Model' : 'Select a Model',
+          ),
           content: SizedBox(
             width: double.maxFinite,
             height: 300,
@@ -504,6 +514,15 @@ class _SettingsScreenState extends State<SettingsScreen>
                         'https://api.groq.com/openai/v1',
                   ),
                   ActionChip(
+                    avatar: const Icon(Icons.memory_rounded, size: 16),
+                    label: const Text('NVIDIA', style: TextStyle(fontSize: 11)),
+                    tooltip: 'NVIDIA NIM free endpoints',
+                    onPressed: () {
+                      _baseUrlController.text = AiService.nvidiaBaseUrl;
+                      _modelController.text = AiService.nvidiaDefaultModel;
+                    },
+                  ),
+                  ActionChip(
                     label: const Text('Custom', style: TextStyle(fontSize: 11)),
                     tooltip: 'Clear fields',
                     onPressed: () {
@@ -679,54 +698,55 @@ class _SettingsScreenState extends State<SettingsScreen>
                 },
                 contentPadding: EdgeInsets.zero,
               ),
-              SwitchListTile(
-                title: const Text('Enable Floating Agent Icon'),
-                subtitle: const Text('Assign tasks without opening the app'),
-                value: _floatingIconEnabled,
-                onChanged: (val) async {
-                  if (val) {
-                    bool? isGranted =
-                        await FlutterOverlayWindow.isPermissionGranted();
-                    if (isGranted != true) {
-                      bool? result =
-                          await FlutterOverlayWindow.requestPermission();
-                      if (result != true) {
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text(
-                                'Permission to draw over other apps is required.',
+              if (FeatureFlags.floatingOverlayEnabled)
+                SwitchListTile(
+                  title: const Text('Enable Floating Agent Icon'),
+                  subtitle: const Text('Assign tasks without opening the app'),
+                  value: _floatingIconEnabled,
+                  onChanged: (val) async {
+                    if (val) {
+                      bool? isGranted =
+                          await FlutterOverlayWindow.isPermissionGranted();
+                      if (isGranted != true) {
+                        bool? result =
+                            await FlutterOverlayWindow.requestPermission();
+                        if (result != true) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Permission to draw over other apps is required.',
+                                ),
                               ),
-                            ),
-                          );
+                            );
+                          }
+                          return;
                         }
-                        return;
+                      }
+                      if (await FlutterOverlayWindow.isActive() == false) {
+                        await FlutterOverlayWindow.showOverlay(
+                          enableDrag: true,
+                          overlayTitle: "PrivateAgent",
+                          overlayContent: "Floating Assistant",
+                          flag: OverlayFlag.focusPointer,
+                          alignment: OverlayAlignment.centerRight,
+                          visibility: NotificationVisibility.visibilitySecret,
+                          positionGravity: PositionGravity.auto,
+                          startPosition: const OverlayPosition(0, 200),
+                          width: 56,
+                          height: 56,
+                        );
+                      }
+                    } else {
+                      if (await FlutterOverlayWindow.isActive() == true) {
+                        await FlutterOverlayWindow.closeOverlay();
                       }
                     }
-                    if (await FlutterOverlayWindow.isActive() == false) {
-                      await FlutterOverlayWindow.showOverlay(
-                        enableDrag: true,
-                        overlayTitle: "PrivateAgent",
-                        overlayContent: "Floating Assistant",
-                        flag: OverlayFlag.focusPointer,
-                        alignment: OverlayAlignment.centerRight,
-                        visibility: NotificationVisibility.visibilitySecret,
-                        positionGravity: PositionGravity.auto,
-                        startPosition: const OverlayPosition(0, 200),
-                        width: 56,
-                        height: 56,
-                      );
-                    }
-                  } else {
-                    if (await FlutterOverlayWindow.isActive() == true) {
-                      await FlutterOverlayWindow.closeOverlay();
-                    }
-                  }
-                  setState(() => _floatingIconEnabled = val);
-                  _autoSave();
-                },
-                contentPadding: EdgeInsets.zero,
-              ),
+                    setState(() => _floatingIconEnabled = val);
+                    _autoSave();
+                  },
+                  contentPadding: EdgeInsets.zero,
+                ),
             ],
           ),
 
@@ -907,38 +927,39 @@ class _SettingsScreenState extends State<SettingsScreen>
       );
     }).toList();
 
-    // Add Overlay Permission tile
-    list.add(
-      ListTile(
-        leading: const Icon(Icons.layers),
-        title: const Text('Display Over Other Apps (Floating Bubble)'),
-        trailing: _isOverlayPermissionGranted
-            ? Icon(
-                Icons.check_circle,
-                color: Theme.of(context).colorScheme.primary,
-              )
-            : TextButton(
-                onPressed: () async {
-                  await FlutterOverlayWindow.requestPermission();
-                  final granted =
-                      await FlutterOverlayWindow.isPermissionGranted();
-                  setState(() {
-                    _isOverlayPermissionGranted = granted;
-                  });
-                },
-                child: const Text('Grant'),
-              ),
-        subtitle: Text(
-          _isOverlayPermissionGranted ? 'Granted' : 'Not granted',
-          style: TextStyle(
-            color: _isOverlayPermissionGranted
-                ? Theme.of(context).colorScheme.primary
-                : Colors.orange,
-            fontSize: 12,
+    if (FeatureFlags.floatingOverlayEnabled) {
+      list.add(
+        ListTile(
+          leading: const Icon(Icons.layers),
+          title: const Text('Display Over Other Apps (Floating Bubble)'),
+          trailing: _isOverlayPermissionGranted
+              ? Icon(
+                  Icons.check_circle,
+                  color: Theme.of(context).colorScheme.primary,
+                )
+              : TextButton(
+                  onPressed: () async {
+                    await FlutterOverlayWindow.requestPermission();
+                    final granted =
+                        await FlutterOverlayWindow.isPermissionGranted();
+                    setState(() {
+                      _isOverlayPermissionGranted = granted;
+                    });
+                  },
+                  child: const Text('Grant'),
+                ),
+          subtitle: Text(
+            _isOverlayPermissionGranted ? 'Granted' : 'Not granted',
+            style: TextStyle(
+              color: _isOverlayPermissionGranted
+                  ? Theme.of(context).colorScheme.primary
+                  : Colors.orange,
+              fontSize: 12,
+            ),
           ),
         ),
-      ),
-    );
+      );
+    }
 
     return list;
   }
