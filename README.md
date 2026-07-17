@@ -23,6 +23,14 @@ The system operates on a continuous feedback loop:
 
 Download the latest APK directly from the [Releases Page](https://github.com/orailnoor/private-agent/releases).
 
+Choose `app-universal-release.apk` when it is available. It supports ARM64,
+32-bit ARM, and x86_64 devices in one package. If a release only provides split
+APKs, most modern Android phones—including Snapdragon devices—must use
+`app-arm64-v8a-release.apk`.
+
+PrivateAgent supports Android 8.0 (API 26) and newer. Current release builds are
+also checked for Android 15/16's 16 KB native-library alignment requirement.
+
 ## Setup Instructions (How to use for FREE)
 
 This app requires an AI brain to operate. You can use it **100% for free** by using OpenRouter's free models.
@@ -35,6 +43,20 @@ This app requires an AI brain to operate. You can use it **100% for free** by us
 6. Paste your API Key.
 7. Type `openai/gpt-oss-120b:free` (or any other free model) into the Model field.
 8. Enable the **"PrivateAgent Screen Control"** service in your Android Accessibility Settings.
+
+### “Restricted setting” when enabling Screen Control
+
+Android may block accessibility access for apps installed from an APK. This is
+an operating-system safety restriction:
+
+1. Open **Settings → Apps → PrivateAgent**.
+2. Open the three-dot menu in the top-right corner.
+3. Tap **Allow restricted settings** and confirm.
+4. Return to PrivateAgent and open **Accessibility Settings** again.
+5. Enable **PrivateAgent Screen Control**.
+
+PrivateAgent now shows these instructions and provides shortcuts to both App
+Info and Accessibility Settings during onboarding.
 
 ## Telegram Integration
 

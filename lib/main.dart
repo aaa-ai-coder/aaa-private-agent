@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'dart:developer';
+import 'config/feature_flags.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'overlay_main.dart';
@@ -43,16 +44,18 @@ void Function(String task)? onOverlayTask;
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  FlutterOverlayWindow.overlayListener.listen((event) {
-    log("Main app received from overlay: $event");
-    if (event is String && event.trim().isNotEmpty) {
-      if (onOverlayTask != null) {
-        onOverlayTask!(event.trim());
-      } else {
-        log("Warning: overlay task received but no handler registered yet");
+  if (FeatureFlags.floatingOverlayEnabled) {
+    FlutterOverlayWindow.overlayListener.listen((event) {
+      log("Main app received from overlay: $event");
+      if (event is String && event.trim().isNotEmpty) {
+        if (onOverlayTask != null) {
+          onOverlayTask!(event.trim());
+        } else {
+          log("Warning: overlay task received but no handler registered yet");
+        }
       }
-    }
-  });
+    });
+  }
 
   final prefs = await SharedPreferences.getInstance();
   final themeStr = prefs.getString('themeMode');
