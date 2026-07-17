@@ -1,7 +1,7 @@
 name: private_agent
 description: "AI agent for Android"
 publish_to: "none"
-version: 1.0.1+2020
+version: 1.0.2+2021
 
 environment:
   sdk: ^3.10.3
