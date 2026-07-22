@@ -40,7 +40,7 @@ class AgentAccessibilityService : AccessibilityService() {
         val listener = eventListener ?: return
         
         // Filter out events from our own app so we don't record the Stop Overlay button clicks
-        if (event.packageName?.toString() == "com.orailnoor.privateagent") return
+        if (event.packageName?.toString() == "com.aaa.privateagent") return
         
         when (event.eventType) {
             AccessibilityEvent.TYPE_VIEW_CLICKED -> {

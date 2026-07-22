@@ -15,6 +15,10 @@ class AiService {
   static const String _defaultModel = 'deepseek-chat';
   static const String nvidiaBaseUrl = 'https://integrate.api.nvidia.com/v1';
   static const String nvidiaDefaultModel = 'z-ai/glm-5.2';
+  static const String ollamaCloudBaseUrl = 'https://api.ollama.com/v1';
+  static const String openRouterBaseUrl = 'https://openrouter.ai/api/v1';
+  static const String groqBaseUrl = 'https://api.groq.com/openai/v1';
+  static const String geminiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/';
 
   /// Free, general-purpose chat endpoints verified in NVIDIA's NIM catalog.
   /// The live /models response is intersected with this list so unavailable or
@@ -500,7 +504,7 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
               headers: {
                 'Content-Type': 'application/json',
                 'Authorization': 'Bearer $_apiKey',
-                'HTTP-Referer': 'https://github.com/orailnoor/private-agent',
+                'HTTP-Referer': 'https://github.com/aaa-ai-coder/aaa-private-agent',
                 'X-Title': 'PrivateAgent',
               },
               body: jsonEncode({

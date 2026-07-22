@@ -16,6 +16,7 @@ dependencies:
   # Database & Auth
   supabase_flutter: ^2.8.0
   passkeys: ^2.21.0
+  google_sign_in: ^6.2.1
 
   # Voice
   speech_to_text: ^7.0.0

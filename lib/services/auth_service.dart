@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:passkeys/authenticator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
@@ -8,6 +9,10 @@ class AuthService extends ChangeNotifier {
   Session? _session;
   bool _isLoading = false;
   String? _error;
+
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    serverClientId: '844358886395-tsh4o7eo55r14e6cbrs6oc1faisu6l33.apps.googleusercontent.com',
+  );
 
   User? get user => _user;
   Session? get session => _session;
@@ -81,6 +86,28 @@ class AuthService extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
+      // 1. Try native in-app Google Sign In prompt (no browser redirect)
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser != null) {
+        final googleAuth = await googleUser.authentication;
+        final idToken = googleAuth.idToken;
+        final accessToken = googleAuth.accessToken;
+
+        if (idToken != null) {
+          final response = await SupabaseConfig.client.auth.signInWithIdToken(
+            provider: OAuthProvider.google,
+            idToken: idToken,
+            accessToken: accessToken,
+          );
+          _user = response.user;
+          _session = response.session;
+          _isLoading = false;
+          notifyListeners();
+          return _user != null;
+        }
+      }
+
+      // 2. Fallback to web OAuth if native sign-in returned null or failed
       await SupabaseConfig.client.auth.signInWithOAuth(
         OAuthProvider.google,
         redirectTo: 'com.aaa.privateagent://callback',
@@ -91,10 +118,23 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return _user != null;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
-      _isLoading = false;
-      notifyListeners();
-      return false;
+      // Fallback try browser if native fails
+      try {
+        await SupabaseConfig.client.auth.signInWithOAuth(
+          OAuthProvider.google,
+          redirectTo: 'com.aaa.privateagent://callback',
+        );
+        _user = SupabaseConfig.client.auth.currentUser;
+        _session = SupabaseConfig.client.auth.currentSession;
+        _isLoading = false;
+        notifyListeners();
+        return _user != null;
+      } catch (e2) {
+        _error = e2.toString().replaceFirst('Exception: ', '');
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
     }
   }
 
