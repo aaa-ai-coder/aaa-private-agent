@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:passkeys/authenticator.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 
@@ -102,28 +103,10 @@ class AuthService extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      await SupabaseConfig.client.auth.signInWithPasskey();
-      _user = SupabaseConfig.client.auth.currentUser;
-      _session = SupabaseConfig.client.auth.currentSession;
-      _isLoading = false;
-      notifyListeners();
-      return _user != null;
-    } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
-      _isLoading = false;
-      notifyListeners();
-      return false;
-    }
-  }
-
-  Future<bool> signUpWithPasskey() async {
-    _isLoading = true;
-    _error = null;
-    notifyListeners();
-    try {
-      await SupabaseConfig.client.auth.signUpWithPasskey();
-      _user = SupabaseConfig.client.auth.currentUser;
-      _session = SupabaseConfig.client.auth.currentSession;
+      final authenticator = PasskeyAuthenticator();
+      final response = await SupabaseConfig.client.auth.signInWithPasskey(authenticator);
+      _user = response.user;
+      _session = response.session;
       _isLoading = false;
       notifyListeners();
       return _user != null;
