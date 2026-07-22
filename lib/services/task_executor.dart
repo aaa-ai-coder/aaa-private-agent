@@ -200,7 +200,7 @@ Rules:
       // If no shortcut is used, and we are currently inside the PrivateAgent app,
       // press Home so the AI doesn't see its own chat bubbles and get confused by the task text.
       final currentPkg = await _screenService.getCurrentPackage();
-      if (currentPkg == 'com.orailnoor.privateagent') {
+      if (currentPkg == 'com.aaa.privateagent') {
         _report('Moving to background...');
         await _screenService.pressHome();
         await Future.delayed(const Duration(milliseconds: 1500));
