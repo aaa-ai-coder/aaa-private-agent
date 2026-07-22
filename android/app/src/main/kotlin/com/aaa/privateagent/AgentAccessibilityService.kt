@@ -1,4 +1,4 @@
-package com.orailnoor.privateagent
+package com.aaa.privateagent
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
@@ -19,7 +19,7 @@ import java.io.ByteArrayOutputStream
 
 class AgentAccessibilityService : AccessibilityService() {
 
-    private val ownPackageName = "com.orailnoor.privateagent"
+    private val ownPackageName = "com.aaa.privateagent"
 
     companion object {
         var instance: AgentAccessibilityService? = null

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
+import '../services/auth_service.dart';
+import '../services/database_service.dart';
 import '../services/ai_service.dart';
 import '../services/shizuku_service.dart';
 import '../services/screen_automation_service.dart';
@@ -164,6 +166,29 @@ class _SettingsScreenState extends State<SettingsScreen>
       maxTokens: int.tryParse(_maxTokensController.text) ?? 1024,
       useScreenCompression: _useScreenCompression,
       useSystemPrompt: _useSystemPrompt,
+    );
+
+    _syncSettingsToSupabase();
+  }
+
+  void _syncSettingsToSupabase() {
+    final userId = authService.userId;
+    if (userId == null) return;
+    DatabaseService.saveSettings(
+      userId: userId,
+      settings: {
+        'api_key': _apiKeyController.text.trim(),
+        'api_base_url': _baseUrlController.text.trim(),
+        'api_model': _modelController.text.trim(),
+        'api_max_steps': _maxSteps.toInt(),
+        'api_disable_max_steps': _disableMaxSteps,
+        'api_temperature': _temperature,
+        'api_max_tokens': int.tryParse(_maxTokensController.text) ?? 1024,
+        'api_use_screen_compression': _useScreenCompression,
+        'api_use_system_prompt': _useSystemPrompt,
+        'telegram_token': _telegramTokenController.text.trim(),
+        'telegram_enabled': _telegramEnabled,
+      },
     );
   }
 
@@ -367,6 +392,49 @@ class _SettingsScreenState extends State<SettingsScreen>
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
         children: [
+          // 0. Account Card
+          _buildSettingsCard(
+            icon: Icons.person_outline,
+            title: 'Account',
+            subtitle: authService.email ?? 'Signed in',
+            isDark: isDark,
+            children: [
+              Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: Theme.of(context).primaryColor.withOpacity(0.15),
+                    child: Icon(Icons.person_rounded, size: 28, color: Theme.of(context).primaryColor),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          authService.email ?? 'User',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'User ID: ${authService.userId?.substring(0, 8) ?? "..."}...',
+                          style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.logout_rounded, color: Colors.redAccent),
+                    tooltip: 'Sign out',
+                    onPressed: () async {
+                      await authService.signOut();
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+
           // 1. Appearance Card
           _buildSettingsCard(
             icon: Icons.palette_outlined,
@@ -726,8 +794,8 @@ class _SettingsScreenState extends State<SettingsScreen>
                       if (await FlutterOverlayWindow.isActive() == false) {
                         await FlutterOverlayWindow.showOverlay(
                           enableDrag: true,
-                          overlayTitle: "PrivateAgent",
-                          overlayContent: "Floating Assistant",
+                          overlayTitle: "AAA Private Agent",
+                          overlayContent: "AAA Private Agent - Floating Assistant",
                           flag: OverlayFlag.focusPointer,
                           alignment: OverlayAlignment.centerRight,
                           visibility: NotificationVisibility.visibilitySecret,
@@ -825,7 +893,7 @@ class _SettingsScreenState extends State<SettingsScreen>
           // 9. About / Links Card
           _buildSettingsCard(
             icon: Icons.info_outline_rounded,
-            title: 'About PrivateAgent',
+            title: 'About AAA Private Agent',
             subtitle: 'Resources and repository access',
             isDark: isDark,
             children: [

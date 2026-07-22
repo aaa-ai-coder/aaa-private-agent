@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import '../config/supabase_config.dart';
 
 class ChatSession {
   final String id;

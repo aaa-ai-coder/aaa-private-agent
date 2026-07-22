@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import '../config/supabase_config.dart';
 import '../models/saved_skill.dart';
 
 class SkillMemoryService {
@@ -91,6 +92,7 @@ class SkillMemoryService {
           skill.steps.addAll(steps);
         }
         await _saveAllSkills();
+        _syncToSupabase(taskGoal, queryKeywords, steps, updateId: skill.id);
         return;
       }
     }
@@ -106,6 +108,7 @@ class SkillMemoryService {
     );
     _skills.add(newSkill);
     await _saveAllSkills();
+    _syncToSupabase(taskGoal, queryKeywords, steps);
   }
 
   Future<void> recordFailure(String skillId) async {
@@ -115,5 +118,19 @@ class SkillMemoryService {
       _skills[index].failCount++;
       await _saveAllSkills();
     }
+  }
+
+  void _syncToSupabase(String task, List<String> keywords, List<ActionStep> steps, {String? updateId}) {
+    final userId = SupabaseConfig.client.auth.currentUser?.id;
+    if (userId == null) return;
+    // Fire and forget - best effort sync
+    SupabaseConfig.client.from('saved_skills').upsert({
+      if (updateId != null) 'id': updateId,
+      'user_id': userId,
+      'task': task,
+      'task_keywords': keywords,
+      'steps': steps.map((s) => s.toJson()).toList(),
+      'last_used': DateTime.now().toIso8601String(),
+    }).then((_) {}).catchError((_) {});
   }
 }

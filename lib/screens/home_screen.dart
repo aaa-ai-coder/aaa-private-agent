@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
 import '../services/ai_service.dart';
 import '../services/action_handler.dart';
 import '../services/voice_service.dart';
+import '../services/auth_service.dart';
+import '../services/database_service.dart';
 import '../widgets/message_bubble.dart';
 import '../services/telegram_service.dart';
 import '../services/chat_history_service.dart';
@@ -41,8 +44,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _mode = 'chat';
 
   // Chat Session state tracking
-  String _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+  String _sessionId = 'local_${DateTime.now().millisecondsSinceEpoch}';
   String _sessionTitle = '';
+
+  final AuthService _authService = authService;
 
   AppLifecycleState _appLifecycleState = AppLifecycleState.resumed;
   Timer? _overlayHistoryTimer;
@@ -72,8 +77,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _saveSession() async {
     if (_messages.isEmpty) return;
+    final userId = authService.userId;
+    if (userId == null) return;
 
-    // Set first user message as session title if not set
     if (_sessionTitle.isEmpty) {
       final firstUserMsg = _messages.firstWhere(
         (m) => m.isUser,
@@ -84,13 +90,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           : firstUserMsg.content;
     }
 
+    if (_sessionId.startsWith('local_')) {
+      final newId = await DatabaseService.createSession(
+        userId, _sessionTitle,
+      );
+      _sessionId = newId;
+    } else {
+      await DatabaseService.updateSessionTitle(_sessionId, _sessionTitle);
+    }
+
+    final lastMsg = _messages.last;
+    await DatabaseService.saveMessage(
+      sessionId: _sessionId,
+      userId: userId,
+      role: lastMsg.role,
+      content: lastMsg.content,
+      actionResult: lastMsg.actionResult?.toJson(),
+    );
+
     final session = ChatSession(
       id: _sessionId,
       title: _sessionTitle,
       timestamp: DateTime.now(),
       messages: _messages.map((m) => m.toJson()).toList(),
     );
-
     await ChatHistoryService.saveSession(session);
   }
 
@@ -245,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!await FlutterOverlayWindow.isActive()) {
       await FlutterOverlayWindow.showOverlay(
         enableDrag: true,
-        overlayTitle: 'PrivateAgent',
+        overlayTitle: 'AAA Private Agent',
         overlayContent: 'Performing task...',
         flag: OverlayFlag.focusPointer,
         alignment: OverlayAlignment.centerRight,
@@ -322,7 +345,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   void _startNewChat() {
     setState(() {
-      _sessionId = DateTime.now().millisecondsSinceEpoch.toString();
+      _sessionId = 'local_${DateTime.now().millisecondsSinceEpoch}';
       _sessionTitle = '';
       _messages.clear();
       _aiService.clearHistory();
@@ -345,6 +368,38 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       }
     });
     _scrollToBottom();
+  }
+
+  Future<void> _loadSessionMessages(String sessionId, String title) async {
+    try {
+      final messages = await DatabaseService.getMessages(sessionId);
+      if (!mounted) return;
+      setState(() {
+        _sessionId = sessionId;
+        _sessionTitle = title;
+        _messages.clear();
+        _aiService.clearHistory();
+        for (final m in messages) {
+          final msg = ChatMessage(
+            role: m['role'] as String,
+            content: m['content'] as String,
+            timestamp: DateTime.parse(m['created_at'] as String),
+            actionResult: m['action_result'] != null
+                ? AgentActionResult.fromJson(
+                    Map<String, dynamic>.from(m['action_result'] as Map),
+                  )
+                : null,
+          );
+          _messages.add(msg);
+          if (msg.actionResult == null) {
+            _aiService.addHistoryMessage(msg.role, msg.content);
+          }
+        }
+      });
+      _scrollToBottom();
+    } catch (e) {
+      developer.log('Failed to load session messages: $e');
+    }
   }
 
   @override
@@ -435,10 +490,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (await FlutterOverlayWindow.isActive()) return;
       await FlutterOverlayWindow.showOverlay(
         enableDrag: true,
-        overlayTitle: "PrivateAgent",
-        overlayContent: _isLoading
-            ? "Performing task..."
-            : "Floating Assistant",
+        overlayTitle: "AAA Private Agent",
+                overlayContent: _isLoading
+                    ? "AAA Private Agent - Performing task..."
+                    : "AAA Private Agent - Floating Assistant",
         flag: OverlayFlag.focusPointer,
         alignment: OverlayAlignment.centerRight,
         visibility: NotificationVisibility.visibilitySecret,
@@ -489,17 +544,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               fontSize: 20,
               color: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
-            children: [
-              TextSpan(
-                text: 'Private',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: Theme.of(context).colorScheme.primary,
-                  letterSpacing: -0.5,
+              children: [
+                TextSpan(
+                  text: 'AAA ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w300,
+                    color: Theme.of(context).colorScheme.primary,
+                    letterSpacing: -0.5,
+                  ),
                 ),
-              ),
-              const TextSpan(
-                text: 'Agent',
+                TextSpan(
+                  text: 'Private',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w900,
+                    color: Theme.of(context).colorScheme.primary,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const TextSpan(
+                  text: 'Agent',
                 style: TextStyle(
                   fontWeight: FontWeight.w400,
                   letterSpacing: -0.5,
@@ -733,16 +796,49 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               left: 24,
               right: 24,
             ),
-            alignment: Alignment.centerLeft,
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.smart_toy_rounded,
-                  color: Theme.of(context).primaryColor,
-                  size: 26,
+                Row(
+                  children: [
+                    Icon(
+                      Icons.smart_toy_rounded,
+                      color: Theme.of(context).primaryColor,
+                      size: 26,
+                    ),
+                    const SizedBox(width: 12),
+                    Text('AAA Private Agent', style: headerStyle),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text('PrivateAgent', style: headerStyle),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: Theme.of(context).primaryColor.withOpacity(0.15),
+                      child: Icon(Icons.person_rounded, size: 18, color: Theme.of(context).primaryColor),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        _authService.email ?? 'User',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.logout_rounded, size: 18, color: Colors.redAccent.withOpacity(0.7)),
+                      tooltip: 'Sign out',
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        await _authService.signOut();
+                      },
+                    ),
+                  ],
+                ),
               ],
             ),
           ),
@@ -821,8 +917,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
           // Chat Sessions List
           Expanded(
-            child: FutureBuilder<List<ChatSession>>(
-              future: ChatHistoryService.loadSessions(),
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: _authService.userId != null
+                  ? DatabaseService.getSessions(_authService.userId!)
+                  : Future.value([]),
               builder: (context, snapshot) {
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return Center(
@@ -842,7 +940,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   itemCount: sessions.length,
                   itemBuilder: (context, index) {
                     final session = sessions[index];
-                    final isCurrent = session.id == _sessionId;
+                    final sessionId = session['id'] as String;
+                    final sessionTitle = session['title'] as String? ?? 'Chat';
+                    final isCurrent = sessionId == _sessionId;
 
                     return Container(
                       margin: const EdgeInsets.symmetric(
@@ -878,7 +978,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                               : (isDark ? Colors.grey[600] : Colors.grey[500]),
                         ),
                         title: Text(
-                          session.title,
+                          sessionTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: textStyle.copyWith(
@@ -899,17 +999,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             color: Colors.redAccent.withOpacity(0.7),
                           ),
                           onPressed: () async {
-                            await ChatHistoryService.deleteSession(session.id);
+                            await DatabaseService.deleteSession(sessionId);
+                            await ChatHistoryService.deleteSession(sessionId);
                             if (isCurrent) {
                               _startNewChat();
                             }
-                            (context as Element)
-                                .markNeedsBuild(); // Re-trigger build refresh
+                            if (mounted) {
+                              setState(() {});
+                            }
                           },
                         ),
                         onTap: () {
                           Navigator.pop(context);
-                          _loadChatSession(session);
+                          _loadSessionMessages(sessionId, sessionTitle);
                         },
                       ),
                     );

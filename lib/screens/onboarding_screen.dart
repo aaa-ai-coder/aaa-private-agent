@@ -631,9 +631,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           const Spacer(flex: 2),
           // Clean Title
           Text(
-            'PrivateAgent',
+            'AAA Private Agent',
             style: TextStyle(
-              fontSize: 38,
+              fontSize: 34,
               fontWeight: FontWeight.w900,
               color: isDark ? Colors.white : const Color(0xFF1E293B),
               letterSpacing: -0.5,
@@ -641,7 +641,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           ),
           const SizedBox(height: 16),
           Text(
-            'Your local, secure, and smart mobile companion. PrivateAgent can navigate apps, perform operations, and speak with you.',
+            'Your local, secure, and smart mobile companion. AAA Private Agent can navigate apps, perform operations, and speak with you.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,
@@ -829,7 +829,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   const SizedBox(height: 12),
                   _buildPermissionCard(
                     'Display Over Other Apps (Floating Bubble)',
-                    'Allows PrivateAgent to show a floating overlay bubble when backgrounded or executing a task so you can monitor progress and execute actions.',
+                    'Allows AAA Private Agent to show a floating overlay bubble when backgrounded or executing a task so you can monitor progress and execute actions.',
                     Icons.layers_rounded,
                     _isOverlayGranted,
                     _requestOverlayPermission,

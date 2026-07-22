@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import '../config/supabase_config.dart';
 
 class TaskHistoryLogger {
   static Future<File> get _localFile async {
@@ -8,14 +9,14 @@ class TaskHistoryLogger {
     return File('${directory.path}/task_history.jsonl');
   }
 
-  /// Appends a task execution record to the history file
+  /// Appends a task execution record to the history file and Supabase
   static Future<void> logTask(String goal, String status, int totalTokens, int steps, List<String> trace) async {
     try {
       final file = await _localFile;
       
       final data = {
         "goal": goal.trim(),
-        "status": status, // "Success", "Failed", "Cancelled"
+        "status": status,
         "total_tokens": totalTokens,
         "steps_taken": steps,
         "trace": trace,
@@ -23,6 +24,19 @@ class TaskHistoryLogger {
       };
       
       await file.writeAsString('${jsonEncode(data)}\n', mode: FileMode.append);
+
+      // Sync to Supabase
+      final userId = SupabaseConfig.client.auth.currentUser?.id;
+      if (userId != null) {
+        SupabaseConfig.client.from('task_history').insert({
+          'user_id': userId,
+          'goal': goal.trim(),
+          'status': status,
+          'total_tokens': totalTokens,
+          'steps_taken': steps,
+          'trace': trace != null ? jsonEncode(trace) : null,
+        }).then((_) {}).catchError((_) {});
+      }
     } catch (e) {
       print('Failed to write task history: $e');
     }

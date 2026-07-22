@@ -45,7 +45,7 @@
     </queries>
 
     <application
-        android:label="PrivateAgent"
+        android:label="AAA Private Agent"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
 
@@ -66,11 +66,17 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="com.aaa.privateagent" android:host="callback"/>
+            </intent-filter>
         </activity>
 
         <receiver android:name=".BackgroundEngineReceiver" android:exported="true">
             <intent-filter>
-                <action android:name="com.orailnoor.privateagent.REGISTER_BACKGROUND_CHANNELS" />
+                <action android:name="com.aaa.privateagent.REGISTER_BACKGROUND_CHANNELS" />
             </intent-filter>
         </receiver>
 
@@ -89,7 +95,7 @@
         <service
             android:name=".AgentAccessibilityService"
             android:exported="true"
-            android:label="PrivateAgent Screen Control"
+            android:label="AAA Private Agent Screen Control"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
                 <action android:name="android.accessibilityservice.AccessibilityService" />
