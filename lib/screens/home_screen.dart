@@ -1546,18 +1546,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             ListTile(
               leading: const Icon(Icons.auto_awesome, color: Colors.teal),
-              title: const Text('Google Gemini 1.5 Flash'),
-              subtitle: const Text('Free tier via Google AI Studio'),
+              title: const Text('Google Gemini 3.5 Flash'),
+              subtitle: const Text('Latest Gemini 3.5 Flash via Google AI Studio'),
               onTap: () async {
                 await _aiService.saveSettings(
                   apiKey: _aiService.apiKey,
                   baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                  model: 'gemini-1.5-flash',
+                  model: 'gemini-3.5-flash',
                 );
                 Navigator.pop(context);
                 setState(() {});
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Switched to Gemini 1.5 Flash')),
+                  const SnackBar(content: Text('Switched to Gemini 3.5 Flash')),
                 );
               },
             ),

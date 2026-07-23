@@ -165,7 +165,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _modelController.text = 'meta-llama/llama-3.2-3b-instruct';
       } else if (provider == 'gemini') {
         _baseUrlController.text = 'https://generativelanguage.googleapis.com/v1beta/openai/';
-        _modelController.text = 'gemini-1.5-flash';
+        _modelController.text = 'gemini-3.5-flash';
       } else if (provider == 'nvidia') {
         _baseUrlController.text = AiService.nvidiaBaseUrl;
         _modelController.text = AiService.nvidiaDefaultModel;
