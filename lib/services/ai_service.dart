@@ -11,8 +11,8 @@ class AiResponse {
 }
 
 class AiService {
-  static const String _defaultBaseUrl = 'https://api.deepseek.com';
-  static const String _defaultModel = 'deepseek-chat';
+  static const String _defaultBaseUrl = 'https://api.groq.com/openai/v1';
+  static const String _defaultModel = 'llama-3.3-70b-versatile';
   static const String nvidiaBaseUrl = 'https://integrate.api.nvidia.com/v1';
   static const String nvidiaDefaultModel = 'z-ai/glm-5.2';
   static const String ollamaCloudBaseUrl = 'https://api.ollama.com/v1';
