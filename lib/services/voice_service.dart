@@ -27,7 +27,6 @@ class VoiceService {
       await _tts.setSpeechRate(0.5);
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
-      await _tts.setAwaitSpeakCompletion(true);
     } catch (_) {}
   }
 
