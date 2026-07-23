@@ -261,13 +261,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             MaterialPageRoute(builder: (_) => const HomeScreen()),
           );
         }
-      } else {
-        setState(() {
-          _validationError =
-              'Failed to fetch models from the server. Verify base URL and API Key.';
-          _isValidating = false;
-        });
-      }
     } catch (e) {
       setState(() {
         _validationError =
