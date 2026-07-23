@@ -582,6 +582,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.psychology_rounded),
+            tooltip: 'Quick AI Model Switcher',
+            onPressed: _showModelQuickPicker,
+          ),
+          IconButton(
             icon: const Icon(Icons.add_comment_outlined),
             tooltip: 'New chat',
             onPressed: _isLoading ? null : _startNewChat,
@@ -1479,6 +1484,119 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showModelQuickPicker() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Select Free AI Model',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Current: ${_aiService.model}',
+              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: const Icon(Icons.bolt, color: Colors.orange),
+              title: const Text('Groq (Llama 3.3 70B)'),
+              subtitle: const Text('Lightning fast & free'),
+              onTap: () async {
+                await _aiService.saveSettings(
+                  apiKey: _aiService.apiKey,
+                  baseUrl: 'https://api.groq.com/openai/v1',
+                  model: 'llama-3.3-70b-versatile',
+                );
+                Navigator.pop(context);
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Switched to Groq Llama 3.3 70B')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.public, color: Colors.purple),
+              title: const Text('OpenRouter (Llama 3.2 3B Free)'),
+              subtitle: const Text('Completely free tier'),
+              onTap: () async {
+                await _aiService.saveSettings(
+                  apiKey: _aiService.apiKey,
+                  baseUrl: 'https://openrouter.ai/api/v1',
+                  model: 'meta-llama/llama-3.2-3b-instruct:free',
+                );
+                Navigator.pop(context);
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Switched to OpenRouter Free')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.auto_awesome, color: Colors.teal),
+              title: const Text('Google Gemini 1.5 Flash'),
+              subtitle: const Text('Free tier via Google AI Studio'),
+              onTap: () async {
+                await _aiService.saveSettings(
+                  apiKey: _aiService.apiKey,
+                  baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
+                  model: 'gemini-1.5-flash',
+                );
+                Navigator.pop(context);
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Switched to Gemini 1.5 Flash')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.memory, color: Colors.green),
+              title: const Text('NVIDIA NIM (GLM-5.2)'),
+              subtitle: const Text('High performance free NIM'),
+              onTap: () async {
+                await _aiService.saveSettings(
+                  apiKey: _aiService.apiKey,
+                  baseUrl: AiService.nvidiaBaseUrl,
+                  model: AiService.nvidiaDefaultModel,
+                );
+                Navigator.pop(context);
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Switched to NVIDIA NIM')),
+                );
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.cloud_circle, color: Colors.blue),
+              title: const Text('Ollama Cloud'),
+              subtitle: const Text('Remote Ollama instance'),
+              onTap: () async {
+                await _aiService.saveSettings(
+                  apiKey: _aiService.apiKey,
+                  baseUrl: 'https://api.ollama.com/v1',
+                  model: 'llama3.3',
+                );
+                Navigator.pop(context);
+                setState(() {});
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Switched to Ollama Cloud')),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
