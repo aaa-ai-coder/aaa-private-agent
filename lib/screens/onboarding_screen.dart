@@ -6,6 +6,8 @@ import 'dart:ui';
 import '../config/feature_flags.dart';
 import '../services/ai_service.dart';
 import '../services/screen_automation_service.dart';
+import '../services/database_service.dart';
+import '../main.dart';
 import 'home_screen.dart';
 
 class OnboardingScreen extends StatefulWidget {
