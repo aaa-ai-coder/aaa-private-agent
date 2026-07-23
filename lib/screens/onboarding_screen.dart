@@ -162,7 +162,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _modelController.text = 'llama-3.3-70b-versatile';
       } else if (provider == 'openrouter') {
         _baseUrlController.text = 'https://openrouter.ai/api/v1';
-        _modelController.text = 'meta-llama/llama-3.2-3b-instruct:free';
+        _modelController.text = 'meta-llama/llama-3.2-3b-instruct';
       } else if (provider == 'gemini') {
         _baseUrlController.text = 'https://generativelanguage.googleapis.com/v1beta/openai/';
         _modelController.text = 'gemini-1.5-flash';
@@ -223,6 +223,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           baseUrl: baseUrl,
           model: model,
         );
+        final userId = authService.userId;
+        if (userId != null) {
+          try {
+            await DatabaseService.saveSettings(
+              userId: userId,
+              settings: {
+                'api_key': apiKey,
+                'api_base_url': baseUrl,
+                'api_model': model,
+              },
+            );
+          } catch (_) {}
+        }
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('onboarding_completed', true);
 
