@@ -133,7 +133,13 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return _user != null;
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      String errStr = e.toString();
+      if (errStr.contains('NoCredentialsAvailableException') || errStr.contains('credential')) {
+        errStr = 'No passkeys found on this device. Please sign in with Google or Email first, then register a passkey.';
+      } else if (errStr.contains('cancelled') || errStr.contains('Cancel')) {
+        errStr = 'Passkey sign in cancelled.';
+      }
+      _error = errStr.replaceFirst('Exception: ', '');
       _isLoading = false;
       notifyListeners();
       return false;
