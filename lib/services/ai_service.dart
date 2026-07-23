@@ -19,6 +19,8 @@ class AiService {
   static const String openRouterBaseUrl = 'https://openrouter.ai/api/v1';
   static const String groqBaseUrl = 'https://api.groq.com/openai/v1';
   static const String geminiBaseUrl = 'https://generativelanguage.googleapis.com/v1beta/openai/';
+  static const String togetherAiBaseUrl = 'https://api.together.xyz/v1';
+  static const String mistralAiBaseUrl = 'https://api.mistral.ai/v1';
 
   /// Free, general-purpose chat endpoints verified in NVIDIA's NIM catalog.
   /// The live /models response is intersected with this list so unavailable or

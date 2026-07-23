@@ -559,54 +559,66 @@ class _SettingsScreenState extends State<SettingsScreen>
                         _baseUrlController.text = 'http://192.168.1.X:8080/v1',
                   ),
                   ActionChip(
-                    label: const Text(
-                      'Ollama Cloud',
-                      style: TextStyle(fontSize: 11),
-                    ),
+                    avatar: const Icon(Icons.cloud_circle_rounded, size: 16, color: Colors.blue),
+                    label: const Text('Ollama Cloud', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = AiService.ollamaCloudBaseUrl;
                       _modelController.text = 'llama3.3';
                     },
                   ),
                   ActionChip(
-                    label: const Text(
-                      'OpenRouter',
-                      style: TextStyle(fontSize: 11),
-                    ),
-                    onPressed: () {
-                      _baseUrlController.text = AiService.openRouterBaseUrl;
-                      _modelController.text = 'meta-llama/llama-3.2-3b-instruct:free';
-                    },
-                  ),
-                  ActionChip(
-                    label: const Text(
-                      'DeepSeek',
-                      style: TextStyle(fontSize: 11),
-                    ),
-                    onPressed: () =>
-                        _baseUrlController.text = 'https://api.deepseek.com',
-                  ),
-                  ActionChip(
-                    label: const Text('Groq', style: TextStyle(fontSize: 11)),
+                    avatar: const Icon(Icons.bolt_rounded, size: 16, color: Colors.orange),
+                    label: const Text('Groq Free', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = AiService.groqBaseUrl;
                       _modelController.text = 'llama-3.3-70b-versatile';
                     },
                   ),
                   ActionChip(
-                    label: const Text('Gemini', style: TextStyle(fontSize: 11)),
+                    avatar: const Icon(Icons.public_rounded, size: 16, color: Colors.purple),
+                    label: const Text('OpenRouter Free', style: TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      _baseUrlController.text = AiService.openRouterBaseUrl;
+                      _modelController.text = 'meta-llama/llama-3.2-3b-instruct:free';
+                    },
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.teal),
+                    label: const Text('Gemini Free', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = AiService.geminiBaseUrl;
                       _modelController.text = 'gemini-1.5-flash';
                     },
                   ),
                   ActionChip(
-                    avatar: const Icon(Icons.memory_rounded, size: 16),
-                    label: const Text('NVIDIA', style: TextStyle(fontSize: 11)),
-                    tooltip: 'NVIDIA NIM free endpoints',
+                    avatar: const Icon(Icons.memory_rounded, size: 16, color: Colors.green),
+                    label: const Text('NVIDIA NIM', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = AiService.nvidiaBaseUrl;
                       _modelController.text = AiService.nvidiaDefaultModel;
+                    },
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.hub_rounded, size: 16, color: Colors.indigo),
+                    label: const Text('Together AI', style: TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      _baseUrlController.text = AiService.togetherAiBaseUrl;
+                      _modelController.text = 'meta-llama/Llama-3-70b-chat-hf';
+                    },
+                  ),
+                  ActionChip(
+                    avatar: const Icon(Icons.waves_rounded, size: 16, color: Colors.amber),
+                    label: const Text('Mistral AI', style: TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      _baseUrlController.text = AiService.mistralAiBaseUrl;
+                      _modelController.text = 'mistral-small-latest';
+                    },
+                  ),
+                  ActionChip(
+                    label: const Text('DeepSeek', style: TextStyle(fontSize: 11)),
+                    onPressed: () {
+                      _baseUrlController.text = 'https://api.deepseek.com';
+                      _modelController.text = 'deepseek-chat';
                     },
                   ),
                   ActionChip(
