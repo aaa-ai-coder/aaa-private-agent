@@ -157,18 +157,24 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     setState(() {
       _selectedProvider = provider;
       _validationError = null;
-      if (provider == 'deepseek') {
-        _baseUrlController.text = 'https://api.deepseek.com';
-        _modelController.text = 'deepseek-chat';
-      } else if (provider == 'groq') {
+      if (provider == 'groq') {
         _baseUrlController.text = 'https://api.groq.com/openai/v1';
         _modelController.text = 'llama-3.3-70b-versatile';
+      } else if (provider == 'openrouter') {
+        _baseUrlController.text = 'https://openrouter.ai/api/v1';
+        _modelController.text = 'meta-llama/llama-3.2-3b-instruct:free';
+      } else if (provider == 'gemini') {
+        _baseUrlController.text = 'https://generativelanguage.googleapis.com/v1beta/openai/';
+        _modelController.text = 'gemini-1.5-flash';
       } else if (provider == 'nvidia') {
         _baseUrlController.text = AiService.nvidiaBaseUrl;
         _modelController.text = AiService.nvidiaDefaultModel;
-      } else if (provider == 'ollama') {
-        _baseUrlController.text = 'http://10.0.2.2:11434/v1';
-        _modelController.text = 'gemma2';
+      } else if (provider == 'ollama_cloud') {
+        _baseUrlController.text = 'https://api.ollama.com/v1';
+        _modelController.text = 'llama3.3';
+      } else if (provider == 'deepseek') {
+        _baseUrlController.text = 'https://api.deepseek.com';
+        _modelController.text = 'deepseek-chat';
       } else if (provider == 'local') {
         _baseUrlController.text = 'http://10.0.2.2:1234/v1';
         _modelController.text = 'qwen2.5-7b-instruct';
@@ -1114,42 +1120,19 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               children: [
-                _buildProviderCard(
-                  'deepseek',
-                  'DeepSeek',
-                  Icons.analytics_rounded,
-                  isDark,
-                ),
+                _buildProviderCard('groq', 'Groq Free', Icons.bolt_rounded, isDark),
                 const SizedBox(width: 10),
-                _buildProviderCard('groq', 'Groq', Icons.speed_rounded, isDark),
+                _buildProviderCard('openrouter', 'OpenRouter', Icons.public_rounded, isDark),
                 const SizedBox(width: 10),
-                _buildProviderCard(
-                  'nvidia',
-                  'NVIDIA',
-                  Icons.memory_rounded,
-                  isDark,
-                ),
+                _buildProviderCard('gemini', 'Gemini', Icons.auto_awesome_rounded, isDark),
                 const SizedBox(width: 10),
-                _buildProviderCard(
-                  'ollama',
-                  'Ollama',
-                  Icons.computer_rounded,
-                  isDark,
-                ),
+                _buildProviderCard('nvidia', 'NVIDIA NIM', Icons.memory_rounded, isDark),
                 const SizedBox(width: 10),
-                _buildProviderCard(
-                  'local',
-                  'Local Server',
-                  Icons.dns_rounded,
-                  isDark,
-                ),
+                _buildProviderCard('ollama_cloud', 'Ollama Cloud', Icons.cloud_circle_rounded, isDark),
                 const SizedBox(width: 10),
-                _buildProviderCard(
-                  'custom',
-                  'Custom',
-                  Icons.settings_suggest_rounded,
-                  isDark,
-                ),
+                _buildProviderCard('deepseek', 'DeepSeek', Icons.analytics_rounded, isDark),
+                const SizedBox(width: 10),
+                _buildProviderCard('local', 'Local Server', Icons.dns_rounded, isDark),
               ],
             ),
           ),
