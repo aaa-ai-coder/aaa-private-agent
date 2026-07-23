@@ -179,33 +179,31 @@ class DatabaseService {
   // ─── User Settings ──────────────────────────────────────────────
 
   static Future<Map<String, dynamic>?> getSettings(String userId) async {
-    final data = await _db
-        .from('user_settings')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-    return data;
+    try {
+      final data = await _db
+          .from('user_settings')
+          .select('*')
+          .eq('user_id', userId)
+          .maybeSingle();
+      return data;
+    } catch (e) {
+      print('Error loading settings from Supabase: $e');
+      return null;
+    }
   }
 
   static Future<void> saveSettings({
     required String userId,
     required Map<String, dynamic> settings,
   }) async {
-    final existing = await _db
-        .from('user_settings')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
-    if (existing != null) {
-      await _db.from('user_settings').update({
-        ...settings,
-        'updated_at': DateTime.now().toIso8601String(),
-      }).eq('user_id', userId);
-    } else {
-      await _db.from('user_settings').insert({
+    try {
+      await _db.from('user_settings').upsert({
         'user_id': userId,
         ...settings,
-      });
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'user_id');
+    } catch (e) {
+      print('Error saving settings to Supabase: $e');
     }
   }
 
