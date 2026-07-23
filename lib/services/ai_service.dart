@@ -94,9 +94,8 @@ CRITICAL RULES:
 Examples of when to use execute_task:
 - "Create a new alarm for 7 AM" → execute_task with goal "Create a new alarm for 7 AM"
 - "Go to YouTube and search for cats" → execute_task
+- "Open Clash of Clans and collect my gold/elixir" → execute_task with goal "Open Clash of Clans and collect resources"
 - "Open WhatsApp and send hello to John" → execute_task
-- "Open Settings and turn on WiFi" → execute_task
-- "Search for restaurants on Google Maps" → execute_task
 
 Examples of when to use open_app:
 - "Open YouTube" → open_app (just opening, no further action)
