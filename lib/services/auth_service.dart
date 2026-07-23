@@ -86,55 +86,37 @@ class AuthService extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      // 1. Try native in-app Google Sign In prompt (no browser redirect)
+      // Clean native in-app Google account picker
       final googleUser = await _googleSignIn.signIn();
-      if (googleUser != null) {
-        final googleAuth = await googleUser.authentication;
-        final idToken = googleAuth.idToken;
-        final accessToken = googleAuth.accessToken;
-
-        if (idToken != null) {
-          final response = await SupabaseConfig.client.auth.signInWithIdToken(
-            provider: OAuthProvider.google,
-            idToken: idToken,
-            accessToken: accessToken,
-          );
-          _user = response.user;
-          _session = response.session;
-          _isLoading = false;
-          notifyListeners();
-          return _user != null;
-        }
-      }
-
-      // 2. Fallback to web OAuth if native sign-in returned null or failed
-      await SupabaseConfig.client.auth.signInWithOAuth(
-        OAuthProvider.google,
-        redirectTo: 'com.aaa.privateagent://callback',
-      );
-      _user = SupabaseConfig.client.auth.currentUser;
-      _session = SupabaseConfig.client.auth.currentSession;
-      _isLoading = false;
-      notifyListeners();
-      return _user != null;
-    } catch (e) {
-      // Fallback try browser if native fails
-      try {
-        await SupabaseConfig.client.auth.signInWithOAuth(
-          OAuthProvider.google,
-          redirectTo: 'com.aaa.privateagent://callback',
-        );
-        _user = SupabaseConfig.client.auth.currentUser;
-        _session = SupabaseConfig.client.auth.currentSession;
-        _isLoading = false;
-        notifyListeners();
-        return _user != null;
-      } catch (e2) {
-        _error = e2.toString().replaceFirst('Exception: ', '');
+      if (googleUser == null) {
+        // User cancelled account picker
         _isLoading = false;
         notifyListeners();
         return false;
       }
+      final googleAuth = await googleUser.authentication;
+      final idToken = googleAuth.idToken;
+      final accessToken = googleAuth.accessToken;
+
+      if (idToken != null) {
+        final response = await SupabaseConfig.client.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: idToken,
+          accessToken: accessToken,
+        );
+        _user = response.user;
+        _session = response.session;
+        _isLoading = false;
+        notifyListeners();
+        return _user != null;
+      } else {
+        throw Exception('Failed to obtain Google authentication tokens.');
+      }
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
     }
   }
 

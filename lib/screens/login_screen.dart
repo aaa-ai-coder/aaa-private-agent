@@ -31,14 +31,14 @@ class _LoginScreenState extends State<LoginScreen>
 
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 700),
     );
     _fadeAnim = CurvedAnimation(
       parent: _animController,
       curve: Curves.easeOut,
     );
     _slideAnim = Tween<Offset>(
-      begin: const Offset(0, 0.15),
+      begin: const Offset(0, 0.1),
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _animController,
@@ -78,17 +78,17 @@ class _LoginScreenState extends State<LoginScreen>
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
-        transitionDuration: const Duration(milliseconds: 500),
+        transitionDuration: const Duration(milliseconds: 400),
       ),
     );
   }
 
-  Future<void> _submit() async {
+  Future<void> _submitEmailPassword() async {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
     if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter email and password')),
+        const SnackBar(content: Text('Please fill in both email and password')),
       );
       return;
     }
@@ -103,6 +103,27 @@ class _LoginScreenState extends State<LoginScreen>
         SnackBar(
           content: Text(widget.authService.error!),
           backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
+  Future<void> _sendMagicLink() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email address above to receive a Magic Link')),
+      );
+      return;
+    }
+    final sent = await widget.authService.sendMagicLink(email);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(sent
+              ? '✨ Magic login link sent to $email! Check your inbox.'
+              : 'Failed: ${widget.authService.error ?? "Unknown error"}'),
+          backgroundColor: sent ? Colors.green : Colors.redAccent,
         ),
       );
     }
@@ -129,45 +150,6 @@ class _LoginScreenState extends State<LoginScreen>
           backgroundColor: Colors.redAccent,
         ),
       );
-    }
-  }
-
-  Future<void> _showMagicLinkDialog() async {
-    final emailCtrl = TextEditingController(text: _emailController.text);
-    final result = await showDialog<String>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Send Magic Link'),
-        content: TextField(
-          controller: emailCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Email Address',
-            hintText: 'you@example.com',
-          ),
-          keyboardType: TextInputType.emailAddress,
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx, emailCtrl.text.trim()),
-            child: const Text('Send'),
-          ),
-        ],
-      ),
-    );
-    emailCtrl.dispose();
-    if (result != null && result.isNotEmpty) {
-      final sent = await widget.authService.sendMagicLink(result);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(sent
-                ? 'Magic link sent! Check your inbox.'
-                : 'Failed: ${widget.authService.error ?? "Unknown error"}'),
-            backgroundColor: sent ? Colors.green : Colors.red,
-          ),
-        );
-      }
     }
   }
 
@@ -228,16 +210,16 @@ class _LoginScreenState extends State<LoginScreen>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          width: 90,
-                          height: 90,
+                          width: 84,
+                          height: 84,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: isDark ? const Color(0xFF151D30) : Colors.white,
                             boxShadow: [
                               BoxShadow(
                                 color: Colors.black.withOpacity(0.12),
-                                blurRadius: 24,
-                                offset: const Offset(0, 10),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
                               )
                             ],
                             border: Border.all(
@@ -247,11 +229,11 @@ class _LoginScreenState extends State<LoginScreen>
                           ),
                           child: Icon(
                             Icons.smart_toy_rounded,
-                            size: 46,
+                            size: 44,
                             color: Theme.of(context).primaryColor,
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
                         Text(
                           'AAA Private Agent',
                           style: TextStyle(
@@ -263,13 +245,15 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          _isRegistering ? 'Create your secure account' : 'Sign in to access your AI assistant',
+                          _isRegistering ? 'Create your account' : 'Sign in to access your AI assistant',
                           style: TextStyle(
                             fontSize: 14,
                             color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                           ),
                         ),
-                        const SizedBox(height: 32),
+                        const SizedBox(height: 28),
+
+                        // Email input
                         TextField(
                           controller: _emailController,
                           keyboardType: TextInputType.emailAddress,
@@ -300,7 +284,9 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                         ),
-                        const SizedBox(height: 14),
+                        const SizedBox(height: 12),
+
+                        // Password input
                         TextField(
                           controller: _passwordController,
                           obscureText: _obscurePassword,
@@ -338,9 +324,29 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                         ),
+
+                        // Send Magic Link option integrated directly
+                        if (!_isRegistering)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton.icon(
+                              onPressed: auth.isLoading ? null : _sendMagicLink,
+                              icon: const Icon(Icons.bolt, size: 16, color: Colors.teal),
+                              label: const Text(
+                                'Send Magic Link instead',
+                                style: TextStyle(
+                                  color: Colors.teal,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+
                         if (auth.error != null) ...[
-                          const SizedBox(height: 12),
+                          const SizedBox(height: 10),
                           Container(
+                            width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
                               color: Colors.redAccent.withOpacity(0.1),
@@ -353,17 +359,19 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                         ],
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
+
+                        // Main Submit Button
                         SizedBox(
                           width: double.infinity,
-                          height: 52,
+                          height: 50,
                           child: ElevatedButton(
-                            onPressed: auth.isLoading ? null : _submit,
+                            onPressed: auth.isLoading ? null : _submitEmailPassword,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Theme.of(context).colorScheme.primary,
                               foregroundColor: Colors.white,
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(14),
                               ),
                               elevation: 0,
                             ),
@@ -377,7 +385,7 @@ class _LoginScreenState extends State<LoginScreen>
                                     ),
                                   )
                                 : Text(
-                                    _isRegistering ? 'Create Account' : 'Sign In',
+                                    _isRegistering ? 'Create Account' : 'Sign In with Email',
                                     style: const TextStyle(
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold,
@@ -385,9 +393,14 @@ class _LoginScreenState extends State<LoginScreen>
                                   ),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const SizedBox(height: 6),
+
+                        // Switch mode (Sign In / Register)
                         TextButton(
-                          onPressed: () => setState(() => _isRegistering = !_isRegistering),
+                          onPressed: () {
+                            auth.clearError();
+                            setState(() => _isRegistering = !_isRegistering);
+                          },
                           child: Text(
                             _isRegistering
                                 ? 'Already have an account? Sign In'
@@ -398,12 +411,13 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
+
                         Row(
                           children: [
                             Expanded(child: Divider(color: isDark ? Colors.grey[800] : Colors.grey[300])),
                             Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              padding: const EdgeInsets.symmetric(horizontal: 14),
                               child: Text(
                                 'or continue with',
                                 style: TextStyle(
@@ -416,16 +430,18 @@ class _LoginScreenState extends State<LoginScreen>
                             Expanded(child: Divider(color: isDark ? Colors.grey[800] : Colors.grey[300])),
                           ],
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
+
+                        // Single Native Google Button
                         SizedBox(
                           width: double.infinity,
-                          height: 50,
+                          height: 48,
                           child: OutlinedButton.icon(
                             onPressed: auth.isLoading ? null : _signInWithGoogle,
                             icon: const Icon(Icons.g_mobiledata_rounded, size: 30, color: Colors.red),
                             label: const Text(
-                              'Sign in with Google (In-App)',
-                              style: TextStyle(fontWeight: FontWeight.w600),
+                              'Sign in with Google',
+                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                             ),
                             style: OutlinedButton.styleFrom(
                               foregroundColor: isDark ? Colors.white : Colors.black87,
@@ -433,60 +449,34 @@ class _LoginScreenState extends State<LoginScreen>
                                 color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                               ),
                               shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
+                                borderRadius: BorderRadius.circular(14),
                               ),
                             ),
                           ),
                         ),
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: SizedBox(
-                                height: 50,
-                                child: OutlinedButton.icon(
-                                  onPressed: auth.isLoading ? null : _signInWithPasskey,
-                                  icon: const Icon(Icons.fingerprint_rounded, size: 20, color: Colors.indigo),
-                                  label: const Text(
-                                    'Passkey',
-                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: isDark ? Colors.white : Colors.black87,
-                                    side: BorderSide(
-                                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                ),
+                        const SizedBox(height: 10),
+
+                        // Passkey Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton.icon(
+                            onPressed: auth.isLoading ? null : _signInWithPasskey,
+                            icon: const Icon(Icons.fingerprint_rounded, size: 20, color: Colors.indigo),
+                            label: const Text(
+                              'Sign in with Passkey',
+                              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: isDark ? Colors.white : Colors.black87,
+                              side: BorderSide(
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: SizedBox(
-                                height: 50,
-                                child: OutlinedButton.icon(
-                                  onPressed: auth.isLoading ? null : _showMagicLinkDialog,
-                                  icon: const Icon(Icons.mark_email_read_outlined, size: 18, color: Colors.teal),
-                                  label: const Text(
-                                    'Magic Link',
-                                    style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
-                                  ),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: isDark ? Colors.white : Colors.black87,
-                                    side: BorderSide(
-                                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-                                    ),
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(16),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ],
                     ),
