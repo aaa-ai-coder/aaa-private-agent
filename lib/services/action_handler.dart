@@ -25,6 +25,13 @@ class ActionHandler {
   /// The currently running task executor, if any
   TaskExecutor? _currentExecutor;
 
+  int _parseInt(dynamic val, int defaultValue) {
+    if (val == null) return defaultValue;
+    if (val is num) return val.toInt();
+    if (val is String) return int.tryParse(val) ?? defaultValue;
+    return defaultValue;
+  }
+
   /// Execute an action and return the result
   Future<AgentActionResult> execute(
     AgentAction action, {
@@ -69,28 +76,28 @@ class ActionHandler {
 
         case 'set_alarm':
           result = await _alarm.setAlarm(
-            hour: (action.params['hour'] as num?)?.toInt() ?? 0,
-            minute: (action.params['minute'] as num?)?.toInt() ?? 0,
+            hour: _parseInt(action.params['hour'], 0),
+            minute: _parseInt(action.params['minute'], 0),
             label: action.params['label'] as String?,
           );
           break;
 
         case 'set_timer':
           result = await _alarm.setTimer(
-            seconds: (action.params['seconds'] as num?)?.toInt() ?? 60,
+            seconds: _parseInt(action.params['seconds'], 60),
             label: action.params['label'] as String?,
           );
           break;
 
         case 'set_volume':
           result = await _systemControl.setVolume(
-            (action.params['level'] as num?)?.toInt() ?? 50,
+            _parseInt(action.params['level'], 50),
           );
           break;
 
         case 'set_brightness':
           result = await _systemControl.setBrightness(
-            (action.params['level'] as num?)?.toInt() ?? 50,
+            _parseInt(action.params['level'], 50),
           );
           break;
 
