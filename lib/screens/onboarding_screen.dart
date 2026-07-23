@@ -216,30 +216,27 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
 
     try {
-      final models = await _aiService.fetchAvailableModels(baseUrl, apiKey);
-      if (models.isNotEmpty ||
-          _selectedProvider == 'ollama' ||
-          _selectedProvider == 'local') {
-        await _aiService.saveSettings(
-          apiKey: apiKey,
-          baseUrl: baseUrl,
-          model: model,
-        );
-        final userId = authService.userId;
-        if (userId != null) {
-          try {
-            await DatabaseService.saveSettings(
-              userId: userId,
-              settings: {
-                'api_key': apiKey,
-                'api_base_url': baseUrl,
-                'api_model': model,
-              },
-            );
-          } catch (_) {}
-        }
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('onboarding_completed', true);
+      // Save settings directly
+      await _aiService.saveSettings(
+        apiKey: apiKey,
+        baseUrl: baseUrl,
+        model: model,
+      );
+      final userId = authService.userId;
+      if (userId != null) {
+        try {
+          await DatabaseService.saveSettings(
+            userId: userId,
+            settings: {
+              'api_key': apiKey,
+              'api_base_url': baseUrl,
+              'api_model': model,
+            },
+          );
+        } catch (_) {}
+      }
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('onboarding_completed', true);
 
         if (mounted) {
           setState(() {
