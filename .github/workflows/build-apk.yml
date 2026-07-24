@@ -34,6 +34,10 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Generate Release Keystore
+        run: |
+          keytool -genkey -v -keystore android/app/release.keystore -alias release -keyalg RSA -keysize 2048 -validity 10000 -storepass privateagent123 -keypass privateagent123 -dname "CN=AAA Private Agent, OU=Agent, O=AAA, L=City, S=State, C=US"
+
       - name: Ensure google-services.json exists
         run: |
           if [ ! -f "android/app/google-services.json" ]; then
