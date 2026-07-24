@@ -1,6 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:developer';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:passkeys/authenticator.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 
@@ -14,6 +20,9 @@ class AuthService extends ChangeNotifier {
     serverClientId: '844358886395-tsh4o7eo55r14e6cbrs6oc1faisu6l33.apps.googleusercontent.com',
   );
 
+  String? get deviceSha => _deviceSha;
+  String? _deviceSha;
+
   User? get user => _user;
   Session? get session => _session;
   bool get isLoading => _isLoading;
@@ -23,12 +32,25 @@ class AuthService extends ChangeNotifier {
   String? get email => _user?.email;
 
   AuthService() {
+    _initDeviceSha();
     _checkSession();
     SupabaseConfig.client.auth.onAuthStateChange.listen((data) {
       _user = data.session?.user;
       _session = data.session;
       notifyListeners();
     });
+  }
+
+  Future<void> _initDeviceSha() async {
+    final prefs = await SharedPreferences.getInstance();
+    _deviceSha = prefs.getString('device_sha');
+    if (_deviceSha == null) {
+      final raw = DateTime.now().millisecondsSinceEpoch.toString() +
+          DateTime.now().toIso8601String() +
+          (kIsDebug ? 'debug' : 'release');
+      _deviceSha = sha256.convert(utf8.encode(raw)).toString();
+      await prefs.setString('device_sha', _deviceSha!);
+    }
   }
 
   Future<void> _checkSession() async {
@@ -48,6 +70,7 @@ class AuthService extends ChangeNotifier {
       );
       _user = response.user;
       _session = response.session;
+      await _linkDevice();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -70,6 +93,7 @@ class AuthService extends ChangeNotifier {
       );
       _user = response.user;
       _session = response.session;
+      await _linkDevice();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -81,15 +105,25 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  Future<void> _linkDevice() async {
+    if (_user == null || _deviceSha == null) return;
+    try {
+      await SupabaseConfig.client.from('user_devices').upsert({
+        'user_id': _user!.id,
+        'device_sha': _deviceSha,
+        'auth_provider': 'supabase',
+        'created_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'user_id,device_sha');
+    } catch (_) {}
+  }
+
   Future<bool> signInWithGoogle() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
     try {
-      // Clean native in-app Google account picker
       final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
-        // User cancelled account picker
         _isLoading = false;
         notifyListeners();
         return false;
@@ -106,12 +140,53 @@ class AuthService extends ChangeNotifier {
         );
         _user = response.user;
         _session = response.session;
+        await _linkDevice();
         _isLoading = false;
         notifyListeners();
         return _user != null;
       } else {
         throw Exception('Failed to obtain Google authentication tokens.');
       }
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  Future<bool> signInWithFirebaseGoogle() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        idToken: googleAuth.idToken,
+        accessToken: googleAuth.accessToken,
+      );
+      final firebaseUser = (await FirebaseAuth.instance.signInWithCredential(credential)).user;
+      if (firebaseUser != null) {
+        final idToken = await firebaseUser.getIdToken();
+        final response = await SupabaseConfig.client.auth.signInWithIdToken(
+          provider: OAuthProvider.google,
+          idToken: idToken,
+          accessToken: googleAuth.accessToken,
+        );
+        _user = response.user;
+        _session = response.session;
+        await _linkDevice();
+        _isLoading = false;
+        notifyListeners();
+        return _user != null;
+      }
+      throw Exception('Firebase Google sign in failed.');
     } catch (e) {
       _error = e.toString().replaceFirst('Exception: ', '');
       _isLoading = false;
@@ -129,6 +204,7 @@ class AuthService extends ChangeNotifier {
       final response = await SupabaseConfig.client.auth.signInWithPasskey(authenticator);
       _user = response.user;
       _session = response.session;
+      await _linkDevice();
       _isLoading = false;
       notifyListeners();
       return _user != null;
@@ -167,6 +243,7 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    await FirebaseAuth.instance.signOut();
     await SupabaseConfig.client.auth.signOut();
     _user = null;
     _session = null;

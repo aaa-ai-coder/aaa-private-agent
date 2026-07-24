@@ -22,6 +22,7 @@ dependencies:
   firebase_analytics: ^11.0.0
   passkeys: ^2.21.0
   google_sign_in: ^6.2.1
+  crypto: ^3.0.3
 
   # Voice
   speech_to_text: ^7.0.0
