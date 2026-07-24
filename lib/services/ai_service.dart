@@ -178,6 +178,46 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
     await prefs.setBool('api_use_system_prompt', useSystemPrompt);
   }
 
+  /// Query the OpenAI-compatible `/models` endpoint to list available live models for the given endpoint & key.
+  Future<List<String>> fetchLiveModels({String? apiKey, String? baseUrl}) async {
+    final keyToUse = (apiKey ?? _apiKey ?? '').trim().replaceAll(RegExp(r'^bearer\s+', caseSensitive: false), '');
+    final urlToUse = (baseUrl ?? _baseUrl).trim().replaceAll(RegExp(r'/+$'), '');
+
+    if (urlToUse.isEmpty) return [];
+
+    final modelsEndpoint = '$urlToUse/models';
+    try {
+      final response = await http.get(
+        Uri.parse(modelsEndpoint),
+        headers: {
+          'Accept': 'application/json',
+          if (keyToUse.isNotEmpty) 'Authorization': 'Bearer $keyToUse',
+        },
+      ).timeout(const Duration(seconds: 12));
+
+      if (response.statusCode == 200) {
+        final Map<String, dynamic> data = jsonDecode(response.body);
+        final List<dynamic> modelList = data['data'] ?? data['models'] ?? [];
+        final List<String> modelIds = [];
+        for (final item in modelList) {
+          if (item is Map && item.containsKey('id') && item['id'] is String) {
+            modelIds.add(item['id'] as String);
+          } else if (item is String) {
+            modelIds.add(item);
+          }
+        }
+        modelIds.sort();
+        if (isNvidiaBaseUrl(urlToUse)) {
+          return filterNvidiaFreeModels(modelIds);
+        }
+        return modelIds;
+      }
+    } catch (e) {
+      developer.log('Error fetching live models from $modelsEndpoint: $e', name: 'PrivateAgent');
+    }
+    return [];
+  }
+
   bool get isConfigured => _apiKey != null && _apiKey!.isNotEmpty;
   String get baseUrl => _baseUrl;
   String get model => _model;
@@ -616,44 +656,71 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
     return null;
   }
 
-  /// Fetches available models from the provider's /models endpoint
+  /// Fetches available models from the provider's /models endpoint with support for all providers (OpenAI, Gemini, Groq, OpenRouter, DeepSeek, Ollama, etc.)
   Future<List<String>> fetchAvailableModels(
     String baseUrl,
     String apiKey,
   ) async {
     try {
-      String cleanBaseUrl = baseUrl;
-      // Many providers host it at /models, but some require the base URL without /chat/completions logic
+      String cleanBaseUrl = baseUrl.trim().replaceAll(RegExp(r'/+$'), '');
       if (cleanBaseUrl.endsWith('/chat/completions')) {
         cleanBaseUrl = cleanBaseUrl.replaceAll('/chat/completions', '');
       }
+      final cleanKey = apiKey.trim().replaceAll(RegExp(r'^bearer\s+', caseSensitive: false), '');
+
+      String endpoint = cleanBaseUrl.endsWith('/models') ? cleanBaseUrl : '$cleanBaseUrl/models';
+
+      // Gemini specific parameter
+      if (cleanBaseUrl.contains('generativelanguage.googleapis.com') && cleanKey.isNotEmpty) {
+        endpoint = '$endpoint?key=$cleanKey';
+      }
 
       final response = await http.get(
-        Uri.parse('$cleanBaseUrl/models'),
-        headers: {'Authorization': 'Bearer $apiKey'},
-      );
+        Uri.parse(endpoint),
+        headers: {
+          'Accept': 'application/json',
+          if (cleanKey.isNotEmpty) 'Authorization': 'Bearer $cleanKey',
+        },
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        List<String> models;
+        List<String> models = [];
         if (data is Map && data.containsKey('data')) {
           final modelsList = data['data'] as List;
-          models = modelsList.map((m) => m['id'].toString()).toList();
+          for (var m in modelsList) {
+            if (m is Map && m['id'] != null) models.add(m['id'].toString());
+            else if (m is String) models.add(m);
+          }
+        } else if (data is Map && data.containsKey('models')) {
+          final modelsList = data['models'] as List;
+          for (var m in modelsList) {
+            if (m is Map && m['name'] != null) {
+              final name = m['name'].toString();
+              models.add(name.startsWith('models/') ? name.substring(7) : name);
+            } else if (m is Map && m['id'] != null) {
+              models.add(m['id'].toString());
+            } else if (m is String) {
+              models.add(m);
+            }
+          }
         } else if (data is List) {
-          models = data.map((m) => m['id'].toString()).toList();
-        } else {
-          return [];
+          for (var m in data) {
+            if (m is Map && m['id'] != null) models.add(m['id'].toString());
+            else if (m is String) models.add(m);
+          }
         }
 
         if (isNvidiaBaseUrl(cleanBaseUrl)) {
           return filterNvidiaFreeModels(models);
         }
+        models = models.toSet().toList();
         models.sort();
         return models;
       }
       return [];
     } catch (e) {
-      print('Error fetching models: $e');
+      developer.log('Error fetching models: $e', name: 'PrivateAgent');
       return [];
     }
   }

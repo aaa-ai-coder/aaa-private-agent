@@ -124,7 +124,8 @@ class AuthService extends ChangeNotifier {
     try {
       if (_deviceSha == null) await _initDeviceSha();
       final deviceEmail = 'device_${_deviceSha!.substring(0, 16)}@privateagent.local';
-      final devicePassword = 'DevicePass_${_deviceSha!}';
+      final passSha = _deviceSha!.length > 24 ? _deviceSha!.substring(0, 24) : _deviceSha!;
+      final devicePassword = 'DevicePass_$passSha';
 
       try {
         final response = await SupabaseConfig.client.auth.signInWithPassword(

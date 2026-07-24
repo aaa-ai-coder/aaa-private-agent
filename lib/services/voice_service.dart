@@ -25,6 +25,7 @@ class VoiceService {
 
     // Configure TTS
     try {
+      await _tts.awaitSpeakCompletion(true);
       await _tts.setLanguage('en-US');
       await _tts.setSpeechRate(0.5);
       await _tts.setVolume(1.0);

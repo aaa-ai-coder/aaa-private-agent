@@ -434,15 +434,13 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
       _report('Step ${step + 1}: $reasoning');
 
       sameActionCount = action == lastAction ? sameActionCount + 1 : 1;
-      final repeatLimit = action == 'press_enter'
-          ? 2
-          : (action == 'scroll' || action == 'swipe' ? 3 : 1000);
+      final repeatLimit = action == 'press_enter' ? 2 : 3;
       if (sameActionCount > repeatLimit) {
         final blockedResult =
-            'Blocked repeated $action action. Use a different action on the visible screen.';
+            'Loop Prevention: Blocked repeating "$action" $sameActionCount times in a row. Please try a different approach (e.g. click coordinates, scroll, or press back/home).';
         results.add(blockedResult);
         _report(blockedResult);
-        consecutiveFailures = 3;
+        consecutiveFailures += 1;
         lastFailedAction = action;
         lastAction = action;
         continue;

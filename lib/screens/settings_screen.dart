@@ -51,6 +51,8 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _autoReadTts = true;
   double _ttsSpeechRate = 0.5;
   double _ttsPitch = 1.0;
+  List<String> _liveModels = [];
+  bool _isFetchingModels = false;
 
   final Map<String, PermissionStatus> _permissions = {};
 
@@ -104,6 +106,35 @@ class _SettingsScreenState extends State<SettingsScreen>
     await prefs.setBool('auto_read_tts', _autoReadTts);
     await prefs.setDouble('tts_speech_rate', _ttsSpeechRate);
     await prefs.setDouble('tts_pitch', _ttsPitch);
+  }
+
+  Future<void> _loadLiveModels() async {
+    setState(() => _isFetchingModels = true);
+    final models = await widget.aiService.fetchLiveModels(
+      apiKey: _apiKeyController.text,
+      baseUrl: _baseUrlController.text,
+    );
+    if (mounted) {
+      setState(() {
+        _liveModels = models;
+        _isFetchingModels = false;
+      });
+      if (models.isNotEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Fetched ${models.length} live models! Select any model below.'),
+            backgroundColor: Colors.teal,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not fetch models. Verify API Key and Endpoint.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _checkOverlayStatus() async {
@@ -258,37 +289,86 @@ class _SettingsScreenState extends State<SettingsScreen>
 
     if (mounted) {
       final isNvidia = AiService.isNvidiaBaseUrl(baseUrl);
+      String filterQuery = '';
+
       showDialog(
         context: context,
-        builder: (context) => AlertDialog(
-          title: Text(
-            isNvidia ? 'Select a Free NVIDIA Model' : 'Select a Model',
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            height: 300,
-            child: ListView.builder(
-              itemCount: models.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  title: Text(models[index]),
-                  onTap: () {
-                    setState(() {
-                      _modelController.text = models[index];
-                    });
-                    Navigator.pop(context);
-                  },
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-          ],
-        ),
+        builder: (context) {
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              final filteredModels = filterQuery.isEmpty
+                  ? models
+                  : models
+                      .where((m) => m.toLowerCase().contains(filterQuery.toLowerCase()))
+                      .toList();
+
+              return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                title: Text(
+                  isNvidia ? 'Select Free NVIDIA Model' : 'Select Live AI Model (${models.length} available)',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  height: 380,
+                  child: Column(
+                    children: [
+                      TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Search live models...',
+                          prefixIcon: const Icon(Icons.search, size: 18),
+                          isDense: true,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onChanged: (val) {
+                          setDialogState(() => filterQuery = val);
+                        },
+                      ),
+                      const SizedBox(height: 10),
+                      Expanded(
+                        child: filteredModels.isEmpty
+                            ? const Center(child: Text('No matching models'))
+                            : ListView.builder(
+                                itemCount: filteredModels.length,
+                                itemBuilder: (context, index) {
+                                  final modelName = filteredModels[index];
+                                  final isSelected = _modelController.text == modelName;
+                                  return ListTile(
+                                    dense: true,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    selected: isSelected,
+                                    title: Text(
+                                      modelName,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                      ),
+                                    ),
+                                    trailing: isSelected ? const Icon(Icons.check_circle, color: Colors.teal, size: 18) : null,
+                                    onTap: () {
+                                      setState(() {
+                                        _modelController.text = modelName;
+                                      });
+                                      Navigator.pop(context);
+                                    },
+                                  );
+                                },
+                              ),
+                      ),
+                    ],
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
       );
     }
   }
