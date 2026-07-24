@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import '../models/chat_message.dart';
 
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
+  final VoidCallback? onSpeakTap;
+  final VoidCallback? onCopyTap;
 
-  const MessageBubble({super.key, required this.message});
+  const MessageBubble({
+    super.key,
+    required this.message,
+    this.onSpeakTap,
+    this.onCopyTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -15,7 +23,7 @@ class MessageBubble extends StatelessWidget {
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: Container(
         constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.8,
+          maxWidth: MediaQuery.of(context).size.width * 0.82,
         ),
         margin: EdgeInsets.only(
           left: isUser ? 48 : 8,
@@ -122,22 +130,74 @@ class MessageBubble extends StatelessWidget {
                   ),
                 ),
               ),
-            // Timestamp
-            const SizedBox(height: 4),
-            Text(
-              _formatTime(message.timestamp),
-              style: TextStyle(
-                fontSize: 11,
-                color: isUser
-                    ? Theme.of(context)
-                        .colorScheme
-                        .onPrimary
-                        .withValues(alpha: 0.6)
-                    : Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(alpha: 0.5),
-              ),
+            // Bottom Action Bar & Timestamp
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  _formatTime(message.timestamp),
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isUser
+                        ? Theme.of(context)
+                            .colorScheme
+                            .onPrimary
+                            .withOpacity(0.7)
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurface
+                            .withOpacity(0.5),
+                  ),
+                ),
+                if (!isUser)
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (onSpeakTap != null)
+                        InkWell(
+                          borderRadius: BorderRadius.circular(12),
+                          onTap: onSpeakTap,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                            child: Icon(
+                              Icons.volume_up_rounded,
+                              size: 16,
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.85),
+                            ),
+                          ),
+                        ),
+                      const SizedBox(width: 6),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(12),
+                        onTap: () {
+                          Clipboard.setData(ClipboardData(text: message.content));
+                          if (onCopyTap != null) {
+                            onCopyTap!();
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Message copied to clipboard'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                          child: Icon(
+                            Icons.copy_rounded,
+                            size: 15,
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurface
+                                .withOpacity(0.6),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+              ],
             ),
           ],
         ),

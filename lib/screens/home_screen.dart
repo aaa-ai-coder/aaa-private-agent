@@ -229,8 +229,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
         await _saveSession();
       } else {
-        // Plain text response, we already rendered it, just speak it
-        _voiceService.speak(accumulated);
+        // Plain text response, speak if auto-read is enabled
+        final prefs = await SharedPreferences.getInstance();
+        final autoRead = prefs.getBool('auto_read_tts') ?? true;
+        if (autoRead) {
+          _voiceService.speak(accumulated);
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -699,7 +703,16 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         ),
                         itemCount: _messages.length,
                         itemBuilder: (context, index) {
-                          return MessageBubble(message: _messages[index]);
+                          return MessageBubble(
+                            message: _messages[index],
+                            onSpeakTap: () {
+                              if (_voiceService.isSpeaking) {
+                                _voiceService.stopSpeaking();
+                              } else {
+                                _voiceService.speak(_messages[index].content);
+                              }
+                            },
+                          );
                         },
                       ),
               ),

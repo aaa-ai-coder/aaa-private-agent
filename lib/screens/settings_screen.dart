@@ -48,6 +48,9 @@ class _SettingsScreenState extends State<SettingsScreen>
   bool _useSystemPrompt = true;
   bool _floatingIconEnabled = false;
   bool _isOverlayPermissionGranted = false;
+  bool _autoReadTts = true;
+  double _ttsSpeechRate = 0.5;
+  double _ttsPitch = 1.0;
 
   final Map<String, PermissionStatus> _permissions = {};
 
@@ -78,10 +81,29 @@ class _SettingsScreenState extends State<SettingsScreen>
     _telegramTokenController.addListener(_autoSave);
     _maxTokensController.addListener(_autoSave);
 
+    _loadVoiceSettings();
     _checkPermissions();
     if (FeatureFlags.floatingOverlayEnabled) {
       _checkOverlayStatus();
     }
+  }
+
+  Future<void> _loadVoiceSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _autoReadTts = prefs.getBool('auto_read_tts') ?? true;
+        _ttsSpeechRate = prefs.getDouble('tts_speech_rate') ?? 0.5;
+        _ttsPitch = prefs.getDouble('tts_pitch') ?? 1.0;
+      });
+    }
+  }
+
+  Future<void> _saveVoiceSettings() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('auto_read_tts', _autoReadTts);
+    await prefs.setDouble('tts_speech_rate', _ttsSpeechRate);
+    await prefs.setDouble('tts_pitch', _ttsPitch);
   }
 
   Future<void> _checkOverlayStatus() async {
@@ -518,7 +540,74 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
           ),
 
-          // 2. AI Engine Config Card
+          // 2. AI Voice & Speech Settings Card
+          _buildSettingsCard(
+            icon: Icons.record_voice_over_rounded,
+            title: 'AI Voice & Speech Settings',
+            subtitle: 'Configure speech recognition and text-to-speech voice output',
+            isDark: isDark,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Auto-read AI responses'),
+                subtitle: const Text('Automatically speak AI messages aloud when received'),
+                value: _autoReadTts,
+                onChanged: (val) {
+                  setState(() => _autoReadTts = val);
+                  _saveVoiceSettings();
+                },
+              ),
+              const Divider(height: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Speech Speed Rate', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text('${_ttsSpeechRate.toStringAsFixed(1)}x', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  Slider(
+                    value: _ttsSpeechRate,
+                    min: 0.2,
+                    max: 1.5,
+                    divisions: 13,
+                    label: '${_ttsSpeechRate.toStringAsFixed(1)}x',
+                    onChanged: (val) {
+                      setState(() => _ttsSpeechRate = val);
+                      _saveVoiceSettings();
+                    },
+                  ),
+                ],
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text('Voice Pitch', style: TextStyle(fontWeight: FontWeight.w600)),
+                      Text('${_ttsPitch.toStringAsFixed(1)}x', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    ],
+                  ),
+                  Slider(
+                    value: _ttsPitch,
+                    min: 0.5,
+                    max: 1.5,
+                    divisions: 10,
+                    label: '${_ttsPitch.toStringAsFixed(1)}x',
+                    onChanged: (val) {
+                      setState(() => _ttsPitch = val);
+                      _saveVoiceSettings();
+                    },
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          // 3. AI Engine Config Card
           _buildSettingsCard(
             icon: Icons.psychology_outlined,
             title: 'AI Engine Configuration',
