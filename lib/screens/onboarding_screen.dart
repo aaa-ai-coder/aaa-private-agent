@@ -206,6 +206,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
 
     if (_selectedProvider != 'ollama' &&
+        _selectedProvider != 'ollama_cloud' &&
         _selectedProvider != 'local' &&
         apiKey.isEmpty) {
       setState(() {
@@ -216,7 +217,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
 
     try {
-      // Save settings directly
       await _aiService.saveSettings(
         apiKey: apiKey,
         baseUrl: baseUrl,
@@ -228,7 +228,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           await DatabaseService.saveSettings(
             userId: userId,
             settings: {
-              'api_key': apiKey,
               'api_base_url': baseUrl,
               'api_model': model,
             },
@@ -1148,6 +1147,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               physics: const BouncingScrollPhysics(),
               children: [
                 if (_selectedProvider != 'ollama' &&
+                    _selectedProvider != 'ollama_cloud' &&
                     _selectedProvider != 'local') ...[
                   _buildFormTextField(
                     controller: _apiKeyController,

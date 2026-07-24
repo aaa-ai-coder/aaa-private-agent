@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -97,6 +98,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _autoSaveTimer?.cancel();
     _apiKeyController.removeListener(_autoSave);
     _baseUrlController.removeListener(_autoSave);
     _modelController.removeListener(_autoSave);
@@ -147,6 +149,8 @@ class _SettingsScreenState extends State<SettingsScreen>
     setState(() => _permissions[name] = status);
   }
 
+  Timer? _autoSaveTimer;
+
   void _autoSave() {
     widget.aiService.saveSettings(
       apiKey: _apiKeyController.text.trim(),
@@ -168,7 +172,10 @@ class _SettingsScreenState extends State<SettingsScreen>
       useSystemPrompt: _useSystemPrompt,
     );
 
-    _syncSettingsToSupabase();
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer(const Duration(seconds: 1), () {
+      _syncSettingsToSupabase();
+    });
   }
 
   void _syncSettingsToSupabase() {
@@ -177,7 +184,6 @@ class _SettingsScreenState extends State<SettingsScreen>
     DatabaseService.saveSettings(
       userId: userId,
       settings: {
-        'api_key': _apiKeyController.text.trim(),
         'api_base_url': _baseUrlController.text.trim(),
         'api_model': _modelController.text.trim(),
         'api_max_steps': _maxSteps.toInt(),

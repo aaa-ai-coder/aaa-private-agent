@@ -15,6 +15,11 @@ dependencies:
 
   # Database & Auth
   supabase_flutter: ^2.8.0
+  firebase_core: ^3.0.0
+  firebase_auth: ^5.0.0
+  cloud_firestore: ^5.0.0
+  firebase_crashlytics: ^4.0.0
+  firebase_analytics: ^11.0.0
   passkeys: ^2.21.0
   google_sign_in: ^6.2.1
 
@@ -23,7 +28,6 @@ dependencies:
   flutter_tts: ^4.2.0
 
   # App management
-  installed_apps: ^1.5.0
   url_launcher: ^6.3.0
   android_intent_plus: ^5.1.0
 

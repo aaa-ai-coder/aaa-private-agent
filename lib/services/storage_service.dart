@@ -5,45 +5,37 @@ import 'package:shared_preferences/shared_preferences.dart';
 class StorageService {
   static String? _accountId;
   static String? _bucketName;
-  static String? _accessKeyId;
-  static String? _secretAccessKey;
+  static String? _apiToken;
 
-  /// Initialize Cloudflare R2 S3 storage settings
   static Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _accountId = prefs.getString('r2_account_id');
     _bucketName = prefs.getString('r2_bucket_name');
-    _accessKeyId = prefs.getString('r2_access_key');
-    _secretAccessKey = prefs.getString('r2_secret_key');
+    _apiToken = prefs.getString('r2_api_token');
   }
 
   static Future<void> saveConfig({
     required String accountId,
     required String bucketName,
-    required String accessKeyId,
-    required String secretAccessKey,
+    required String apiToken,
   }) async {
     _accountId = accountId.trim();
     _bucketName = bucketName.trim();
-    _accessKeyId = accessKeyId.trim();
-    _secretAccessKey = secretAccessKey.trim();
+    _apiToken = apiToken.trim();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('r2_account_id', _accountId!);
     await prefs.setString('r2_bucket_name', _bucketName!);
-    await prefs.setString('r2_access_key', _accessKeyId!);
-    await prefs.setString('r2_secret_key', _secretAccessKey!);
+    await prefs.setString('r2_api_token', _apiToken!);
   }
 
   static bool get isConfigured =>
       _accountId != null &&
       _bucketName != null &&
-      _accessKeyId != null &&
-      _secretAccessKey != null &&
+      _apiToken != null &&
       _accountId!.isNotEmpty &&
       _bucketName!.isNotEmpty;
 
-  /// Upload a file or screenshot to Cloudflare R2 (S3 compatible endpoint)
   static Future<String?> uploadFile({
     required File file,
     required String fileName,
@@ -53,14 +45,12 @@ class StorageService {
 
     try {
       final endpoint = 'https://$_accountId.r2.cloudflarestorage.com/$_bucketName/$folder/$fileName';
-      
       final bytes = await file.readAsBytes();
-      
-      // Cloudflare R2 S3 HTTP PUT upload
+
       final response = await http.put(
         Uri.parse(endpoint),
         headers: {
-          'Authorization': 'Bearer $_accessKeyId', // Or AWS Signature V4 if required
+          'Authorization': 'Bearer $_apiToken',
           'Content-Type': 'application/octet-stream',
         },
         body: bytes,
