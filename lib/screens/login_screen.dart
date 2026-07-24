@@ -136,6 +136,19 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  Future<void> _signInWithDevice() async {
+    widget.authService.clearError();
+    final success = await widget.authService.signInWithDevice();
+    if (!success && mounted && widget.authService.error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(widget.authService.error!),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -267,6 +280,30 @@ class _LoginScreenState extends State<LoginScreen>
                             icon: const Icon(Icons.fingerprint_rounded, size: 22, color: Colors.indigo),
                             label: const Text(
                               'Sign in with Passkey (Biometric)',
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: isDark ? Colors.white : Colors.black87,
+                              side: BorderSide(
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Instant Device Sign In
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            onPressed: auth.isLoading ? null : _signInWithDevice,
+                            icon: const Icon(Icons.smartphone_rounded, size: 22, color: Colors.teal),
+                            label: const Text(
+                              'Instant Device Guest Sign-In',
                               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                             ),
                             style: OutlinedButton.styleFrom(

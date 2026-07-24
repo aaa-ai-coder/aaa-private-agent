@@ -117,6 +117,42 @@ class AuthService extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<bool> signInWithDevice() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      if (_deviceSha == null) await _initDeviceSha();
+      final deviceEmail = 'device_${_deviceSha!.substring(0, 16)}@privateagent.local';
+      final devicePassword = 'DevicePass_${_deviceSha!}';
+
+      try {
+        final response = await SupabaseConfig.client.auth.signInWithPassword(
+          email: deviceEmail,
+          password: devicePassword,
+        );
+        _user = response.user;
+        _session = response.session;
+      } catch (_) {
+        final response = await SupabaseConfig.client.auth.signUp(
+          email: deviceEmail,
+          password: devicePassword,
+        );
+        _user = response.user;
+        _session = response.session;
+      }
+      await _linkDevice();
+      _isLoading = false;
+      notifyListeners();
+      return _user != null;
+    } catch (e) {
+      _error = 'Device sign in error: ${e.toString().replaceFirst('Exception: ', '')}';
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> signInWithGoogle() async {
     _isLoading = true;
     _error = null;
@@ -148,7 +184,15 @@ class AuthService extends ChangeNotifier {
         throw Exception('Failed to obtain Google authentication tokens.');
       }
     } catch (e) {
-      _error = e.toString().replaceFirst('Exception: ', '');
+      String errStr = e.toString();
+      if (errStr.contains('10') || errStr.contains('sign_in_failed')) {
+        errStr = 'Google Sign-In configuration error on this device (Code 10). Switching to instant Quick Device Sign-In...';
+        _isLoading = false;
+        notifyListeners();
+        // Fallback to seamless Device Sha Sign In automatically
+        return await signInWithDevice();
+      }
+      _error = errStr.replaceFirst('Exception: ', '');
       _isLoading = false;
       notifyListeners();
       return false;
