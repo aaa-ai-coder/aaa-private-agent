@@ -31,6 +31,7 @@ dependencies:
   # App management
   url_launcher: ^6.3.0
   android_intent_plus: ^5.1.0
+  installed_apps: ^1.1.0
 
   # Contacts
   flutter_contacts: ^1.1.9+2

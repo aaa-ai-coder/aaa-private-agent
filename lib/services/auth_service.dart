@@ -3,16 +3,16 @@ import 'dart:convert';
 import 'dart:developer';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' as fb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:passkeys/authenticator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../config/supabase_config.dart';
 
 class AuthService extends ChangeNotifier {
-  User? _user;
-  Session? _session;
+  sb.User? _user;
+  sb.Session? _session;
   bool _isLoading = false;
   String? _error;
 
@@ -23,8 +23,8 @@ class AuthService extends ChangeNotifier {
   String? get deviceSha => _deviceSha;
   String? _deviceSha;
 
-  User? get user => _user;
-  Session? get session => _session;
+  sb.User? get user => _user;
+  sb.Session? get session => _session;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isLoggedIn => _user != null;
@@ -47,7 +47,7 @@ class AuthService extends ChangeNotifier {
     if (_deviceSha == null) {
       final raw = DateTime.now().millisecondsSinceEpoch.toString() +
           DateTime.now().toIso8601String() +
-          (kIsDebug ? 'debug' : 'release');
+          (kDebugMode ? 'debug' : 'release');
       _deviceSha = sha256.convert(utf8.encode(raw)).toString();
       await prefs.setString('device_sha', _deviceSha!);
     }
@@ -134,7 +134,7 @@ class AuthService extends ChangeNotifier {
 
       if (idToken != null) {
         final response = await SupabaseConfig.client.auth.signInWithIdToken(
-          provider: OAuthProvider.google,
+          provider: sb.OAuthProvider.google,
           idToken: idToken,
           accessToken: accessToken,
         );
@@ -167,24 +167,26 @@ class AuthService extends ChangeNotifier {
         return false;
       }
       final googleAuth = await googleUser.authentication;
-      final credential = GoogleAuthProvider.credential(
+      final credential = fb.GoogleAuthProvider.credential(
         idToken: googleAuth.idToken,
         accessToken: googleAuth.accessToken,
       );
-      final firebaseUser = (await FirebaseAuth.instance.signInWithCredential(credential)).user;
+      final firebaseUser = (await fb.FirebaseAuth.instance.signInWithCredential(credential)).user;
       if (firebaseUser != null) {
         final idToken = await firebaseUser.getIdToken();
-        final response = await SupabaseConfig.client.auth.signInWithIdToken(
-          provider: OAuthProvider.google,
-          idToken: idToken,
-          accessToken: googleAuth.accessToken,
-        );
-        _user = response.user;
-        _session = response.session;
-        await _linkDevice();
-        _isLoading = false;
-        notifyListeners();
-        return _user != null;
+        if (idToken != null) {
+          final response = await SupabaseConfig.client.auth.signInWithIdToken(
+            provider: sb.OAuthProvider.google,
+            idToken: idToken,
+            accessToken: googleAuth.accessToken,
+          );
+          _user = response.user;
+          _session = response.session;
+          await _linkDevice();
+          _isLoading = false;
+          notifyListeners();
+          return _user != null;
+        }
       }
       throw Exception('Firebase Google sign in failed.');
     } catch (e) {
@@ -243,7 +245,7 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
-    await FirebaseAuth.instance.signOut();
+    await fb.FirebaseAuth.instance.signOut();
     await SupabaseConfig.client.auth.signOut();
     _user = null;
     _session = null;
