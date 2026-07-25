@@ -13,6 +13,13 @@ import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/quick_actions.dart';
+import '../widgets/home_drawer.dart';
+import '../widgets/home_background_glows.dart';
+import '../widgets/home_mode_selector.dart';
+import '../widgets/home_empty_state.dart';
+import '../widgets/home_input_bar.dart';
+import '../widgets/model_picker_sheet.dart';
+import '../widgets/api_warning_banner.dart';
 import '../services/telegram_service.dart';
 import '../services/chat_history_service.dart';
 import '../services/notification_service.dart';
@@ -540,10 +547,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         height: 56,
       );
       if (_isLoading && _appLifecycleState == AppLifecycleState.paused) {
-        // Give the overlay isolate time to attach its listener, then send the
-        // full active conversation. A second snapshot makes cold starts
-        // reliable without duplicating messages because the overlay replaces
-        // its list atomically.
         await Future<void>.delayed(const Duration(milliseconds: 250));
         await _sendOverlayHistorySnapshot();
         await Future<void>.delayed(const Duration(milliseconds: 250));
@@ -571,9 +574,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? const Color(0xFF0C0A15)
-          : const Color(0xFFFFFFFF),
+      backgroundColor: isDark ? const Color(0xFF0C0A15) : const Color(0xFFFFFFFF),
       appBar: AppBar(
         title: RichText(
           text: TextSpan(
@@ -581,25 +582,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               fontSize: 20,
               color: isDark ? Colors.white : const Color(0xFF1E293B),
             ),
-              children: [
-                TextSpan(
-                  text: 'AAA ',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w300,
-                    color: Theme.of(context).colorScheme.primary,
-                    letterSpacing: -0.5,
-                  ),
+            children: [
+              TextSpan(
+                text: 'AAA ',
+                style: TextStyle(
+                  fontWeight: FontWeight.w300,
+                  color: Theme.of(context).colorScheme.primary,
+                  letterSpacing: -0.5,
                 ),
-                TextSpan(
-                  text: 'Private',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w900,
-                    color: Theme.of(context).colorScheme.primary,
-                    letterSpacing: -0.5,
-                  ),
+              ),
+              TextSpan(
+                text: 'Private',
+                style: TextStyle(
+                  fontWeight: FontWeight.w900,
+                  color: Theme.of(context).colorScheme.primary,
+                  letterSpacing: -0.5,
                 ),
-                const TextSpan(
-                  text: 'Agent',
+              ),
+              TextSpan(
+                text: 'Agent',
                 style: TextStyle(
                   fontWeight: FontWeight.w400,
                   letterSpacing: -0.5,
@@ -662,7 +663,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           IconButton(
             icon: const Icon(Icons.psychology_rounded),
             tooltip: 'Quick AI Model Switcher',
-            onPressed: _showModelQuickPicker,
+            onPressed: () => ModelPickerSheet.show(context, _aiService, () {
+              setState(() {});
+            }),
           ),
           IconButton(
             icon: const Icon(Icons.add_comment_outlined),
@@ -690,11 +693,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ],
       ),
-      drawer: _buildDrawer(context, isDark),
+      drawer: HomeDrawer(
+        isDark: isDark,
+        currentSessionId: _sessionId,
+        onNewChat: _startNewChat,
+        onLoadSession: _loadSessionMessages,
+        onTaskHistory: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
+        ),
+        onSettings: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SettingsScreen(
+                aiService: _aiService,
+                shizukuService: _actionHandler.shizuku,
+                screenAutomationService: _actionHandler.screenAutomation,
+                telegramService: _telegramService,
+              ),
+            ),
+          );
+          await _actionHandler.shizuku.checkAvailability();
+          if (mounted) setState(() {});
+        },
+      ),
       body: Stack(
         children: [
           // Background mesh glows
-          _buildBackgroundGlows(isDark),
+          HomeBackgroundGlows(isDark: isDark),
 
           Positioned.fill(
             child: BackdropFilter(
@@ -706,75 +733,47 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           Column(
             children: [
               // Pill selector switcher
-              _buildModeSelector(isDark),
+              HomeModeSelector(
+                currentMode: _mode,
+                onModeChanged: (mode) {
+                  HapticFeedback.lightImpact();
+                  setState(() => _mode = mode);
+                },
+                isDark: isDark,
+              ),
 
               // API key warning banner
               if (!_aiService.isConfigured)
-                Container(
-                  margin: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Colors.orangeAccent.withOpacity(0.15),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.orangeAccent.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.warning_amber_rounded,
-                        color: Colors.orange,
-                      ),
-                      const SizedBox(width: 12),
-                      const Expanded(
-                        child: Text(
-                          'API not configured. Tap Settings to add details.',
-                          style: TextStyle(
-                            fontSize: 12.5,
-                            fontWeight: FontWeight.w600,
-                          ),
+                ApiWarningBanner(
+                  isDark: isDark,
+                  onConfigure: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => SettingsScreen(
+                          aiService: _aiService,
+                          shizukuService: _actionHandler.shizuku,
+                          screenAutomationService: _actionHandler.screenAutomation,
+                          telegramService: _telegramService,
                         ),
                       ),
-                      TextButton(
-                        onPressed: () async {
-                          await Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => SettingsScreen(
-                                aiService: _aiService,
-                                shizukuService: _actionHandler.shizuku,
-                                screenAutomationService:
-                                    _actionHandler.screenAutomation,
-                                telegramService: _telegramService,
-                              ),
-                            ),
-                          );
-                          if (mounted) setState(() {});
-                        },
-                        child: const Text('Configure'),
-                      ),
-                    ],
-                  ),
+                    );
+                    if (mounted) setState(() {});
+                  },
                 ),
 
               // Chat content area
               Expanded(
                 child: _messages.isEmpty
-                    ? _buildEmptyState(isDark)
+                    ? HomeEmptyState(
+                        mode: _mode,
+                        isDark: isDark,
+                        onSend: _sendMessage,
+                      )
                     : ListView.builder(
                         controller: _scrollController,
                         physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
-                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         itemCount: _messages.length,
                         itemBuilder: (context, index) {
                           return MessageBubble(
@@ -794,59 +793,64 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               // Think loading indicator
               if (_isLoading)
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 8,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
-                      const SizedBox(
+                      SizedBox(
                         width: 14,
                         height: 14,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.indigoAccent,
+                            Theme.of(context).colorScheme.secondary,
                           ),
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Text(
-                        'Thinking...',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isDark
-                              ? const Color(0xFF9E9BAC)
-                              : const Color(0xFF6C6A7C),
-                          fontWeight: FontWeight.w500,
+                      ShaderMask(
+                        shaderCallback: (bounds) => LinearGradient(
+                          colors: [
+                            Theme.of(context).colorScheme.primary,
+                            Theme.of(context).colorScheme.secondary,
+                          ],
+                        ).createShader(bounds),
+                        child: Text(
+                          'Thinking...',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                       ),
                       const SizedBox(width: 8),
-                      TextButton.icon(
-                        onPressed: () {
-                          _actionHandler.cancelTask();
-                          setState(() {
-                            _isLoading = false;
-                          });
-                        },
-                        icon: const Icon(
-                          Icons.stop_circle_rounded,
-                          size: 16,
-                          color: Colors.redAccent,
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
                         ),
-                        label: const Text(
-                          'Stop',
-                          style: TextStyle(
-                            color: Colors.redAccent,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
+                        child: TextButton.icon(
+                          onPressed: () {
+                            _actionHandler.cancelTask();
+                            setState(() {
+                              _isLoading = false;
+                            });
+                          },
+                          icon: const Icon(Icons.stop_circle_rounded, size: 16, color: Colors.redAccent),
+                          label: const Text(
+                            'Stop',
+                            style: TextStyle(
+                              color: Colors.redAccent,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        ),
-                        style: TextButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
                         ),
                       ),
                     ],
@@ -861,845 +865,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
 
               // Custom Input bar
-              _buildInputBar(isDark),
+              HomeInputBar(
+                controller: _textController,
+                isListening: _isListening,
+                isLoading: _isLoading,
+                isDark: isDark,
+                onMicTap: _toggleVoice,
+                onSend: _sendMessage,
+              ),
             ],
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildDrawer(BuildContext context, bool isDark) {
-    final drawerBg = isDark ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFC);
-    final textStyle = TextStyle(
-      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-      fontWeight: FontWeight.w600,
-      fontSize: 13.5,
-    );
-    final headerStyle = TextStyle(
-      color: isDark ? Colors.white : const Color(0xFF1E293B),
-      fontSize: 17,
-      fontWeight: FontWeight.w900,
-      letterSpacing: -0.5,
-    );
-
-    return Drawer(
-      backgroundColor: drawerBg,
-      child: Column(
-        children: [
-          // Drawer Header
-          Container(
-            padding: const EdgeInsets.only(
-              top: 60,
-              bottom: 20,
-              left: 24,
-              right: 24,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(
-                      Icons.smart_toy_rounded,
-                      color: Theme.of(context).primaryColor,
-                      size: 26,
-                    ),
-                    const SizedBox(width: 12),
-                    Text('AAA Private Agent', style: headerStyle),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    CircleAvatar(
-                      radius: 16,
-                      backgroundColor: Theme.of(context).primaryColor.withOpacity(0.15),
-                      child: Icon(Icons.person_rounded, size: 18, color: Theme.of(context).primaryColor),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        _authService.email ?? 'User',
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(Icons.logout_rounded, size: 18, color: Colors.redAccent.withOpacity(0.7)),
-                      tooltip: 'Sign out',
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        await _authService.signOut();
-                      },
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // New Chat Button
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Container(
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primary,
-                borderRadius: BorderRadius.circular(16),
-                boxShadow: [
-                  BoxShadow(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withOpacity(0.2),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
-                  ),
-                ],
-              ),
-              child: Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: () {
-                    Navigator.pop(context); // Close drawer
-                    _startNewChat();
-                  },
-                  borderRadius: BorderRadius.circular(16),
-                  child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 12),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.add_comment_rounded,
-                          color: Colors.white,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          'New Chat',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 13.5,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-
-          const Divider(indent: 16, endIndent: 16, height: 20),
-
-          // Section CHAT HISTORY
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 6),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'CHAT HISTORY',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w800,
-                  color: Theme.of(context).primaryColor,
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-          ),
-
-          // Chat Sessions List
-          Expanded(
-            child: FutureBuilder<List<Map<String, dynamic>>>(
-              future: _authService.userId != null
-                  ? DatabaseService.getSessions(_authService.userId!)
-                  : Future.value([]),
-              builder: (context, snapshot) {
-                if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                  return Center(
-                    child: Text(
-                      'No recent chats',
-                      style: TextStyle(
-                        color: isDark ? Colors.grey[800] : Colors.grey[400],
-                        fontSize: 12,
-                      ),
-                    ),
-                  );
-                }
-
-                final sessions = snapshot.data!;
-                return ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  itemCount: sessions.length,
-                  itemBuilder: (context, index) {
-                    final session = sessions[index];
-                    final sessionId = session['id'] as String;
-                    final sessionTitle = session['title'] as String? ?? 'Chat';
-                    final isCurrent = sessionId == _sessionId;
-
-                    return Container(
-                      margin: const EdgeInsets.symmetric(
-                        vertical: 2,
-                        horizontal: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: isCurrent
-                            ? Theme.of(
-                                context,
-                              ).colorScheme.primary.withOpacity(0.08)
-                            : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
-                        border: isCurrent
-                            ? Border.all(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.primary.withOpacity(0.15),
-                              )
-                            : null,
-                      ),
-                      child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 0,
-                        ),
-                        dense: true,
-                        leading: Icon(
-                          Icons.chat_bubble_outline_rounded,
-                          size: 15,
-                          color: isCurrent
-                              ? Theme.of(context).colorScheme.primary
-                              : (isDark ? Colors.grey[600] : Colors.grey[500]),
-                        ),
-                        title: Text(
-                          sessionTitle,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: textStyle.copyWith(
-                            fontWeight: isCurrent
-                                ? FontWeight.bold
-                                : FontWeight.w500,
-                            color: isCurrent
-                                ? (isDark
-                                      ? Colors.white
-                                      : const Color(0xFF1E293B))
-                                : null,
-                          ),
-                        ),
-                        trailing: IconButton(
-                          icon: Icon(
-                            Icons.delete_outline_rounded,
-                            size: 16,
-                            color: Colors.redAccent.withOpacity(0.7),
-                          ),
-                          onPressed: () async {
-                            await DatabaseService.deleteSession(sessionId);
-                            await ChatHistoryService.deleteSession(sessionId);
-                            if (isCurrent) {
-                              _startNewChat();
-                            }
-                            if (mounted) {
-                              setState(() {});
-                            }
-                          },
-                        ),
-                        onTap: () {
-                          Navigator.pop(context);
-                          _loadSessionMessages(sessionId, sessionTitle);
-                        },
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
-          ),
-
-          const Divider(indent: 16, endIndent: 16, height: 20),
-
-          // Section TASKS & SETTINGS
-          ListTile(
-            horizontalTitleGap: 8,
-            leading: Icon(
-              Icons.history_rounded,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-              size: 20,
-            ),
-            title: Text('Task History', style: textStyle),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
-              );
-            },
-          ),
-          ListTile(
-            horizontalTitleGap: 8,
-            leading: Icon(
-              Icons.settings_rounded,
-              color: isDark ? Colors.grey[400] : Colors.grey[600],
-              size: 20,
-            ),
-            title: Text('Settings', style: textStyle),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => SettingsScreen(
-                    aiService: _aiService,
-                    shizukuService: _actionHandler.shizuku,
-                    screenAutomationService: _actionHandler.screenAutomation,
-                    telegramService: _telegramService,
-                  ),
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBackgroundGlows(bool isDark) {
-    return Positioned.fill(
-      child: Stack(
-        children: [
-          Positioned(
-            top: -150,
-            left: -50,
-            child: Container(
-              width: 400,
-              height: 400,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    isDark
-                        ? const Color(0xFF6366F1).withOpacity(0.24)
-                        : const Color(0xFF4F46E5).withOpacity(0.12),
-                    isDark
-                        ? const Color(0xFF6366F1).withOpacity(0)
-                        : const Color(0xFF4F46E5).withOpacity(0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 50,
-            right: -100,
-            child: Container(
-              width: 350,
-              height: 350,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    isDark
-                        ? const Color(0xFF38BDF8).withOpacity(0.18)
-                        : const Color(0xFF0EA5E9).withOpacity(0.09),
-                    isDark
-                        ? const Color(0xFF38BDF8).withOpacity(0)
-                        : const Color(0xFF0EA5E9).withOpacity(0),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildModeSelector(bool isDark) {
-    final activeBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
-
-    return Center(
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 12),
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: activeBg,
-          borderRadius: BorderRadius.circular(30),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.06),
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildModeButton(
-              'chat',
-              'Chat',
-              Icons.chat_bubble_outline_rounded,
-              isDark,
-            ),
-            _buildModeButton(
-              'agent',
-              'Agent',
-              Icons.smart_toy_outlined,
-              isDark,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildModeButton(
-    String modeId,
-    String label,
-    IconData icon,
-    bool isDark,
-  ) {
-    final isSelected = _mode == modeId;
-
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        setState(() {
-          _mode = modeId;
-        });
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(26),
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary
-              : Colors.transparent,
-          boxShadow: isSelected
-              ? [
-                  BoxShadow(
-                    color: Theme.of(
-                      context,
-                    ).colorScheme.primary.withOpacity(0.20),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ]
-              : null,
-        ),
-        child: Row(
-          children: [
-            Icon(
-              icon,
-              size: 15,
-              color: isSelected
-                  ? Colors.white
-                  : (isDark
-                        ? const Color(0xFF94A3B8)
-                        : const Color(0xFF475569)),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected
-                    ? Colors.white
-                    : (isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF475569)),
-                fontWeight: FontWeight.bold,
-                fontSize: 13,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(bool isDark) {
-    final time = DateTime.now();
-    String timeGreeting = 'Hello';
-    if (time.hour >= 5 && time.hour < 12) {
-      timeGreeting = 'Hello, good morning.';
-    } else if (time.hour >= 12 && time.hour < 17) {
-      timeGreeting = 'Hello, good afternoon.';
-    } else if (time.hour >= 17 && time.hour < 22) {
-      timeGreeting = 'Hello, good evening.';
-    } else {
-      timeGreeting = 'Hello.';
-    }
-
-    final suggestions = _mode == 'chat'
-        ? [
-            'Write a professional email',
-            'Explain quantum computing simply',
-            'Brainstorm mobile app ideas',
-            'Write a poem about robots',
-          ]
-        : [
-            'Open YouTube and search for cats',
-            'Call Mom',
-            'Set volume to 80%',
-            'What\'s on my screen?',
-          ];
-
-    return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-        child: Column(
-          children: [
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    timeGreeting,
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w300,
-                      color: isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF64748B),
-                      letterSpacing: -1.5,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'How can I help you?',
-                    style: TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.primary,
-                      letterSpacing: -1.5,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 48),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'SUGGESTIONS',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  color: isDark
-                      ? const Color(0xFF94A3B8)
-                      : const Color(0xFF475569),
-                  letterSpacing: 1.5,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 52,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                itemCount: suggestions.length,
-                itemBuilder: (context, index) {
-                  final suggestion = suggestions[index];
-                  return Container(
-                    margin: const EdgeInsets.only(right: 12),
-                    child: InkWell(
-                      onTap: () => _sendMessage(suggestion),
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isDark
-                              ? const Color(0xFF151D30)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isDark
-                                ? const Color(0xFF243049).withOpacity(0.4)
-                                : const Color(0xFFE2E8F0),
-                            width: 1.2,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(
-                                isDark ? 0.1 : 0.02,
-                              ),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Center(
-                          child: Text(
-                            suggestion,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? const Color(0xFFF8FAFC)
-                                  : const Color(0xFF1E293B),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInputBar(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-      decoration: const BoxDecoration(color: Colors.transparent),
-      child: Row(
-        children: [
-          // Glowing Voice Mic button
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: _isListening
-                  ? Colors.redAccent
-                  : Theme.of(context).cardTheme.color,
-              border: Border.all(
-                color: _isListening
-                    ? Colors.redAccent
-                    : Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
-                width: 1.2,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-                if (_isListening)
-                  BoxShadow(
-                    color: Colors.redAccent.withOpacity(0.4),
-                    blurRadius: 12,
-                    spreadRadius: 2,
-                  ),
-              ],
-            ),
-                    child: IconButton(
-                      icon: Icon(
-                        _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                        color: _isListening
-                            ? Colors.white
-                            : Theme.of(context).colorScheme.primary,
-                      ),
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              HapticFeedback.mediumImpact();
-                              _toggleVoice();
-                            },
-                    ),
-          ),
-          const SizedBox(width: 10),
-
-          // Custom Text input container
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Theme.of(context).cardTheme.color,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface.withOpacity(0.08),
-                  width: 1.2,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _textController,
-                      style: const TextStyle(fontSize: 14),
-                      decoration: InputDecoration(
-                        hintText: _isListening
-                            ? 'Listening...'
-                            : 'Type a command...',
-                        hintStyle: TextStyle(
-                          fontSize: 13,
-                          color: isDark ? Colors.grey[600] : Colors.grey[400],
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        border: InputBorder.none,
-                      ),
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: _isLoading
-                          ? null
-                          : (text) => _sendMessage(text),
-                    ),
-                  ),
-
-                  // Solid Send button
-                  Container(
-                    margin: const EdgeInsets.only(right: 6),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                    child: IconButton(
-                      icon: const Icon(
-                        Icons.send_rounded,
-                        size: 16,
-                        color: Colors.white,
-                      ),
-                      onPressed: _isLoading
-                          ? null
-                          : () {
-                              HapticFeedback.lightImpact();
-                              _sendMessage(_textController.text);
-                            },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showModelQuickPicker() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Select Free AI Model',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Current: ${_aiService.model}',
-              style: TextStyle(fontSize: 13, color: Colors.grey[600]),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              leading: const Icon(Icons.bolt, color: Colors.orange),
-              title: const Text('Groq (Llama 3.3 70B)'),
-              subtitle: const Text('Lightning fast & free'),
-              onTap: () async {
-                await _aiService.saveSettings(
-                  apiKey: _aiService.apiKey,
-                  baseUrl: 'https://api.groq.com/openai/v1',
-                  model: 'llama-3.3-70b-versatile',
-                );
-                Navigator.pop(context);
-                setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Switched to Groq Llama 3.3 70B')),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.public, color: Colors.purple),
-              title: const Text('OpenRouter (Llama 3.2 3B Free)'),
-              subtitle: const Text('Completely free tier'),
-              onTap: () async {
-                await _aiService.saveSettings(
-                  apiKey: _aiService.apiKey,
-                  baseUrl: 'https://openrouter.ai/api/v1',
-                  model: 'meta-llama/llama-3.2-3b-instruct:free',
-                );
-                Navigator.pop(context);
-                setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Switched to OpenRouter Free')),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.auto_awesome, color: Colors.teal),
-              title: const Text('Google Gemini 3.5 Flash'),
-              subtitle: const Text('Latest Gemini 3.5 Flash via Google AI Studio'),
-              onTap: () async {
-                await _aiService.saveSettings(
-                  apiKey: _aiService.apiKey,
-                  baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai/',
-                  model: 'gemini-3.5-flash',
-                );
-                Navigator.pop(context);
-                setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Switched to Gemini 3.5 Flash')),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.memory, color: Colors.green),
-              title: const Text('NVIDIA NIM (GLM-5.2)'),
-              subtitle: const Text('High performance free NIM'),
-              onTap: () async {
-                await _aiService.saveSettings(
-                  apiKey: _aiService.apiKey,
-                  baseUrl: AiService.nvidiaBaseUrl,
-                  model: AiService.nvidiaDefaultModel,
-                );
-                Navigator.pop(context);
-                setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Switched to NVIDIA NIM')),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.cloud_circle, color: Colors.blue),
-              title: const Text('Ollama Cloud'),
-              subtitle: const Text('Remote Ollama instance'),
-              onTap: () async {
-                await _aiService.saveSettings(
-                  apiKey: _aiService.apiKey,
-                  baseUrl: 'https://api.ollama.com/v1',
-                  model: 'llama3.3',
-                );
-                Navigator.pop(context);
-                setState(() {});
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Switched to Ollama Cloud')),
-                );
-              },
-            ),
-          ],
-        ),
       ),
     );
   }
