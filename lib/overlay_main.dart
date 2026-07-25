@@ -347,7 +347,7 @@ class _OverlayAppState extends State<OverlayApp> with WidgetsBindingObserver {
         _isSent = false;
       });
     }
-    await _overlayHistoryWrite;
+    await _overlayHistoryQueue.enqueue(() => Future<void>.value());
     const intent = AndroidIntent(
       action: 'android.intent.action.MAIN',
       category: 'android.intent.category.LAUNCHER',

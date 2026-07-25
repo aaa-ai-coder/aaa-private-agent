@@ -1,3 +1,5 @@
+import 'dart:async';
+
 /// A sequential task queue that ensures async operations execute one at a time
 /// in FIFO order, with each operation awaiting the previous one.
 ///

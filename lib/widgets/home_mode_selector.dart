@@ -32,17 +32,17 @@ class HomeModeSelector extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _buildButton('chat', 'Chat', Icons.chat_bubble_outline_rounded),
-            _buildButton('agent', 'Agent', Icons.smart_toy_outlined),
+            _buildButton('chat', 'Chat', Icons.chat_bubble_outline_rounded, Theme.of(context)),
+            _buildButton('agent', 'Agent', Icons.smart_toy_outlined, Theme.of(context)),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildButton(String modeId, String label, IconData icon) {
+  Widget _buildButton(String modeId, String label, IconData icon, [ThemeData? theme]) {
     final isSelected = currentMode == modeId;
-    final theme = Theme.of(context);
+    final t = theme ?? ThemeData();
 
     return GestureDetector(
       onTap: () {
@@ -55,11 +55,11 @@ class HomeModeSelector extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(26),
-          color: isSelected ? theme.colorScheme.primary : Colors.transparent,
+          color: isSelected ? t.colorScheme.primary : Colors.transparent,
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: theme.colorScheme.primary.withOpacity(0.25),
+                    color: t.colorScheme.primary.withOpacity(0.25),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),
