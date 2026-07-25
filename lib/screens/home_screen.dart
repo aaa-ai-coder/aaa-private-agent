@@ -12,6 +12,7 @@ import '../services/voice_service.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../widgets/message_bubble.dart';
+import '../widgets/quick_actions.dart';
 import '../services/telegram_service.dart';
 import '../services/chat_history_service.dart';
 import '../services/notification_service.dart';
@@ -850,6 +851,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     ],
                   ),
+                ),
+
+              // Quick Actions bar (shown when no messages)
+              if (_messages.isEmpty)
+                QuickActions(
+                  onSend: _sendMessage,
+                  isDark: isDark,
                 ),
 
               // Custom Input bar
