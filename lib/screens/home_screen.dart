@@ -17,6 +17,7 @@ import '../services/notification_service.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'package:share_plus/share_plus.dart';
 import '../main.dart';
 import '../config/feature_flags.dart';
 
@@ -364,6 +365,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
+  void _exportChatSession() {
+    if (_messages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No chat history to export.')),
+      );
+      return;
+    }
+
+    final buffer = StringBuffer();
+    buffer.writeln('# AAA Private Agent - Chat Export');
+    buffer.writeln('Date: ${DateTime.now().toLocal().toString().split('.')[0]}\n');
+
+    for (final m in _messages) {
+      final sender = m.isUser ? 'User' : 'AAA Agent';
+      buffer.writeln('### $sender');
+      buffer.writeln('${m.content}\n');
+    }
+
+    final exportedText = buffer.toString();
+    Share.share(exportedText, subject: 'AAA Private Agent Chat Export');
+  }
+
   void _loadChatSession(ChatSession session) {
     setState(() {
       _sessionId = session.id;
@@ -627,6 +650,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 );
               }
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.share_rounded),
+            tooltip: 'Export & Share Chat',
+            onPressed: _messages.isEmpty ? null : _exportChatSession,
           ),
           IconButton(
             icon: const Icon(Icons.psychology_rounded),
