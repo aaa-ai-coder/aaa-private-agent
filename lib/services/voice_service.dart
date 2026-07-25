@@ -1,3 +1,4 @@
+import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -8,6 +9,7 @@ class VoiceService {
   bool _isInitialized = false;
   bool _isListening = false;
   bool _isSpeaking = false;
+  Function()? _onSpeakCompletion;
 
   bool get isListening => _isListening;
   bool get isSpeaking => _isSpeaking;
@@ -16,11 +18,14 @@ class VoiceService {
     if (_isInitialized) return;
 
     try {
-      _isInitialized = await _speech.initialize(
-        onError: (error) {
-          _isListening = false;
-        },
-      );
+      final status = await Permission.microphone.request();
+      if (status.isGranted) {
+        _isInitialized = await _speech.initialize(
+          onError: (error) {
+            _isListening = false;
+          },
+        );
+      }
     } catch (_) {}
 
     // Configure TTS
@@ -31,16 +36,34 @@ class VoiceService {
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
 
+      // Try setting Google TTS engine on Android if available
+      try {
+        final engines = await _tts.getEngines;
+        if (engines is List && engines.contains('com.google.android.tts')) {
+          await _tts.setEngine('com.google.android.tts');
+        }
+      } catch (_) {}
+
       _tts.setStartHandler(() {
         _isSpeaking = true;
       });
 
       _tts.setCompletionHandler(() {
         _isSpeaking = false;
+        if (_onSpeakCompletion != null) {
+          final cb = _onSpeakCompletion;
+          _onSpeakCompletion = null;
+          cb!();
+        }
       });
 
       _tts.setErrorHandler((msg) {
         _isSpeaking = false;
+        if (_onSpeakCompletion != null) {
+          final cb = _onSpeakCompletion;
+          _onSpeakCompletion = null;
+          cb!();
+        }
       });
     } catch (_) {}
   }
@@ -75,6 +98,7 @@ class VoiceService {
       );
     } catch (e) {
       _isListening = false;
+      onDone();
     }
   }
 
@@ -100,11 +124,15 @@ class VoiceService {
   }
 
   /// Speak text aloud with cleaned markdown for clear voice synthesis
-  Future<void> speak(String text) async {
-    if (text.trim().isEmpty) return;
+  Future<void> speak(String text, {Function()? onComplete}) async {
+    if (text.trim().isEmpty) {
+      onComplete?.call();
+      return;
+    }
     try {
       await init();
       await _tts.stop();
+      _onSpeakCompletion = onComplete;
 
       // Clean markdown tags for natural speech
       final cleanText = text
@@ -114,19 +142,24 @@ class VoiceService {
           .replaceAll(RegExp(r'\[([^\]]+)\]\([^\)]+\)'), r'$1')
           .trim();
 
-      if (cleanText.isEmpty) return;
+      if (cleanText.isEmpty) {
+        onComplete?.call();
+        return;
+      }
 
       _isSpeaking = true;
       await _tts.speak(cleanText);
     } catch (e) {
       _isSpeaking = false;
       print('TTS speak error: $e');
+      onComplete?.call();
     }
   }
 
   /// Stop speaking
   Future<void> stopSpeaking() async {
     _isSpeaking = false;
+    _onSpeakCompletion = null;
     try {
       await _tts.stop();
     } catch (_) {}

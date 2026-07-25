@@ -39,6 +39,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
   bool _isListening = false;
+  bool _continuousVoiceMode = false;
 
   // Custom switch state: 'chat' or 'agent'
   String _mode = 'chat';
@@ -229,11 +230,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
         await _saveSession();
       } else {
-        // Plain text response, speak if auto-read is enabled
+        // Plain text response, speak if auto-read or continuous voice mode is enabled
         final prefs = await SharedPreferences.getInstance();
         final autoRead = prefs.getBool('auto_read_tts') ?? true;
-        if (autoRead) {
-          _voiceService.speak(accumulated);
+        if (autoRead || _continuousVoiceMode) {
+          _voiceService.speak(
+            accumulated,
+            onComplete: () {
+              if (_continuousVoiceMode && mounted && !_isLoading) {
+                _toggleVoice();
+              }
+            },
+          );
         }
       }
     } catch (e) {
@@ -585,6 +593,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ),
         actions: [
+          IconButton(
+            icon: Icon(
+              _continuousVoiceMode
+                  ? Icons.record_voice_over_rounded
+                  : Icons.voice_over_off_rounded,
+              color: _continuousVoiceMode ? Colors.tealAccent : null,
+            ),
+            tooltip: _continuousVoiceMode
+                ? 'Hands-Free Voice Mode Active'
+                : 'Turn on Hands-Free Voice Mode',
+            onPressed: () {
+              setState(() {
+                _continuousVoiceMode = !_continuousVoiceMode;
+              });
+              if (_continuousVoiceMode) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Hands-Free Voice Mode ON: AI will speak and listen continuously!'),
+                    backgroundColor: Colors.teal,
+                  ),
+                );
+                if (!_isListening && !_voiceService.isSpeaking) {
+                  _toggleVoice();
+                }
+              } else {
+                _voiceService.stopSpeaking();
+                _voiceService.stopListening();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Hands-Free Voice Mode OFF'),
+                  ),
+                );
+              }
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.psychology_rounded),
             tooltip: 'Quick AI Model Switcher',
