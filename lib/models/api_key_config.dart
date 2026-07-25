@@ -12,7 +12,7 @@ class ApiKeyConfig {
   final DateTime createdAt;
   final DateTime updatedAt;
 
-  const ApiKeyConfig({
+  ApiKeyConfig({
     required this.id,
     required this.userId,
     required this.name,
