@@ -81,6 +81,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _telegramService.init();
     await _actionHandler.shizuku.checkAvailability();
 
+    // Seed default preferences that may not have been set yet
+    final prefs = await SharedPreferences.getInstance();
+    if (!prefs.containsKey('auto_read_tts')) {
+      await prefs.setBool('auto_read_tts', true);
+    }
+
     if (mounted) {
       setState(() {});
     }

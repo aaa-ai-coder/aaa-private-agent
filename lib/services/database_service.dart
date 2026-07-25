@@ -3,6 +3,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
 import '../models/chat_message.dart';
 import '../models/saved_skill.dart';
+import '../models/api_key_config.dart';
 
 class DatabaseService {
   static SupabaseClient get _db => SupabaseConfig.client;
@@ -204,6 +205,64 @@ class DatabaseService {
       }, onConflict: 'user_id');
     } catch (e) {
       print('Error saving settings to Supabase: $e');
+    }
+  }
+
+  // ─── API Keys ───────────────────────────────────────────────────
+
+  /// Get all API keys for a user from Supabase.
+  static Future<List<ApiKeyConfig>> getApiKeys(String userId) async {
+    try {
+      final data = await _db
+          .from('api_keys')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+      return data.map((json) => ApiKeyConfig.fromJson(json)).toList();
+    } catch (e) {
+      print('Error loading API keys: $e');
+      return [];
+    }
+  }
+
+  /// Save (upsert) an API key to Supabase.
+  static Future<void> saveApiKey({
+    required String userId,
+    required ApiKeyConfig key,
+  }) async {
+    try {
+      await _db.from('api_keys').upsert({
+        'id': key.id,
+        'user_id': userId,
+        'name': key.name,
+        'provider': key.provider,
+        'base_url': key.baseUrl,
+        'model': key.model,
+        'api_key': key.apiKey,
+        'is_active': key.isActive,
+        'updated_at': DateTime.now().toIso8601String(),
+      }, onConflict: 'id');
+    } catch (e) {
+      print('Error saving API key: $e');
+    }
+  }
+
+  /// Delete an API key from Supabase.
+  static Future<void> deleteApiKey(String keyId) async {
+    try {
+      await _db.from('api_keys').delete().eq('id', keyId);
+    } catch (e) {
+      print('Error deleting API key: $e');
+    }
+  }
+
+  /// Set one key as active and deactivate all others for the user.
+  static Future<void> setActiveApiKey(String userId, String keyId) async {
+    try {
+      await _db.from('api_keys').update({'is_active': false}).eq('user_id', userId);
+      await _db.from('api_keys').update({'is_active': true}).eq('id', keyId);
+    } catch (e) {
+      print('Error setting active API key: $e');
     }
   }
 

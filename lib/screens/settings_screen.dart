@@ -6,9 +6,11 @@ import '../main.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/ai_service.dart';
+import '../services/storage_service.dart';
 import '../services/shizuku_service.dart';
 import '../services/screen_automation_service.dart';
 import '../services/telegram_service.dart';
+import '../models/api_key_config.dart';
 import 'task_history_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
@@ -37,6 +39,7 @@ class _SettingsScreenState extends State<SettingsScreen>
   late TextEditingController _apiKeyController;
   late TextEditingController _baseUrlController;
   late TextEditingController _modelController;
+  late TextEditingController _keyNameController;
   late TextEditingController _telegramTokenController;
   bool _obscureKey = true;
   bool _telegramEnabled = false;
@@ -53,6 +56,11 @@ class _SettingsScreenState extends State<SettingsScreen>
   double _ttsPitch = 1.0;
   List<String> _liveModels = [];
   bool _isFetchingModels = false;
+  List<ApiKeyConfig> _allKeys = [];
+  late TextEditingController _r2AccountController;
+  late TextEditingController _r2BucketController;
+  late TextEditingController _r2TokenController;
+  bool _obscureR2Token = true;
 
   final Map<String, PermissionStatus> _permissions = {};
 
@@ -63,6 +71,9 @@ class _SettingsScreenState extends State<SettingsScreen>
     _apiKeyController = TextEditingController(text: widget.aiService.apiKey);
     _baseUrlController = TextEditingController(text: widget.aiService.baseUrl);
     _modelController = TextEditingController(text: widget.aiService.model);
+    _keyNameController = TextEditingController(
+      text: widget.aiService.activeKey?.name ?? 'Default',
+    );
     _telegramTokenController = TextEditingController(
       text: widget.telegramService.botToken,
     );
@@ -80,10 +91,16 @@ class _SettingsScreenState extends State<SettingsScreen>
     _apiKeyController.addListener(_autoSave);
     _baseUrlController.addListener(_autoSave);
     _modelController.addListener(_autoSave);
+    _keyNameController.addListener(_autoSave);
     _telegramTokenController.addListener(_autoSave);
     _maxTokensController.addListener(_autoSave);
 
+    _r2AccountController = TextEditingController();
+    _r2BucketController = TextEditingController();
+    _r2TokenController = TextEditingController();
     _loadVoiceSettings();
+    _loadApiKeys();
+    _loadR2Config();
     _checkPermissions();
     if (FeatureFlags.floatingOverlayEnabled) {
       _checkOverlayStatus();
@@ -101,11 +118,336 @@ class _SettingsScreenState extends State<SettingsScreen>
     }
   }
 
+  void _loadApiKeys() {
+    _allKeys = widget.aiService.allKeys;
+    // If no keys exist but settings have a key configured, create one
+    if (_allKeys.isEmpty && widget.aiService.apiKey.isNotEmpty) {
+      _syncTemporaryKeyToMultiKey();
+    }
+  }
+
+  void _syncTemporaryKeyToMultiKey() {
+    widget.aiService.saveSettings(
+      apiKey: widget.aiService.apiKey,
+      baseUrl: widget.aiService.baseUrl,
+      model: widget.aiService.model,
+      name: 'Default',
+    );
+    _allKeys = widget.aiService.allKeys;
+  }
+
+  Future<void> _switchKey(String id) async {
+    try {
+      await widget.aiService.setActiveApiKey(id);
+      setState(() {
+        _allKeys = widget.aiService.allKeys;
+        final active = widget.aiService.activeKey;
+        if (active != null) {
+          _apiKeyController.text = active.apiKey;
+          _baseUrlController.text = active.baseUrl;
+          _modelController.text = active.model;
+          _keyNameController.text = active.name;
+        }
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error selecting key: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _showAddKeyDialog() async {
+    final nameCtrl = TextEditingController();
+    final apiKeyCtrl = TextEditingController();
+    final baseUrlCtrl = TextEditingController(text: widget.aiService.baseUrl);
+    final modelCtrl = TextEditingController(text: widget.aiService.model);
+    bool obscure = true;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: const Text('Add New API Key'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextField(
+                      controller: nameCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Key Name',
+                        hintText: 'My API Key',
+                        prefixIcon: Icon(Icons.label_outline, size: 18),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: apiKeyCtrl,
+                      decoration: InputDecoration(
+                        labelText: 'API Key',
+                        hintText: 'sk-...',
+                        prefixIcon: const Icon(Icons.key_rounded, size: 18),
+                        suffixIcon: IconButton(
+                          icon: Icon(obscure ? Icons.visibility_off : Icons.visibility, size: 18),
+                          onPressed: () => setDialogState(() => obscure = !obscure),
+                        ),
+                      ),
+                      obscureText: obscure,
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: baseUrlCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Base URL',
+                        hintText: 'https://api.groq.com/openai/v1',
+                        prefixIcon: Icon(Icons.dns_rounded, size: 18),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      controller: modelCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'Model',
+                        hintText: 'llama-3.3-70b-versatile',
+                        prefixIcon: Icon(Icons.smart_toy_rounded, size: 18),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text('Quick presets:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        ActionChip(
+                          label: const Text('Groq', style: TextStyle(fontSize: 10)),
+                          onPressed: () {
+                            baseUrlCtrl.text = AiService.groqBaseUrl;
+                            setDialogState(() {});
+                            _autoFetchModels();
+                          },
+                        ),
+                        ActionChip(
+                          label: const Text('OpenRouter', style: TextStyle(fontSize: 10)),
+                          onPressed: () {
+                            baseUrlCtrl.text = AiService.openRouterBaseUrl;
+                            setDialogState(() {});
+                            _autoFetchModels();
+                          },
+                        ),
+                        ActionChip(
+                          label: const Text('Gemini', style: TextStyle(fontSize: 10)),
+                          onPressed: () {
+                            baseUrlCtrl.text = AiService.geminiBaseUrl;
+                            setDialogState(() {});
+                            _autoFetchModels();
+                          },
+                        ),
+                        ActionChip(
+                          label: const Text('NVIDIA', style: TextStyle(fontSize: 10)),
+                          onPressed: () {
+                            baseUrlCtrl.text = AiService.nvidiaBaseUrl;
+                            setDialogState(() {});
+                            _autoFetchModels();
+                          },
+                        ),
+                        ActionChip(
+                          label: const Text('DeepSeek', style: TextStyle(fontSize: 10)),
+                          onPressed: () {
+                            baseUrlCtrl.text = 'https://api.deepseek.com';
+                            setDialogState(() {});
+                            _autoFetchModels();
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final id = 'key_${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecondsSinceEpoch}';
+                    final newKey = ApiKeyConfig(
+                      id: id,
+                      userId: authService.userId ?? '',
+                      name: nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : 'New Key',
+                      provider: 'custom',
+                      baseUrl: baseUrlCtrl.text.trim(),
+                      model: modelCtrl.text.trim(),
+                      apiKey: apiKeyCtrl.text.trim(),
+                      isActive: _allKeys.isEmpty || _allKeys.every((k) => !k.isActive),
+                    );
+                    try {
+                      await widget.aiService.addApiKey(newKey);
+                      if (mounted) {
+                        setState(() {
+                          _allKeys = widget.aiService.allKeys;
+                          final active = widget.aiService.activeKey;
+                          if (active != null && active.id == newKey.id) {
+                            _apiKeyController.text = active.apiKey;
+                            _baseUrlController.text = active.baseUrl;
+                            _modelController.text = active.model;
+                            _keyNameController.text = active.name;
+                          }
+                        });
+                      }
+                      if (mounted) {
+                        Navigator.of(dialogContext).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Key added successfully'), backgroundColor: Colors.teal),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Error adding key: $e'), backgroundColor: Colors.red),
+                        );
+                      }
+                    }
+                  },
+                  child: const Text('Save'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    nameCtrl.dispose();
+    apiKeyCtrl.dispose();
+    baseUrlCtrl.dispose();
+    modelCtrl.dispose();
+  }
+
+  Future<void> _deleteCurrentKey() async {
+    final active = widget.aiService.activeKey;
+    if (active == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No active key to delete'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
+    try {
+      await widget.aiService.deleteApiKey(active.id);
+      if (mounted) {
+        setState(() {
+          _allKeys = widget.aiService.allKeys;
+          final nextActive = widget.aiService.activeKey;
+          if (nextActive != null) {
+            _apiKeyController.text = nextActive.apiKey;
+            _baseUrlController.text = nextActive.baseUrl;
+            _modelController.text = nextActive.model;
+            _keyNameController.text = nextActive.name;
+          } else {
+            _apiKeyController.clear();
+            _baseUrlController.clear();
+            _modelController.clear();
+            _keyNameController.clear();
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Key deleted'), backgroundColor: Colors.teal),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error deleting key: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _syncKeysToCloud() async {
+    final userId = authService.userId;
+    if (userId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sign in to sync keys to cloud'), backgroundColor: Colors.orange),
+        );
+      }
+      return;
+    }
+    try {
+      final count = await widget.aiService.syncKeysToSupabase(userId);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Synced $count key(s) to cloud'), backgroundColor: Colors.teal),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error syncing keys: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _autoFetchModels() {
+    Future.delayed(const Duration(milliseconds: 500), () {
+      widget.aiService.refreshCachedModels().then((_) {
+        if (mounted) setState(() {});
+      });
+    });
+  }
+
   Future<void> _saveVoiceSettings() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('auto_read_tts', _autoReadTts);
     await prefs.setDouble('tts_speech_rate', _ttsSpeechRate);
     await prefs.setDouble('tts_pitch', _ttsPitch);
+  }
+
+  Future<void> _loadR2Config() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() {
+        _r2AccountController.text = prefs.getString('r2_account_id') ?? '';
+        _r2BucketController.text = prefs.getString('r2_bucket_name') ?? '';
+        _r2TokenController.text = prefs.getString('r2_api_token') ?? '';
+      });
+    }
+  }
+
+  Future<void> _saveR2Config() async {
+    try {
+      await StorageService.saveConfig(
+        accountId: _r2AccountController.text.trim(),
+        bucketName: _r2BucketController.text.trim(),
+        apiToken: _r2TokenController.text.trim(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Cloudflare R2 configuration saved.'),
+            backgroundColor: Colors.teal,
+          ),
+        );
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error saving R2 config: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   String? _apiUrlError;
@@ -171,13 +513,18 @@ class _SettingsScreenState extends State<SettingsScreen>
     _apiKeyController.removeListener(_autoSave);
     _baseUrlController.removeListener(_autoSave);
     _modelController.removeListener(_autoSave);
+    _keyNameController.removeListener(_autoSave);
     _telegramTokenController.removeListener(_autoSave);
     _maxTokensController.removeListener(_autoSave);
     _apiKeyController.dispose();
     _baseUrlController.dispose();
     _modelController.dispose();
+    _keyNameController.dispose();
     _telegramTokenController.dispose();
     _maxTokensController.dispose();
+    _r2AccountController.dispose();
+    _r2BucketController.dispose();
+    _r2TokenController.dispose();
     super.dispose();
   }
 
@@ -221,10 +568,12 @@ class _SettingsScreenState extends State<SettingsScreen>
   Timer? _autoSaveTimer;
 
   void _autoSave() {
+    final keyName = _keyNameController.text.trim();
     widget.aiService.saveSettings(
       apiKey: _apiKeyController.text.trim(),
       baseUrl: _baseUrlController.text.trim(),
       model: _modelController.text.trim(),
+      name: keyName.isNotEmpty ? keyName : null,
     );
 
     widget.telegramService.saveSettings(
@@ -265,6 +614,11 @@ class _SettingsScreenState extends State<SettingsScreen>
         'telegram_enabled': _telegramEnabled,
       },
     );
+    // Sync all API keys to Supabase
+    final keys = widget.aiService.allKeys;
+    for (final key in keys) {
+      DatabaseService.saveApiKey(userId: userId, key: key);
+    }
   }
 
   Future<void> _fetchModels() async {
@@ -280,112 +634,29 @@ class _SettingsScreenState extends State<SettingsScreen>
       return;
     }
 
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    final models = await widget.aiService.fetchAvailableModels(baseUrl, apiKey);
-
-    // Hide loading
-    if (mounted) Navigator.pop(context);
-
-    if (models.isEmpty) {
+    setState(() => _isFetchingModels = true);
+    try {
+      await widget.aiService.refreshCachedModels();
+      if (mounted) {
+        setState(() {});
+        if (widget.aiService.cachedModels.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('No models found. Check your API key and base URL.')),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Found ${widget.aiService.cachedModels.length} models')),
+          );
+        }
+      }
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No models found or error fetching models.'),
-          ),
+          SnackBar(content: Text('Error fetching models: $e'), backgroundColor: Colors.red),
         );
       }
-      return;
-    }
-
-    if (mounted) {
-      final isNvidia = AiService.isNvidiaBaseUrl(baseUrl);
-      String filterQuery = '';
-
-      showDialog(
-        context: context,
-        builder: (context) {
-          return StatefulBuilder(
-            builder: (context, setDialogState) {
-              final filteredModels = filterQuery.isEmpty
-                  ? models
-                  : models
-                      .where((m) => m.toLowerCase().contains(filterQuery.toLowerCase()))
-                      .toList();
-
-              return AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                title: Text(
-                  isNvidia ? 'Select Free NVIDIA Model' : 'Select Live AI Model (${models.length} available)',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                content: SizedBox(
-                  width: double.maxFinite,
-                  height: 380,
-                  child: Column(
-                    children: [
-                      TextField(
-                        decoration: InputDecoration(
-                          hintText: 'Search live models...',
-                          prefixIcon: const Icon(Icons.search, size: 18),
-                          isDense: true,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        onChanged: (val) {
-                          setDialogState(() => filterQuery = val);
-                        },
-                      ),
-                      const SizedBox(height: 10),
-                      Expanded(
-                        child: filteredModels.isEmpty
-                            ? const Center(child: Text('No matching models'))
-                            : ListView.builder(
-                                itemCount: filteredModels.length,
-                                itemBuilder: (context, index) {
-                                  final modelName = filteredModels[index];
-                                  final isSelected = _modelController.text == modelName;
-                                  return ListTile(
-                                    dense: true,
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                                    selected: isSelected,
-                                    title: Text(
-                                      modelName,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                      ),
-                                    ),
-                                    trailing: isSelected ? const Icon(Icons.check_circle, color: Colors.teal, size: 18) : null,
-                                    onTap: () {
-                                      setState(() {
-                                        _modelController.text = modelName;
-                                      });
-                                      Navigator.pop(context);
-                                    },
-                                  );
-                                },
-                              ),
-                      ),
-                    ],
-                  ),
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Cancel'),
-                  ),
-                ],
-              );
-            },
-          );
-        },
-      );
+    } finally {
+      if (mounted) setState(() => _isFetchingModels = false);
     }
   }
 
@@ -397,19 +668,27 @@ class _SettingsScreenState extends State<SettingsScreen>
     required bool isDark,
   }) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 20),
+      margin: const EdgeInsets.only(bottom: 28),
+      elevation: isDark ? 0 : 1.5,
+      shadowColor: Colors.black.withOpacity(isDark ? 0.4 : 0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: isDark
+            ? BorderSide(color: Colors.white.withOpacity(0.04), width: 0.5)
+            : BorderSide.none,
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(22),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(8),
+                  padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
                     color: Theme.of(context).primaryColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     icon,
@@ -417,7 +696,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     size: 20,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,7 +709,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                         ),
                       ),
                       if (subtitle != null) ...[
-                        const SizedBox(height: 2),
+                        const SizedBox(height: 3),
                         Text(
                           subtitle,
                           style: TextStyle(
@@ -446,7 +725,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 22),
             ...children,
           ],
         ),
@@ -703,13 +982,57 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
           ),
 
-          // 3. AI Engine Config Card
+          // 3. AI Engine Configuration Card (Multi-Key Management)
           _buildSettingsCard(
             icon: Icons.psychology_outlined,
             title: 'AI Engine Configuration',
             subtitle: 'Supports any OpenAI-compatible API endpoint',
             isDark: isDark,
             children: [
+              // -- Key Selector Row --
+              SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  children: [
+                    ..._allKeys.map((key) {
+                      final isActive = key.isActive;
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(
+                            key.name.isNotEmpty ? key.name : key.id.substring(0, 8),
+                            style: TextStyle(fontSize: 12, color: isActive ? Colors.white : null),
+                          ),
+                          selected: isActive,
+                          selectedColor: Theme.of(context).colorScheme.primary,
+                          onSelected: (_) => _switchKey(key.id),
+                        ),
+                      );
+                    }),
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: const Icon(Icons.add, size: 18),
+                        selected: false,
+                        onSelected: (_) => _showAddKeyDialog(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // -- Active Key Editor --
+              TextField(
+                controller: _keyNameController,
+                decoration: _buildInputDecoration(
+                  labelText: 'Key Name',
+                  hintText: 'My API Key',
+                  prefixIcon: const Icon(Icons.label_outline, size: 18),
+                ),
+              ),
+              const SizedBox(height: 12),
               TextField(
                 controller: _apiKeyController,
                 decoration: _buildInputDecoration(
@@ -753,15 +1076,13 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ),
               ],
               const SizedBox(height: 10),
+              // -- Provider Presets --
               Wrap(
                 spacing: 8,
                 runSpacing: 4,
                 children: [
                   ActionChip(
-                    label: const Text(
-                      'Local Server',
-                      style: TextStyle(fontSize: 11),
-                    ),
+                    label: const Text('Local Server', style: TextStyle(fontSize: 11)),
                     tooltip: 'For local Llama.cpp or LM Studio',
                     onPressed: () =>
                         _baseUrlController.text = 'http://192.168.1.X:8080/v1',
@@ -771,7 +1092,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     label: const Text('Ollama Cloud', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = AiService.ollamaCloudBaseUrl;
-                      _modelController.text = 'llama3.3';
+                      _autoFetchModels();
                     },
                   ),
                   ActionChip(
@@ -779,7 +1100,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     label: const Text('Groq Free', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = AiService.groqBaseUrl;
-                      _modelController.text = 'llama-3.3-70b-versatile';
+                      _autoFetchModels();
                     },
                   ),
                   ActionChip(
@@ -787,7 +1108,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     label: const Text('OpenRouter Free', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = AiService.openRouterBaseUrl;
-                      _modelController.text = 'meta-llama/llama-3.2-3b-instruct:free';
+                      _autoFetchModels();
                     },
                   ),
                   ActionChip(
@@ -795,7 +1116,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     label: const Text('Gemini Free', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = AiService.geminiBaseUrl;
-                      _modelController.text = 'gemini-1.5-flash';
+                      _autoFetchModels();
                     },
                   ),
                   ActionChip(
@@ -803,7 +1124,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     label: const Text('NVIDIA NIM', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = AiService.nvidiaBaseUrl;
-                      _modelController.text = AiService.nvidiaDefaultModel;
+                      _autoFetchModels();
                     },
                   ),
                   ActionChip(
@@ -811,7 +1132,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                     label: const Text('Together AI', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = AiService.togetherAiBaseUrl;
-                      _modelController.text = 'meta-llama/Llama-3-70b-chat-hf';
+                      _autoFetchModels();
                     },
                   ),
                   ActionChip(
@@ -819,14 +1140,14 @@ class _SettingsScreenState extends State<SettingsScreen>
                     label: const Text('Mistral AI', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = AiService.mistralAiBaseUrl;
-                      _modelController.text = 'mistral-small-latest';
+                      _autoFetchModels();
                     },
                   ),
                   ActionChip(
                     label: const Text('DeepSeek', style: TextStyle(fontSize: 11)),
                     onPressed: () {
                       _baseUrlController.text = 'https://api.deepseek.com';
-                      _modelController.text = 'deepseek-chat';
+                      _autoFetchModels();
                     },
                   ),
                   ActionChip(
@@ -841,55 +1162,156 @@ class _SettingsScreenState extends State<SettingsScreen>
                 ],
               ),
               const SizedBox(height: 12),
+              // -- Model field with Autocomplete and Refresh button --
               Row(
                 children: [
                   Expanded(
-                    child: TextField(
-                      controller: _modelController,
-                      decoration: _buildInputDecoration(
-                        labelText: 'Model',
-                        hintText: 'deepseek-chat',
-                        prefixIcon: const Icon(
-                          Icons.smart_toy_rounded,
-                          size: 18,
-                        ),
-                      ),
+                    child: Autocomplete<String>(
+                      optionsBuilder: (textEditingValue) {
+                        if (textEditingValue.text.isEmpty) {
+                          return widget.aiService.cachedModels;
+                        }
+                        return widget.aiService.cachedModels.where((m) =>
+                            m.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+                      },
+                      fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
+                        return TextField(
+                          controller: _modelController,
+                          focusNode: focusNode,
+                          decoration: _buildInputDecoration(
+                            labelText: 'Model',
+                            hintText: 'deepseek-chat',
+                            prefixIcon: const Icon(Icons.smart_toy_rounded, size: 18),
+                          ),
+                          onChanged: (val) {
+                            // Sync to Autocomplete's internal controller so it can build options
+                            textController.text = val;
+                          },
+                        );
+                      },
+                      onSelected: (selection) {
+                        _modelController.text = selection;
+                      },
                     ),
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton.icon(
                     onPressed: _fetchModels,
-                    icon: const Icon(
-                      Icons.cloud_download,
-                      size: 18,
-                      color: Colors.white,
-                    ),
-                    label: const Text(
-                      'Fetch',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                      ),
+                    icon: _isFetchingModels
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.refresh, size: 18, color: Colors.white),
+                    label: Text(
+                      _isFetchingModels ? '...' : 'Refresh',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                     ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Theme.of(context).colorScheme.primary,
                       elevation: 0,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 14,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              // -- Action Buttons --
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.add, size: 16),
+                    label: const Text('Add Key'),
+                    onPressed: _showAddKeyDialog,
+                  ),
+                  const SizedBox(width: 8),
+                  if (_allKeys.length > 1)
+                    TextButton.icon(
+                      icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
+                      label: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      onPressed: _deleteCurrentKey,
+                    ),
+                  const Spacer(),
+                  if (authService.isLoggedIn)
+                    TextButton.icon(
+                      icon: const Icon(Icons.cloud_upload, size: 16),
+                      label: const Text('Sync'),
+                      onPressed: _syncKeysToCloud,
+                    ),
+                ],
+              ),
+            ],
+          ),
+
+          // 4. Cloudflare R2 Storage Card
+          _buildSettingsCard(
+            icon: Icons.cloud_outlined,
+            title: 'Cloudflare R2 Storage',
+            subtitle: 'Store heavy data (images, files) in the cloud',
+            isDark: isDark,
+            children: [
+              TextField(
+                controller: _r2AccountController,
+                decoration: _buildInputDecoration(
+                  labelText: 'Account ID',
+                  hintText: 'Your Cloudflare Account ID',
+                  prefixIcon: const Icon(Icons.badge_outlined, size: 18),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _r2BucketController,
+                decoration: _buildInputDecoration(
+                  labelText: 'Bucket Name',
+                  hintText: 'my-bucket',
+                  prefixIcon: const Icon(Icons.folder_outlined, size: 18),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _r2TokenController,
+                decoration: _buildInputDecoration(
+                  labelText: 'API Token',
+                  hintText: 'R2 API Token',
+                  prefixIcon: const Icon(Icons.vpn_key_outlined, size: 18),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureR2Token ? Icons.visibility_off : Icons.visibility,
+                      size: 18,
+                    ),
+                    onPressed: () => setState(() => _obscureR2Token = !_obscureR2Token),
+                  ),
+                ),
+                obscureText: _obscureR2Token,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  if (StorageService.isConfigured)
+                    const Icon(Icons.check_circle, color: Colors.green, size: 18)
+                  else
+                    const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    StorageService.isConfigured ? 'Configured' : 'Not configured',
+                    style: TextStyle(
+                      color: StorageService.isConfigured ? Colors.green : Colors.orange,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const Spacer(),
+                  ElevatedButton(
+                    onPressed: _saveR2Config,
+                    child: const Text('Save'),
                   ),
                 ],
               ),
             ],
           ),
 
-          // 3. Parameters & Tuning Card
+          // 5. Parameters & Tuning Card
           _buildSettingsCard(
             icon: Icons.tune_outlined,
             title: 'Tuning & Boundaries',
@@ -972,7 +1394,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
           ),
 
-          // 4. Behavior & Extensions Card
+          // 6. Behavior & Extensions Card
           _buildSettingsCard(
             icon: Icons.extension_outlined,
             title: 'Behavior & Extensions',
@@ -1057,7 +1479,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
           ),
 
-          // 5. Telegram Remote Access Card
+          // 7. Telegram Remote Access Card
           _buildSettingsCard(
             icon: Icons.send_and_archive_outlined,
             title: 'Telegram Remote Access',
@@ -1085,7 +1507,7 @@ class _SettingsScreenState extends State<SettingsScreen>
             ],
           ),
 
-          // 6. Accessibility Screen Control Card
+          // 8. Accessibility Screen Control Card
           _buildSettingsCard(
             icon: Icons.visibility_outlined,
             title: 'Screen Control (Accessibility)',

@@ -107,6 +107,96 @@ class ActionHandler {
           );
           break;
 
+        // ─── WiFi & Network Actions ──────────────────────────
+
+        case 'scan_wifi':
+          final networks = await _shizuku.scanWifiNetworks();
+          result = networks.isNotEmpty
+              ? 'Found ${networks.length} networks: ${networks.map((n) => n['info'] ?? n['raw'] ?? '?').join(', ')}'
+              : 'No networks found or scan failed.';
+          break;
+
+        case 'get_wifi_password':
+          result = await _shizuku.getWifiPassword(
+            action.params['ssid'] as String? ?? '',
+          );
+          break;
+
+        case 'connect_wifi':
+          result = await _shizuku.connectToWifi(
+            action.params['ssid'] as String? ?? '',
+            action.params['password'] as String? ?? '',
+          );
+          break;
+
+        case 'toggle_wifi':
+          result = await _shizuku.toggleWifi(
+            action.params['enable'] as bool? ?? true,
+          );
+          break;
+
+        case 'get_current_wifi':
+          result = await _shizuku.getCurrentWifi();
+          break;
+
+        case 'toggle_mobile_data':
+          result = await _shizuku.toggleMobileData(
+            action.params['enable'] as bool? ?? true,
+          );
+          break;
+
+        case 'toggle_bluetooth':
+          result = await _shizuku.toggleBluetooth(
+            action.params['enable'] as bool? ?? true,
+          );
+          break;
+
+        // ─── Device Control Actions ──────────────────────────
+
+        case 'set_ringer_mode':
+          result = await _shizuku.setRingerMode(
+            _parseInt(action.params['mode'], 2),
+          );
+          break;
+
+        case 'toggle_flashlight':
+          result = await _shizuku.toggleFlashlight(
+            action.params['enable'] as bool? ?? true,
+          );
+          break;
+
+        case 'lock_screen':
+          result = await _shizuku.lockScreen();
+          break;
+
+        case 'take_screenshot':
+          result = await _shizuku.takeScreenshot();
+          break;
+
+        case 'force_stop_app':
+          result = await _shizuku.forceStopApp(
+            action.params['package_name'] as String? ?? '',
+          );
+          break;
+
+        case 'install_apk':
+          result = await _shizuku.installApk(
+            action.params['apk_path'] as String? ?? '',
+          );
+          break;
+
+        case 'uninstall_app':
+          result = await _shizuku.uninstallApp(
+            action.params['package_name'] as String? ?? '',
+          );
+          break;
+
+        case 'clear_app_data':
+          result = await _shizuku.clearAppData(
+            action.params['package_name'] as String? ?? '',
+          );
+          break;
+
         case 'send_email':
           result = await _communication.sendEmail(
             to: action.params['to'] as String? ?? '',

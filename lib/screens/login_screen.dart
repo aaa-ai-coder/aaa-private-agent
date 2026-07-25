@@ -136,6 +136,51 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
+  Future<void> _showForgotPasswordDialog() async {
+    final emailCtrl = TextEditingController();
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Reset Password'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Enter your email to receive a password reset link.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: emailCtrl,
+              keyboardType: TextInputType.emailAddress,
+              decoration: const InputDecoration(
+                labelText: 'Email Address',
+                hintText: 'you@example.com',
+                prefixIcon: Icon(Icons.email_outlined),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () async {
+              if (emailCtrl.text.trim().isEmpty) return;
+              await widget.authService.resetPassword(emailCtrl.text.trim());
+              if (ctx.mounted) Navigator.pop(ctx, true);
+            },
+            child: const Text('Send Reset Link'),
+          ),
+        ],
+      ),
+    );
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Password reset link sent! Check your email.'),
+          backgroundColor: Colors.teal,
+        ),
+      );
+    }
+  }
+
   Future<void> _signInWithDevice() async {
     widget.authService.clearError();
     final success = await widget.authService.signInWithDevice();
@@ -206,16 +251,16 @@ class _LoginScreenState extends State<LoginScreen>
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Container(
-                          width: 88,
-                          height: 88,
+                          width: 96,
+                          height: 96,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: isDark ? const Color(0xFF151D30) : Colors.white,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.12),
-                                blurRadius: 22,
-                                offset: const Offset(0, 8),
+                                color: Colors.black.withOpacity(0.15),
+                                blurRadius: 28,
+                                offset: const Offset(0, 10),
                               )
                             ],
                             border: Border.all(
@@ -223,10 +268,14 @@ class _LoginScreenState extends State<LoginScreen>
                               width: 1.5,
                             ),
                           ),
-                          child: Icon(
-                            Icons.smart_toy_rounded,
-                            size: 44,
-                            color: Theme.of(context).primaryColor,
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(48),
+                            child: Image.asset(
+                              'assets/app-logo.png',
+                              width: 72,
+                              height: 72,
+                              fit: BoxFit.contain,
+                            ),
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -409,6 +458,23 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                         ),
+
+                        // Forgot Password - only show in sign-in mode
+                        if (!_isRegistering)
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: TextButton(
+                              onPressed: auth.isLoading ? null : _showForgotPasswordDialog,
+                              child: Text(
+                                'Forgot Password?',
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  fontWeight: FontWeight.w500,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          ),
 
                         if (auth.error != null) ...[
                           const SizedBox(height: 12),

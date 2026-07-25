@@ -269,6 +269,33 @@ class AuthService extends ChangeNotifier {
     }
   }
 
+  /// Validate password strength
+  static String? validatePassword(String password) {
+    if (password.isEmpty) return 'Password is required';
+    if (password.length < 6) return 'Password must be at least 6 characters';
+    if (!password.contains(RegExp(r'[A-Za-z]'))) return 'Password must contain a letter';
+    if (!password.contains(RegExp(r'[0-9]'))) return 'Password must contain a number';
+    return null;
+  }
+
+  /// Send password reset email
+  Future<bool> resetPassword(String email) async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await SupabaseConfig.client.auth.resetPasswordForEmail(email.trim());
+      _isLoading = false;
+      notifyListeners();
+      return true;
+    } catch (e) {
+      _error = e.toString().replaceFirst('Exception: ', '');
+      _isLoading = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<bool> sendMagicLink(String email) async {
     _isLoading = true;
     _error = null;

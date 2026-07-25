@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:speech_to_text/speech_recognition_result.dart';
@@ -6,7 +7,10 @@ import 'package:flutter_tts/flutter_tts.dart';
 class VoiceService {
   final stt.SpeechToText _speech = stt.SpeechToText();
   final FlutterTts _tts = FlutterTts();
-  bool _isInitialized = false;
+
+  // Separate initialization flags for STT and TTS
+  bool _sttInitialized = false;
+  bool _ttsInitialized = false;
   bool _isListening = false;
   bool _isSpeaking = false;
   Function()? _onSpeakCompletion;
@@ -15,49 +19,86 @@ class VoiceService {
   bool get isSpeaking => _isSpeaking;
 
   Future<void> init() async {
-    if (_isInitialized) return;
+    await _initStt();
+    await _initTts();
+  }
 
+  // ─── Speech-to-Text Initialization ───────────────────────────────
+
+  Future<void> _initStt() async {
+    if (_sttInitialized) return;
     try {
       final status = await Permission.microphone.request();
       if (status.isGranted) {
-        _isInitialized = await _speech.initialize(
+        _sttInitialized = await _speech.initialize(
           onError: (error) {
             _isListening = false;
+            developer.log('STT error: $error', name: 'VoiceService');
+          },
+          onStatus: (status) {
+            developer.log('STT status: $status', name: 'VoiceService');
           },
         );
+        if (_sttInitialized) {
+          developer.log('STT initialized successfully', name: 'VoiceService');
+        }
       }
-    } catch (_) {}
+    } catch (e) {
+      developer.log('STT init error: $e', name: 'VoiceService');
+    }
+  }
 
-    // Configure TTS
+  // ─── Text-to-Speech Initialization (separate from STT) ──────────
+
+  Future<void> _initTts() async {
+    if (_ttsInitialized) return;
     try {
-      await _tts.awaitSpeakCompletion(true);
+      // Do NOT use awaitSpeakCompletion(true) — it conflicts with the
+      // completion handler approach. We rely on setCompletionHandler instead.
       await _tts.setLanguage('en-US');
       await _tts.setSpeechRate(0.5);
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
 
-      // Try setting Google TTS engine on Android if available
+      // Try setting Google TTS engine on Android if available; fall back to
+      // the system default if Google TTS is not installed.
       try {
         final engines = await _tts.getEngines;
-        if (engines is List && engines.contains('com.google.android.tts')) {
-          await _tts.setEngine('com.google.android.tts');
+        if (engines is List) {
+          if (engines.contains('com.google.android.tts')) {
+            await _tts.setEngine('com.google.android.tts');
+            developer.log('TTS: using Google TTS engine', name: 'VoiceService');
+          } else if (engines.isNotEmpty) {
+            // Use first available engine
+            final first = engines.isNotEmpty ? engines[0].toString() : null;
+            if (first != null && first.isNotEmpty) {
+              await _tts.setEngine(first);
+              developer.log('TTS: using engine: $first', name: 'VoiceService');
+            }
+          }
         }
-      } catch (_) {}
+      } catch (e) {
+        developer.log('TTS engine selection: $e', name: 'VoiceService');
+      }
+
+      // Completion handler — fires when utterance finishes
+      _tts.setCompletionHandler(() {
+        developer.log('TTS: speech completed', name: 'VoiceService');
+        _isSpeaking = false;
+        if (_onSpeakCompletion != null) {
+          final cb = _onSpeakCompletion;
+          _onSpeakCompletion = null;
+          cb!();
+        }
+      });
 
       _tts.setStartHandler(() {
         _isSpeaking = true;
-      });
-
-      _tts.setCompletionHandler(() {
-        _isSpeaking = false;
-        if (_onSpeakCompletion != null) {
-          final cb = _onSpeakCompletion;
-          _onSpeakCompletion = null;
-          cb!();
-        }
+        developer.log('TTS: speech started', name: 'VoiceService');
       });
 
       _tts.setErrorHandler((msg) {
+        developer.log('TTS error: $msg', name: 'VoiceService');
         _isSpeaking = false;
         if (_onSpeakCompletion != null) {
           final cb = _onSpeakCompletion;
@@ -65,16 +106,38 @@ class VoiceService {
           cb!();
         }
       });
-    } catch (_) {}
+
+      // Set a cancel handler in case the utterance is interrupted
+      _tts.setCancelHandler(() {
+        _isSpeaking = false;
+        if (_onSpeakCompletion != null) {
+          final cb = _onSpeakCompletion;
+          _onSpeakCompletion = null;
+          cb!();
+        }
+      });
+
+      _ttsInitialized = true;
+      developer.log('TTS initialized successfully', name: 'VoiceService');
+    } catch (e) {
+      developer.log('TTS init error: $e', name: 'VoiceService');
+    }
   }
+
+  // ─── Speech Recognition ─────────────────────────────────────────
 
   /// Start listening for speech. Supports multilingual recognition.
   Future<void> startListening({
     required Function(String) onResult,
     required Function() onDone,
   }) async {
-    if (!_isInitialized) await init();
+    if (!_sttInitialized) await _initStt();
+    if (!_sttInitialized) {
+      onDone();
+      return;
+    }
 
+    // Stop any ongoing TTS before listening
     if (_isSpeaking) {
       await stopSpeaking();
     }
@@ -86,7 +149,11 @@ class VoiceService {
         onResult: (SpeechRecognitionResult result) {
           if (result.finalResult) {
             _isListening = false;
-            onResult(result.recognizedWords);
+            final recognized = result.recognizedWords;
+            if (recognized.trim().isNotEmpty) {
+              developer.log('STT recognized: $recognized', name: 'VoiceService');
+              onResult(recognized);
+            }
             onDone();
           }
         },
@@ -94,9 +161,11 @@ class VoiceService {
         listenOptions: stt.SpeechListenOptions(
           listenMode: stt.ListenMode.confirmation,
           partialResults: false,
+          cancelOnError: true,
         ),
       );
     } catch (e) {
+      developer.log('STT listen error: $e', name: 'VoiceService');
       _isListening = false;
       onDone();
     }
@@ -107,52 +176,93 @@ class VoiceService {
     _isListening = false;
     try {
       await _speech.stop();
-    } catch (_) {}
+    } catch (e) {
+      developer.log('STT stop error: $e', name: 'VoiceService');
+    }
   }
+
+  // ─── Speech Synthesis ───────────────────────────────────────────
 
   /// Update speech parameters dynamically
   Future<void> setSpeechRate(double rate) async {
     try {
       await _tts.setSpeechRate(rate);
-    } catch (_) {}
+    } catch (e) {
+      developer.log('TTS setRate error: $e', name: 'VoiceService');
+    }
   }
 
   Future<void> setPitch(double pitch) async {
     try {
       await _tts.setPitch(pitch);
-    } catch (_) {}
+    } catch (e) {
+      developer.log('TTS setPitch error: $e', name: 'VoiceService');
+    }
   }
 
-  /// Speak text aloud with cleaned markdown for clear voice synthesis
+  /// Speak text aloud with cleaned markdown for clear voice synthesis.
+  /// Initializes TTS lazily on first call, then reuses the initialized engine.
   Future<void> speak(String text, {Function()? onComplete}) async {
     if (text.trim().isEmpty) {
       onComplete?.call();
       return;
     }
-    try {
-      await init();
-      await _tts.stop();
-      _onSpeakCompletion = onComplete;
 
-      // Clean markdown tags for natural speech
-      final cleanText = text
-          .replaceAll(RegExp(r'```[\s\S]*?```'), ' Code block omitted. ')
-          .replaceAll(RegExp(r'`([^`]+)`'), r'$1')
-          .replaceAll(RegExp(r'[*#_~`]'), '')
-          .replaceAll(RegExp(r'\[([^\]]+)\]\([^\)]+\)'), r'$1')
-          .trim();
-
-      if (cleanText.isEmpty) {
-        onComplete?.call();
-        return;
-      }
-
-      _isSpeaking = true;
-      await _tts.speak(cleanText);
-    } catch (e) {
-      _isSpeaking = false;
-      print('TTS speak error: $e');
+    // Initialize TTS once if not already done
+    if (!_ttsInitialized) {
+      await _initTts();
+    }
+    if (!_ttsInitialized) {
+      developer.log('TTS not available, cannot speak', name: 'VoiceService');
       onComplete?.call();
+      return;
+    }
+
+    // Stop any current utterance
+    try {
+      await _tts.stop();
+    } catch (_) {}
+
+    _onSpeakCompletion = onComplete;
+
+    // Clean markdown tags for natural speech
+    final cleanText = text
+        .replaceAll(RegExp(r'```[\s\S]*?```'), ' Code block omitted. ')
+        .replaceAll(RegExp(r'`([^`]+)`'), r'$1')
+        .replaceAll(RegExp(r'[*#_~`]'), '')
+        .replaceAll(RegExp(r'\[([^\]]+)\]\([^\)]+\)'), r'$1')
+        .trim();
+
+    if (cleanText.isEmpty) {
+      onComplete?.call();
+      _onSpeakCompletion = null;
+      return;
+    }
+
+    try {
+      _isSpeaking = true;
+      final result = await _tts.speak(cleanText);
+      if (result != 1) {
+        // flutter_tts returns 1 on success, 0 on failure
+        developer.log('TTS speak returned: $result', name: 'VoiceService');
+        // If speak returned 0 (failure), fire completion immediately
+        if (result == 0) {
+          _isSpeaking = false;
+          if (_onSpeakCompletion != null) {
+            final cb = _onSpeakCompletion;
+            _onSpeakCompletion = null;
+            cb!();
+          }
+        }
+      }
+    } catch (e) {
+      developer.log('TTS speak error: $e', name: 'VoiceService');
+      _isSpeaking = false;
+      if (_onSpeakCompletion != null) {
+        final cb = _onSpeakCompletion;
+        _onSpeakCompletion = null;
+        cb!();
+      }
     }
   }
 
@@ -162,7 +272,9 @@ class VoiceService {
     _onSpeakCompletion = null;
     try {
       await _tts.stop();
-    } catch (_) {}
+    } catch (e) {
+      developer.log('TTS stop error: $e', name: 'VoiceService');
+    }
   }
 
   void dispose() {
