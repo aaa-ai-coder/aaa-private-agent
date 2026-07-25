@@ -253,6 +253,14 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
   }
 
   /// Send a message to the AI and get a response.
+  /// Ensures the base URL ends with /chat/completions
+  String _buildChatUrl(String baseUrl) {
+    String url = baseUrl.trim();
+    if (url.endsWith('/chat/completions')) return url;
+    if (url.endsWith('/')) return '${url}chat/completions';
+    return '$url/chat/completions';
+  }
+
   Future<String> sendMessage(String message, {bool isAgentMode = true}) async {
     if (_apiKey == null || _apiKey!.isEmpty) {
       throw Exception('API Key is not configured. Please go to Settings.');
@@ -274,16 +282,7 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
         ..._conversationHistory,
       ];
 
-      String requestUrl = _baseUrl;
-      if (requestUrl.endsWith('/chat/completions')) {
-        requestUrl = requestUrl; // User already included it
-      } else {
-        if (requestUrl.endsWith('/')) {
-          requestUrl = '${requestUrl}chat/completions';
-        } else {
-          requestUrl = '$requestUrl/chat/completions';
-        }
-      }
+      final requestUrl = _buildChatUrl(_baseUrl);
 
       final requestBody = jsonEncode({
         'model': _model,
@@ -386,16 +385,7 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
         ..._conversationHistory,
       ];
 
-      String requestUrl = _baseUrl;
-      if (requestUrl.endsWith('/chat/completions')) {
-        requestUrl = requestUrl;
-      } else {
-        if (requestUrl.endsWith('/')) {
-          requestUrl = '${requestUrl}chat/completions';
-        } else {
-          requestUrl = '$requestUrl/chat/completions';
-        }
-      }
+      final requestUrl = _buildChatUrl(_baseUrl);
 
       final client = http.Client();
       final request = http.Request('POST', Uri.parse(requestUrl));
@@ -530,14 +520,7 @@ Answer questions, explain concepts, brainstorm, write emails/messages, and chat 
           {'role': 'user', 'content': prompt},
         ];
 
-        String requestUrl = _baseUrl;
-        if (!requestUrl.endsWith('/chat/completions')) {
-          if (requestUrl.endsWith('/')) {
-            requestUrl = '${requestUrl}chat/completions';
-          } else {
-            requestUrl = '$requestUrl/chat/completions';
-          }
-        }
+        final requestUrl = _buildChatUrl(_baseUrl);
 
         final response = await http
             .post(

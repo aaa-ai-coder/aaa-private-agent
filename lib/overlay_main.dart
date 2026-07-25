@@ -15,6 +15,7 @@ import 'services/shizuku_service.dart';
 import 'services/chat_history_service.dart';
 import 'models/chat_message.dart';
 import 'widgets/message_bubble.dart';
+import 'utils/async_queue.dart';
 
 class OverlayApp extends StatefulWidget {
   const OverlayApp({super.key});
@@ -23,7 +24,7 @@ class OverlayApp extends StatefulWidget {
   State<OverlayApp> createState() => _OverlayAppState();
 }
 
-class _OverlayAppState extends State<OverlayApp> {
+class _OverlayAppState extends State<OverlayApp> with WidgetsBindingObserver {
   bool _isExpanded = false;
   final TextEditingController _taskController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
@@ -31,6 +32,7 @@ class _OverlayAppState extends State<OverlayApp> {
   bool _isListening = false;
   final stt.SpeechToText _speech = stt.SpeechToText();
   final List<ChatMessage> _messages = [];
+  bool _isDark = false;
 
   late final AiService _aiService;
   late final ScreenAutomationService _screenService;
@@ -39,11 +41,13 @@ class _OverlayAppState extends State<OverlayApp> {
   late final Future<void> _servicesReady;
   StreamSubscription<dynamic>? _overlaySubscription;
   TaskExecutor? _executor;
-  Future<void> _overlayHistoryWrite = Future<void>.value();
+  /// Sequential queue for overlay message writes to prevent interleaved file I/O.
+  final AsyncQueue _overlayHistoryQueue = AsyncQueue();
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _speech.initialize();
 
     _aiService = AiService();
@@ -54,6 +58,7 @@ class _OverlayAppState extends State<OverlayApp> {
     _overlaySubscription = FlutterOverlayWindow.overlayListener.listen(
       _handleMainAppEvent,
     );
+    _detectTheme();
 
     // Welcome message
     _messages.add(
@@ -65,11 +70,24 @@ class _OverlayAppState extends State<OverlayApp> {
     );
   }
 
+  void _detectTheme() {
+    // Use platform brightness since overlay runs in its own isolate
+    final Brightness brightness = WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    _isDark = brightness == Brightness.dark;
+  }
+
+  @override
+  void didChangePlatformBrightness() {
+    setState(() => _detectTheme());
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _overlaySubscription?.cancel();
     _taskController.dispose();
     _scrollController.dispose();
+    _speech.stop();
     super.dispose();
   }
 
@@ -159,11 +177,13 @@ class _OverlayAppState extends State<OverlayApp> {
   }
 
   void _persistOverlayMessage(ChatMessage message) {
-    _overlayHistoryWrite = _overlayHistoryWrite
-        .then((_) => ChatHistoryService.appendOverlayMessage(message.toJson()))
-        .catchError((Object error) {
-          log('Overlay history handoff failed: $error');
-        });
+    unawaited(
+      _overlayHistoryQueue.enqueue(
+        () => ChatHistoryService.appendOverlayMessage(message.toJson()),
+      ).catchError((Object error) {
+        log('Overlay history handoff failed: $error');
+      }),
+    );
   }
 
   Future<void> _toggleListening() async {
@@ -300,22 +320,19 @@ class _OverlayAppState extends State<OverlayApp> {
 
   Future<void> _toggleExpanded() async {
     if (!_isExpanded) {
-      // Save current bubble position before expanding
       _savedBubblePosition = await FlutterOverlayWindow.getOverlayPosition();
       final initialPosition = OverlayPosition(
         10,
         _savedBubblePosition?.y ?? 300,
       );
-      // Move to a safe position so the expanded panel stays on-screen
       await FlutterOverlayWindow.moveOverlay(initialPosition);
-      await FlutterOverlayWindow.resizeOverlay(300, 360, false);
+      await FlutterOverlayWindow.resizeOverlay(320, 400, false);
       setState(() {
         _isExpanded = true;
         _scrollToBottom();
       });
     } else {
       await FlutterOverlayWindow.resizeOverlay(56, 56, true);
-      // Restore the original bubble position
       if (_savedBubblePosition != null) {
         await FlutterOverlayWindow.moveOverlay(_savedBubblePosition!);
       }
@@ -353,18 +370,27 @@ class _OverlayAppState extends State<OverlayApp> {
     );
   }
 
+  Color get _surface => _isDark ? const Color(0xFF131B2E) : Colors.white;
+  Color get _background => _isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF8FAFC);
+  Color get _text => _isDark ? const Color(0xFFF8FAFC) : Colors.black87;
+  Color get _textSecondary => _isDark ? const Color(0xFF94A3B8) : Colors.black45;
+  Color get _border => _isDark ? const Color(0xFF1E293B) : const Color(0xFFEAEAEA);
+  Color get _primary => const Color(0xFF6366F1);
+
   Widget _buildContent() {
+    final c = this;
+
     if (!_isExpanded) {
       return GestureDetector(
         onTap: _toggleExpanded,
         child: SizedBox.expand(
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: c._surface,
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.25),
+                  color: Colors.black.withOpacity(_isDark ? 0.35 : 0.25),
                   blurRadius: 8,
                   spreadRadius: 1,
                   offset: const Offset(0, 2),
@@ -382,21 +408,21 @@ class _OverlayAppState extends State<OverlayApp> {
 
     // Full Chat Interface Panel
     return OverflowBox(
-      minWidth: 300,
-      maxWidth: 300,
-      minHeight: 360,
-      maxHeight: 360,
+      minWidth: 320,
+      maxWidth: 320,
+      minHeight: 400,
+      maxHeight: 400,
       alignment: Alignment.center,
       child: Container(
-        width: 300,
-        height: 360,
+        width: 320,
+        height: 400,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: c._surface,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFEAEAEA), width: 1),
+          border: Border.all(color: c._border, width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.15),
+              color: Colors.black.withOpacity(_isDark ? 0.4 : 0.15),
               blurRadius: 12,
               spreadRadius: 2,
               offset: const Offset(0, 4),
@@ -408,9 +434,9 @@ class _OverlayAppState extends State<OverlayApp> {
             // Header Bar
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: Color(0xFFF2F2F2), width: 1),
+                  bottom: BorderSide(color: c._border, width: 1),
                 ),
               ),
               child: Row(
@@ -425,12 +451,12 @@ class _OverlayAppState extends State<OverlayApp> {
                         fit: BoxFit.contain,
                       ),
                       const SizedBox(width: 8),
-                      const Text(
+                      Text(
                         'AAA Private Agent',
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: c._text,
                         ),
                       ),
                     ],
@@ -442,11 +468,11 @@ class _OverlayAppState extends State<OverlayApp> {
                         label: 'Open PrivateAgent',
                         child: GestureDetector(
                           onTap: () => unawaited(_openMainApp()),
-                          child: const Padding(
-                            padding: EdgeInsets.symmetric(horizontal: 8),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             child: Icon(
                               Icons.open_in_new_rounded,
-                              color: Colors.black45,
+                              color: c._textSecondary,
                               size: 18,
                             ),
                           ),
@@ -456,13 +482,15 @@ class _OverlayAppState extends State<OverlayApp> {
                         onTap: _toggleExpanded,
                         child: Container(
                           padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFF2F2F5),
+                          decoration: BoxDecoration(
+                            color: _isDark
+                                ? const Color(0xFF1E293B)
+                                : const Color(0xFFF2F2F5),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.remove,
-                            color: Colors.black54,
+                            color: c._textSecondary,
                             size: 12,
                           ),
                         ),
@@ -476,7 +504,7 @@ class _OverlayAppState extends State<OverlayApp> {
             // Message Log List
             Expanded(
               child: Container(
-                color: const Color(0xFFF8FAFC),
+                color: c._background,
                 child: ListView.builder(
                   controller: _scrollController,
                   physics: const BouncingScrollPhysics(),
@@ -491,12 +519,12 @@ class _OverlayAppState extends State<OverlayApp> {
             // Input Controller Area
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-              decoration: const BoxDecoration(
-                color: Colors.white,
+              decoration: BoxDecoration(
+                color: c._surface,
                 border: Border(
-                  top: BorderSide(color: Color(0xFFF2F2F2), width: 1),
+                  top: BorderSide(color: c._border, width: 1),
                 ),
-                borderRadius: BorderRadius.vertical(
+                borderRadius: const BorderRadius.vertical(
                   bottom: Radius.circular(24),
                 ),
               ),
@@ -509,12 +537,10 @@ class _OverlayAppState extends State<OverlayApp> {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
+                        color: c._background,
                         borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: Theme.of(
-                            context,
-                          ).colorScheme.onSurface.withValues(alpha: 0.08),
+                          color: c._border,
                           width: 1.2,
                         ),
                       ),
@@ -523,19 +549,19 @@ class _OverlayAppState extends State<OverlayApp> {
                           Expanded(
                             child: TextField(
                               controller: _taskController,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.black87,
+                                color: c._text,
                               ),
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 hintText: 'Type a command...',
                                 hintStyle: TextStyle(
                                   fontSize: 11.5,
-                                  color: Colors.grey,
+                                  color: c._textSecondary,
                                 ),
                                 border: InputBorder.none,
                                 isDense: true,
-                                contentPadding: EdgeInsets.symmetric(
+                                contentPadding: const EdgeInsets.symmetric(
                                   vertical: 6,
                                 ),
                               ),
@@ -549,7 +575,7 @@ class _OverlayAppState extends State<OverlayApp> {
                                 _isListening ? Icons.mic : Icons.mic_none,
                                 color: _isListening
                                     ? Colors.red
-                                    : Theme.of(context).colorScheme.primary,
+                                    : c._primary,
                                 size: 16,
                               ),
                             ),
@@ -559,14 +585,14 @@ class _OverlayAppState extends State<OverlayApp> {
                   ),
                   const SizedBox(width: 6),
                   _isSent
-                      ? const SizedBox(
+                      ? SizedBox(
                           width: 28,
                           height: 28,
                           child: Padding(
-                            padding: EdgeInsets.all(6),
+                            padding: const EdgeInsets.all(6),
                             child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: Colors.black,
+                              color: c._primary,
                             ),
                           ),
                         )
@@ -575,8 +601,8 @@ class _OverlayAppState extends State<OverlayApp> {
                           child: Container(
                             width: 28,
                             height: 28,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF4F46E5),
+                            decoration: BoxDecoration(
+                              color: c._primary,
                               shape: BoxShape.circle,
                             ),
                             child: const Icon(

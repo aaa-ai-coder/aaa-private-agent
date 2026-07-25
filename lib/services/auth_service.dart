@@ -29,7 +29,7 @@ class AuthService extends ChangeNotifier {
   String? get error => _error;
   bool get isLoggedIn => _user != null;
   String? get userId => _user?.id;
-  String? get email => _user?.email;
+  String get email => _user?.email ?? '';
 
   AuthService() {
     _initDeviceSha();

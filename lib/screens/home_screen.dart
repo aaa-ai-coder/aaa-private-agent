@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
 import '../services/ai_service.dart';
@@ -627,6 +628,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ? 'Hands-Free Voice Mode Active'
                 : 'Turn on Hands-Free Voice Mode',
             onPressed: () {
+              HapticFeedback.selectionClick();
               setState(() {
                 _continuousVoiceMode = !_continuousVoiceMode;
               });
@@ -1254,6 +1256,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     return GestureDetector(
       onTap: () {
+        HapticFeedback.lightImpact();
         setState(() {
           _mode = modeId;
         });
@@ -1486,15 +1489,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ),
               ],
             ),
-            child: IconButton(
-              icon: Icon(
-                _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-                color: _isListening
-                    ? Colors.white
-                    : Theme.of(context).colorScheme.primary,
-              ),
-              onPressed: _isLoading ? null : _toggleVoice,
-            ),
+                    child: IconButton(
+                      icon: Icon(
+                        _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                        color: _isListening
+                            ? Colors.white
+                            : Theme.of(context).colorScheme.primary,
+                      ),
+                      onPressed: _isLoading
+                          ? null
+                          : () {
+                              HapticFeedback.mediumImpact();
+                              _toggleVoice();
+                            },
+                    ),
           ),
           const SizedBox(width: 10),
 
@@ -1560,7 +1568,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                       onPressed: _isLoading
                           ? null
-                          : () => _sendMessage(_textController.text),
+                          : () {
+                              HapticFeedback.lightImpact();
+                              _sendMessage(_textController.text);
+                            },
                     ),
                   ),
                 ],

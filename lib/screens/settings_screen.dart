@@ -108,6 +108,22 @@ class _SettingsScreenState extends State<SettingsScreen>
     await prefs.setDouble('tts_pitch', _ttsPitch);
   }
 
+  String? _apiUrlError;
+
+  void _validateApiSettings() {
+    final url = _baseUrlController.text.trim();
+    final key = _apiKeyController.text.trim();
+    setState(() {
+      if (url.isNotEmpty && !Uri.tryParse(url)!.hasScheme) {
+        _apiUrlError = 'URL must start with http:// or https://';
+      } else if (url.isNotEmpty && !url.contains('.')) {
+        _apiUrlError = 'URL seems invalid (missing domain)';
+      } else {
+        _apiUrlError = null;
+      }
+    });
+  }
+
   Future<void> _loadLiveModels() async {
     setState(() => _isFetchingModels = true);
     final models = await widget.aiService.fetchLiveModels(
@@ -709,6 +725,7 @@ class _SettingsScreenState extends State<SettingsScreen>
                   ),
                 ),
                 obscureText: _obscureKey,
+                onChanged: (_) => _validateApiSettings(),
               ),
               const SizedBox(height: 12),
               TextField(
@@ -718,7 +735,23 @@ class _SettingsScreenState extends State<SettingsScreen>
                   hintText: 'https://api.deepseek.com',
                   prefixIcon: const Icon(Icons.dns_rounded, size: 18),
                 ),
+                onChanged: (_) => _validateApiSettings(),
               ),
+              if (_apiUrlError != null) ...[
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.info_outline, size: 14, color: Colors.orange),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _apiUrlError!,
+                        style: const TextStyle(fontSize: 11.5, color: Colors.orange),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
