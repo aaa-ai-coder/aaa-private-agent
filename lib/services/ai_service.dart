@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/agent_action.dart';
 import '../models/api_key_config.dart';
 import 'database_service.dart';
+import 'ari_ai_engine.dart';
 
 class AiResponse {
   final String content;
@@ -682,15 +683,11 @@ No surrounding markdown block code fences, no introductory or trailing text arou
     }
   }
 
-  /// Send a message and stream the response chunk-by-chunk.
+  /// Send a message and stream the response chunk-by-chunk using ARI AI Failover Engine.
   Stream<String> sendMessageStream(
     String message, {
     bool isAgentMode = true,
   }) async* {
-    if (_apiKey == null || _apiKey!.isEmpty) {
-      throw Exception('API Key is not configured. Please go to Settings.');
-    }
-
     _conversationHistory.add({'role': 'user', 'content': message});
 
     if (_conversationHistory.length > 20) {
@@ -699,123 +696,43 @@ No surrounding markdown block code fences, no introductory or trailing text arou
 
     try {
       final systemPrompt = isAgentMode ? _systemPrompt : _chatSystemPrompt;
-      final messages = [
+      final messagesList = [
         if (_useSystemPrompt) {'role': 'system', 'content': systemPrompt},
         ..._conversationHistory,
       ];
 
-      final requestUrl = _buildChatUrl(_baseUrl);
+      final castMessages = messagesList
+          .map((m) => {
+                'role': m['role'].toString(),
+                'content': m['content'].toString(),
+              })
+          .toList();
 
-      final client = http.Client();
-      final request = http.Request('POST', Uri.parse(requestUrl));
-      request.headers.addAll({
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $_apiKey',
-        'HTTP-Referer': 'https://github.com/orailnoor/private-agent',
-        'X-Title': 'PrivateAgent',
-      });
+      String fullResponse = '';
+      final stream = AriAiEngine.instance.executeStreamWithFailover(
+        messages: castMessages,
+        temperature: _temperature,
+        maxTokens: _effectiveMaxTokens,
+        activeCustomKey: activeKey,
+      );
 
-      request.body = jsonEncode({
-        'model': _model,
-        'messages': messages,
-        'temperature': _temperature,
-        'max_tokens': _effectiveMaxTokens,
-        'stream': true,
-      });
-
-      final response = await client
-          .send(request)
-          .timeout(const Duration(minutes: 30));
-
-      if (response.statusCode != 200) {
-        final body = await response.stream.bytesToString();
-        String errorMessage = body;
-        try {
-          final decoded = jsonDecode(body);
-          if (decoded is Map<String, dynamic>) {
-            if (decoded['error'] is Map<String, dynamic>) {
-              errorMessage = decoded['error']['message']?.toString() ?? body;
-            } else if (decoded['error'] is String) {
-              errorMessage = decoded['error'];
-            }
-          }
-        } catch (_) {}
-        client.close();
-        throw Exception('API error (${response.statusCode}): $errorMessage');
+      await for (final chunk in stream) {
+        fullResponse += chunk;
+        yield chunk;
       }
 
-      final accumulatedContent = StringBuffer();
-      bool inThinkBlock = false;
-
-      String emittedText = '';
-
-      // Listen to response stream
-      final lineStream = response.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter());
-
-      await for (final line in lineStream) {
-        final trimmedLine = line.trim();
-        if (trimmedLine.isEmpty) continue;
-        if (trimmedLine.startsWith('data:')) {
-          final dataStr = trimmedLine.substring(5).trim();
-          if (dataStr == '[DONE]') break;
-          try {
-            final json = jsonDecode(dataStr);
-            if (json is Map && json['choices'] is List) {
-              final choices = json['choices'] as List;
-              if (choices.isNotEmpty) {
-                final choice = choices[0];
-                if (choice is! Map) continue;
-                final rawDelta = choice['delta'];
-                final delta = rawDelta is Map ? rawDelta : const {};
-                final rawContent = delta['content'];
-                if (rawContent is String && rawContent.isNotEmpty) {
-                  accumulatedContent.write(rawContent);
-
-                  // Filter <think>...</think> from streamed text cleanly
-                  final currentFull = accumulatedContent.toString();
-                  final cleanCurrent = currentFull
-                      .replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '')
-                      .replaceAll(RegExp(r'<think>.*$', dotAll: true), '');
-
-                  if (cleanCurrent.length > emittedText.length) {
-                    final newChunk = cleanCurrent.substring(emittedText.length);
-                    emittedText = cleanCurrent;
-                    yield newChunk;
-                  }
-                }
-                if (choice['finish_reason'] != null) break;
-              }
-            }
-          } catch (_) {
-            // Ignore incomplete chunks
-          }
-        }
+      if (fullResponse.trim().isNotEmpty) {
+        _conversationHistory.add({
+          'role': 'assistant',
+          'content': fullResponse.trim(),
+        });
       }
-
-      client.close();
-
-      // Clean up final accumulated response and add to history
-      String finalResponse = accumulatedContent.toString().trim();
-      finalResponse = finalResponse
-          .replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '')
-          .trim();
-
-      if (finalResponse.isEmpty) {
-        throw Exception(
-          'The model finished without a visible answer. Increase Max Tokens '
-          'or try another model.',
-        );
-      }
-      _conversationHistory.add({'role': 'assistant', 'content': finalResponse});
     } catch (e) {
       if (_conversationHistory.isNotEmpty &&
           _conversationHistory.last['role'] == 'user') {
         _conversationHistory.removeLast();
       }
-      if (e is Exception) rethrow;
-      throw Exception('Network error: $e');
+      rethrow;
     }
   }
 
