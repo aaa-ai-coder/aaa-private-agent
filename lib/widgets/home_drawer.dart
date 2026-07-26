@@ -401,7 +401,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
 
 class _CloudBadge extends StatelessWidget {
   final String label;
-  final MaterialColor color;
+  final Color color;
   final bool isDark;
 
   const _CloudBadge({
@@ -439,7 +439,7 @@ class _CloudBadge extends StatelessWidget {
             style: TextStyle(
               fontSize: 9.5,
               fontWeight: FontWeight.bold,
-              color: isDark ? color[200] : color[800],
+              color: isDark ? color : color.withOpacity(0.9),
             ),
           ),
         ],
