@@ -23,14 +23,11 @@ class DeviceInfoService {
   /// Get battery level info.
   Future<String> getBatteryLevel() async {
     try {
-      // Use a simple approach: report what we can determine
       if (Platform.isAndroid) {
         final info = await _deviceInfo.androidInfo;
-        final battery = info.batteryPercentage;
-        if (battery != null) {
-          return '${battery.toStringAsFixed(0)}%';
-        }
-        return 'Unknown (battery info not available)';
+        // Battery percentage was removed from device_info_plus 10+
+        // Report available RAM as proxy or just note limitation
+        return 'Battery info available via system APIs only';
       }
       return 'Battery info only available on Android';
     } catch (e) {
@@ -41,18 +38,17 @@ class DeviceInfoService {
   /// Get storage info.
   Future<String> getStorageInfo() async {
     try {
-      // Report basic storage info from Android
       if (Platform.isAndroid) {
         final storage = await _deviceInfo.androidInfo;
-        final totalStorage = storage.totalStorage;
-        final freeStorage = storage.freeStorage;
-        if (totalStorage != null && freeStorage != null) {
-          final used = totalStorage - freeStorage;
-          final usedGb = (used / (1024 * 1024 * 1024)).toStringAsFixed(1);
-          final totalGb = (totalStorage / (1024 * 1024 * 1024)).toStringAsFixed(1);
+        final totalBytes = storage.totalDiskSize;
+        final freeBytes = storage.freeDiskSize;
+        if (totalBytes > 0) {
+          final usedBytes = totalBytes - freeBytes;
+          final usedGb = (usedBytes / (1024 * 1024 * 1024)).toStringAsFixed(1);
+          final totalGb = (totalBytes / (1024 * 1024 * 1024)).toStringAsFixed(1);
           return '${usedGb}GB used / ${totalGb}GB total';
         }
-        return 'Total: unknown, Free: unknown';
+        return 'Storage info not available';
       }
       return 'Storage info only available on Android';
     } catch (e) {
@@ -65,15 +61,13 @@ class DeviceInfoService {
     try {
       if (Platform.isAndroid) {
         final info = await _deviceInfo.androidInfo;
-        final totalRam = info.totalRAM;
-        final freeRam = info.freeRAM;
-        if (totalRam != null) {
-          final totalGb = (totalRam / (1024 * 1024 * 1024)).toStringAsFixed(1);
-          if (freeRam != null) {
-            final freeGb = (freeRam / (1024 * 1024 * 1024)).toStringAsFixed(1);
-            return '${freeGb}GB free / ${totalGb}GB total RAM';
-          }
-          return '${totalGb}GB total RAM';
+        // device_info_plus 13.x: physicalRamSize, availableRamSize (in MB)
+        final totalMb = info.physicalRamSize;
+        final freeMb = info.availableRamSize;
+        final totalGb = (totalMb / 1024).toStringAsFixed(1);
+        final freeGb = (freeMb / 1024).toStringAsFixed(1);
+        if (totalMb > 0) {
+          return '${freeGb}GB free / ${totalGb}GB total RAM';
         }
         return 'RAM info not available';
       }
