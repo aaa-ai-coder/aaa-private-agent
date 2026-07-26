@@ -3,9 +3,8 @@ import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/chat_history_service.dart';
 import '../main.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// Navigation drawer for the home screen.
+/// Modern navigation drawer with search, cloud backend badges, and session history.
 class HomeDrawer extends StatefulWidget {
   final bool isDark;
   final String currentSessionId;
@@ -30,11 +29,19 @@ class HomeDrawer extends StatefulWidget {
 
 class _HomeDrawerState extends State<HomeDrawer> {
   final AuthService _authService = authService;
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final drawerBg = widget.isDark ? const Color(0xFF0B0F19) : const Color(0xFFF8FAFC);
+    final drawerBg = widget.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
     final textStyle = TextStyle(
       color: widget.isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
       fontWeight: FontWeight.w600,
@@ -53,7 +60,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
         children: [
           // Drawer Header
           Container(
-            padding: const EdgeInsets.only(top: 60, bottom: 20, left: 24, right: 24),
+            padding: const EdgeInsets.only(top: 56, bottom: 16, left: 20, right: 20),
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
@@ -68,35 +75,56 @@ class _HomeDrawerState extends State<HomeDrawer> {
                 Row(
                   children: [
                     Container(
-                      padding: const EdgeInsets.all(8),
+                      width: 36,
+                      height: 36,
                       decoration: BoxDecoration(
-                        color: theme.primaryColor.withOpacity(0.12),
-                        borderRadius: BorderRadius.circular(12),
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(
+                      child: const Icon(
                         Icons.smart_toy_rounded,
-                        color: theme.primaryColor,
-                        size: 22,
+                        color: Colors.white,
+                        size: 20,
                       ),
                     ),
                     const SizedBox(width: 12),
                     Text('AAA Private Agent', style: headerStyle),
                   ],
                 ),
+                const SizedBox(height: 14),
+
+                // Cloud Storage Badges
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      _CloudBadge(label: 'Supabase', color: Colors.emerald, isDark: widget.isDark),
+                      const SizedBox(width: 6),
+                      _CloudBadge(label: 'Firebase', color: Colors.amber, isDark: widget.isDark),
+                      const SizedBox(width: 6),
+                      _CloudBadge(label: 'Cloudflare R2', color: Colors.orange, isDark: widget.isDark),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 12),
+
+                // User Info
                 Row(
                   children: [
                     CircleAvatar(
-                      radius: 16,
-                      backgroundColor: theme.primaryColor.withOpacity(0.15),
-                      child: Icon(Icons.person_rounded, size: 18, color: theme.primaryColor),
+                      radius: 14,
+                      backgroundColor: const Color(0xFF7C3AED).withOpacity(0.15),
+                      child: const Icon(Icons.person_rounded, size: 16, color: Color(0xFFA78BFA)),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _authService.email ?? 'User',
+                        _authService.email ?? 'User Account',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
                           color: widget.isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
                         ),
                         overflow: TextOverflow.ellipsis,
@@ -118,22 +146,19 @@ class _HomeDrawerState extends State<HomeDrawer> {
 
           // New Chat Button
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             child: Container(
               width: double.infinity,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    theme.colorScheme.primary,
-                    theme.colorScheme.primary.withOpacity(0.8),
-                  ],
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: theme.colorScheme.primary.withOpacity(0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+                    color: const Color(0xFF7C3AED).withOpacity(0.3),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
@@ -146,14 +171,14 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   },
                   borderRadius: BorderRadius.circular(16),
                   child: const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 13),
+                    padding: EdgeInsets.symmetric(vertical: 12),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.add_comment_rounded, color: Colors.white, size: 16),
                         SizedBox(width: 8),
                         Text(
-                          'New Chat',
+                          'New Conversation',
                           style: TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.bold,
@@ -168,9 +193,45 @@ class _HomeDrawerState extends State<HomeDrawer> {
             ),
           ),
 
-          // Section CHAT HISTORY
+          // Search Chat History Input
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Container(
+              height: 36,
+              decoration: BoxDecoration(
+                color: widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: TextField(
+                controller: _searchController,
+                onChanged: (val) => setState(() => _searchQuery = val.trim().toLowerCase()),
+                style: TextStyle(
+                  fontSize: 12.5,
+                  color: widget.isDark ? Colors.white : Colors.black,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Search chats...',
+                  hintStyle: TextStyle(
+                    fontSize: 12,
+                    color: widget.isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  ),
+                  prefixIcon: Icon(
+                    Icons.search_rounded,
+                    size: 16,
+                    color: widget.isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.only(top: 8),
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 8),
+
+          // Section Title
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
@@ -178,7 +239,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  color: theme.primaryColor,
+                  color: const Color(0xFFA78BFA),
                   letterSpacing: 1.5,
                 ),
               ),
@@ -215,7 +276,14 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   );
                 }
 
-                final sessions = snapshot.data!;
+                final allSessions = snapshot.data!;
+                final sessions = _searchQuery.isEmpty
+                    ? allSessions
+                    : allSessions.where((s) {
+                        final title = (s['title'] as String? ?? '').toLowerCase();
+                        return title.contains(_searchQuery);
+                      }).toList();
+
                 return ListView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 8),
                   itemCount: sessions.length,
@@ -229,12 +297,12 @@ class _HomeDrawerState extends State<HomeDrawer> {
                       margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
                       decoration: BoxDecoration(
                         color: isCurrent
-                            ? theme.colorScheme.primary.withOpacity(0.08)
+                            ? const Color(0xFF7C3AED).withOpacity(0.12)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(12),
                         border: isCurrent
                             ? Border.all(
-                                color: theme.colorScheme.primary.withOpacity(0.15),
+                                color: const Color(0xFF7C3AED).withOpacity(0.3),
                               )
                             : null,
                       ),
@@ -245,7 +313,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                           Icons.chat_bubble_outline_rounded,
                           size: 15,
                           color: isCurrent
-                              ? theme.colorScheme.primary
+                              ? const Color(0xFFA78BFA)
                               : (widget.isDark ? Colors.grey[600] : Colors.grey[500]),
                         ),
                         title: Text(
@@ -302,7 +370,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                     color: widget.isDark ? Colors.grey[400] : Colors.grey[600],
                     size: 20,
                   ),
-                  title: Text('Task History', style: textStyle),
+                  title: Text('Task Execution History', style: textStyle),
                   onTap: () {
                     Navigator.pop(context);
                     widget.onTaskHistory();
@@ -315,7 +383,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                     color: widget.isDark ? Colors.grey[400] : Colors.grey[600],
                     size: 20,
                   ),
-                  title: Text('Settings', style: textStyle),
+                  title: Text('Settings & API Keys', style: textStyle),
                   onTap: () {
                     Navigator.pop(context);
                     widget.onSettings();
@@ -323,6 +391,55 @@ class _HomeDrawerState extends State<HomeDrawer> {
                 ),
                 const SizedBox(height: 12),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CloudBadge extends StatelessWidget {
+  final String label;
+  final MaterialColor color;
+  final bool isDark;
+
+  const _CloudBadge({
+    required this.label,
+    required this.color,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 0.8,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 5,
+            height: 5,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.bold,
+              color: isDark ? color[200] : color[800],
             ),
           ),
         ],

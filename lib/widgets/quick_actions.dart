@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// A collapsible grid of quick-action chips for common device tasks.
+/// A sleek, glassmorphic horizontal list of quick action chips for the AI Agent.
 class QuickActions extends StatelessWidget {
   final void Function(String command) onSend;
   final bool isDark;
@@ -13,36 +13,43 @@ class QuickActions extends StatelessWidget {
   });
 
   static const List<_QuickAction> _actions = [
-    _QuickAction(icon: Icons.videocam_rounded, label: 'YouTube', command: 'Open YouTube'),
-    _QuickAction(icon: Icons.phone_rounded, label: 'Call', command: 'Call Mom'),
+    _QuickAction(icon: Icons.graphic_eq_rounded, label: 'Voice Chat', command: 'Start listening'),
+    _QuickAction(icon: Icons.wifi_find_rounded, label: 'Scan Wi-Fi', command: 'Scan available Wi-Fi networks'),
+    _QuickAction(icon: Icons.play_circle_fill_rounded, label: 'YouTube', command: 'Open YouTube'),
+    _QuickAction(icon: Icons.phone_in_talk_rounded, label: 'Call', command: 'Make a phone call'),
     _QuickAction(icon: Icons.alarm_rounded, label: 'Alarm', command: 'Set an alarm for 7 AM'),
-    _QuickAction(icon: Icons.visibility_rounded, label: 'Screen', command: 'What\'s on my screen?'),
-    _QuickAction(icon: Icons.wb_sunny_rounded, label: 'Volume', command: 'Set volume to 50%'),
-    _QuickAction(icon: Icons.message_rounded, label: 'SMS', command: 'Send a text message'),
-    _QuickAction(icon: Icons.search_rounded, label: 'Search', command: 'Search Google'),
-    _QuickAction(icon: Icons.brightness_6_rounded, label: 'Brightness', command: 'Set brightness to 70%'),
-    _QuickAction(icon: Icons.bluetooth_rounded, label: 'Bluetooth', command: 'Turn on Bluetooth'),
-    _QuickAction(icon: Icons.wifi_rounded, label: 'WiFi', command: 'Turn on WiFi'),
+    _QuickAction(icon: Icons.screenshot_monitor_rounded, label: 'Screenshot', command: 'Take a screenshot'),
+    _QuickAction(icon: Icons.battery_charging_full_rounded, label: 'Battery', command: 'Show battery and device info'),
+    _QuickAction(icon: Icons.flash_on_rounded, label: 'Flashlight', command: 'Turn on flashlight'),
+    _QuickAction(icon: Icons.play_arrow_rounded, label: 'Media Play', command: 'Play media'),
+    _QuickAction(icon: Icons.share_rounded, label: 'Export Chat', command: 'Export this chat session'),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             children: [
-              Icon(
-                Icons.flash_on_rounded,
-                size: 12,
-                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+              Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF8B5CF6).withOpacity(0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_rounded,
+                  size: 11,
+                  color: Color(0xFFA78BFA),
+                ),
               ),
-              const SizedBox(width: 4),
+              const SizedBox(width: 6),
               Text(
-                'QUICK ACTIONS',
+                'QUICK COMMANDS',
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
@@ -54,7 +61,7 @@ class QuickActions extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           SizedBox(
-            height: 36,
+            height: 38,
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
@@ -106,39 +113,39 @@ class _ActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
+    final primary = isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED);
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E1B4B).withOpacity(0.4) : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: isDark
-                ? const Color(0xFF151D30)
-                : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isDark
-                  ? const Color(0xFF243049).withOpacity(0.4)
-                  : const Color(0xFFE2E8F0),
-              width: 1.2,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 14, color: Theme.of(context).colorScheme.primary),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+        border: Border.all(
+          color: isDark ? const Color(0xFF8B5CF6).withOpacity(0.2) : const Color(0xFFCBD5E1),
+          width: 1.0,
+        ),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          splashColor: primary.withOpacity(0.15),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(icon, size: 14, color: primary),
+                const SizedBox(width: 6),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

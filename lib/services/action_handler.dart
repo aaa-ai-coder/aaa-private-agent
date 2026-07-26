@@ -15,6 +15,7 @@ import 'clipboard_service.dart';
 import 'device_info_service.dart';
 import 'firebase_service.dart';
 import 'storage_service.dart';
+import 'chat_export_service.dart';
 
 class ActionHandler {
   final AppLauncherService _appLauncher = AppLauncherService();
@@ -106,6 +107,18 @@ class ActionHandler {
         case 'set_brightness':
           result = await _systemControl.setBrightness(
             _parseInt(action.params['level'], 50),
+          );
+          break;
+
+        case 'open_system_setting':
+          result = await _systemControl.openSystemSetting(
+            action.params['setting'] as String? ?? 'settings',
+          );
+          break;
+
+        case 'control_media':
+          result = await _systemControl.controlMedia(
+            action.params['command'] as String? ?? 'play',
           );
           break;
 
@@ -330,6 +343,14 @@ class ActionHandler {
 
         case 'paste_clipboard':
           result = await _clipboard.pasteFromClipboard();
+          break;
+
+        case 'export_chat':
+          final title = action.params['title'] as String? ?? 'Chat Export';
+          result = await ChatExportService.exportChatToMarkdown(
+            title: title,
+            messages: [],
+          );
           break;
 
         case 'get_battery':

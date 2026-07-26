@@ -298,20 +298,21 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         const SizedBox(height: 32),
 
-                        // Google Sign In
+                        // 1. Primary: Google Sign In
                         SizedBox(
                           width: double.infinity,
                           height: 52,
                           child: ElevatedButton.icon(
                             onPressed: auth.isLoading ? null : _signInWithGoogle,
-                            icon: const Icon(Icons.g_mobiledata_rounded, size: 32, color: Colors.red),
+                            icon: const Icon(Icons.g_mobiledata_rounded, size: 32, color: Colors.redAccent),
                             label: const Text(
                               'Continue with Google',
                               style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.black87),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
-                              elevation: 1,
+                              elevation: 2,
+                              shadowColor: Colors.black12,
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
                               ),
@@ -320,39 +321,15 @@ class _LoginScreenState extends State<LoginScreen>
                         ),
                         const SizedBox(height: 12),
 
-                        // Passkey Sign In
-                        SizedBox(
-                          width: double.infinity,
-                          height: 52,
-                          child: OutlinedButton.icon(
-                            onPressed: auth.isLoading ? null : _signInWithPasskey,
-                            icon: const Icon(Icons.fingerprint_rounded, size: 22, color: Colors.indigo),
-                            label: const Text(
-                              'Sign in with Passkey (Biometric)',
-                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                            ),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: isDark ? Colors.white : Colors.black87,
-                              side: BorderSide(
-                                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
-                              ),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-
-                        // Instant Device Sign In
+                        // 2. Guest Instant Access
                         SizedBox(
                           width: double.infinity,
                           height: 52,
                           child: OutlinedButton.icon(
                             onPressed: auth.isLoading ? null : _signInWithDevice,
-                            icon: const Icon(Icons.smartphone_rounded, size: 22, color: Colors.teal),
+                            icon: const Icon(Icons.bolt_rounded, size: 22, color: Colors.amber),
                             label: const Text(
-                              'Instant Device Guest Sign-In',
+                              'Instant Guest Access (No Setup)',
                               style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
                             ),
                             style: OutlinedButton.styleFrom(
@@ -366,7 +343,7 @@ class _LoginScreenState extends State<LoginScreen>
                             ),
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 24),
 
                         Row(
                           children: [

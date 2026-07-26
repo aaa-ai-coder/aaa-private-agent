@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:flutter_tts/flutter_tts.dart';
@@ -112,12 +113,14 @@ class VoiceService {
   Future<void> _initTts() async {
     if (_ttsInitialized) return;
     try {
-      // Do NOT use awaitSpeakCompletion(true) — it conflicts with the
-      // completion handler approach. We rely on setCompletionHandler instead.
+      final prefs = await SharedPreferences.getInstance();
+      final rate = prefs.getDouble('tts_speech_rate') ?? 0.5;
+      final pitch = prefs.getDouble('tts_pitch') ?? 1.0;
+
       await _tts.setLanguage(_currentLanguage.locale);
-      await _tts.setSpeechRate(0.5);
+      await _tts.setSpeechRate(rate);
       await _tts.setVolume(1.0);
-      await _tts.setPitch(1.0);
+      await _tts.setPitch(pitch);
 
       // Try setting Google TTS engine on Android if available; fall back to
       // the system default if Google TTS is not installed.
