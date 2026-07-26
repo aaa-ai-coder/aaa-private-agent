@@ -18,7 +18,7 @@ class ChatExportService {
       for (final msg in messages) {
         final role = msg.isUser ? '👤 User' : '🤖 Assistant';
         buffer.writeln('### $role');
-        buffer.writeln('${msg.text}\n');
+        buffer.writeln('${msg.content}\n');
       }
 
       final dir = await getApplicationDocumentsDirectory();

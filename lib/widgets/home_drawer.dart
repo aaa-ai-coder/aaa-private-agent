@@ -100,7 +100,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _CloudBadge(label: 'Supabase', color: Colors.emerald, isDark: widget.isDark),
+                      _CloudBadge(label: 'Supabase', color: const Color(0xFF10B981), isDark: widget.isDark),
                       const SizedBox(width: 6),
                       _CloudBadge(label: 'Firebase', color: Colors.amber, isDark: widget.isDark),
                       const SizedBox(width: 6),
