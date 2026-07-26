@@ -57,12 +57,28 @@ jobs:
           name: AAA-Private-Agent-APK
           path: build/app/outputs/flutter-apk/AAA-Private-Agent.apk
 
+      - name: Get current date for release tag
+        id: date
+        run: echo "tag=build-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: build/app/outputs/flutter-apk/AAA-Private-Agent.apk
-          name: "AAA Private Agent ${{ github.ref_name }}"
-          tag_name: ${{ github.ref_name }}
+          name: "AAA Private Agent ${{ steps.date.outputs.tag }}"
+          tag_name: ${{ steps.date.outputs.tag }}
+          body: |
+            ## AAA Private Agent APK
+            
+            Latest build from main branch.
+            
+            📱 **How to install on your phone:**
+            1. Download this APK from the release page
+            2. Open the downloaded file on your Android phone
+            3. Tap "Install Anyway" if Play Protect shows a warning
+            4. Open the app and enjoy!
+            
+            Release: ${{ steps.date.outputs.tag }}
           draft: false
           prerelease: false
+          make_latest: true
