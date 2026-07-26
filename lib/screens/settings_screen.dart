@@ -4,17 +4,13 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../services/auth_service.dart';
-import '../services/database_service.dart';
 import '../services/ai_service.dart';
-import '../services/storage_service.dart';
 import '../services/shizuku_service.dart';
 import '../services/screen_automation_service.dart';
 import '../services/telegram_service.dart';
 import '../models/api_key_config.dart';
 import 'task_history_screen.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
-import '../config/feature_flags.dart';
 
 class SettingsScreen extends StatefulWidget {
   final AiService aiService;
@@ -34,77 +30,23 @@ class SettingsScreen extends StatefulWidget {
   State<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen>
-    with WidgetsBindingObserver {
-  late TextEditingController _apiKeyController;
-  late TextEditingController _baseUrlController;
-  late TextEditingController _modelController;
-  late TextEditingController _keyNameController;
-  late TextEditingController _telegramTokenController;
-  bool _obscureKey = true;
-  bool _telegramEnabled = false;
-  double _maxSteps = 15;
-  bool _disableMaxSteps = false;
-  late TextEditingController _maxTokensController;
-  double _temperature = 1.0;
-  bool _useScreenCompression = true;
-  bool _useSystemPrompt = true;
-  bool _floatingIconEnabled = false;
-  bool _isOverlayPermissionGranted = false;
+class _SettingsScreenState extends State<SettingsScreen> {
+  late AuthService _authService;
   bool _autoReadTts = true;
   double _ttsSpeechRate = 0.5;
   double _ttsPitch = 1.0;
+  bool _isOverlayPermissionGranted = false;
+  bool _floatingIconEnabled = false;
   List<String> _liveModels = [];
   bool _isFetchingModels = false;
-  List<ApiKeyConfig> _allKeys = [];
-  late TextEditingController _r2AccountController;
-  late TextEditingController _r2BucketController;
-  late TextEditingController _r2TokenController;
-  bool _obscureR2Token = true;
-
-  final Map<String, PermissionStatus> _permissions = {};
+  bool _isSyncingKeys = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _apiKeyController = TextEditingController(text: widget.aiService.apiKey);
-    _baseUrlController = TextEditingController(text: widget.aiService.baseUrl);
-    _modelController = TextEditingController(text: widget.aiService.model);
-    _keyNameController = TextEditingController(
-      text: widget.aiService.activeKey?.name ?? 'Default',
-    );
-    _telegramTokenController = TextEditingController(
-      text: widget.telegramService.botToken,
-    );
-    _telegramEnabled = widget.telegramService.isEnabled;
-    _maxSteps = widget.aiService.rawMaxSteps.toDouble();
-    _disableMaxSteps = widget.aiService.disableMaxSteps;
-    _temperature = widget.aiService.temperature;
-    _maxTokensController = TextEditingController(
-      text: widget.aiService.maxTokens.toString(),
-    );
-    _useScreenCompression = widget.aiService.useScreenCompression;
-    _useSystemPrompt = widget.aiService.useSystemPrompt;
-
-    // Auto-save listeners
-    _apiKeyController.addListener(_autoSave);
-    _baseUrlController.addListener(_autoSave);
-    _modelController.addListener(_autoSave);
-    _keyNameController.addListener(_autoSave);
-    _telegramTokenController.addListener(_autoSave);
-    _maxTokensController.addListener(_autoSave);
-
-    _r2AccountController = TextEditingController();
-    _r2BucketController = TextEditingController();
-    _r2TokenController = TextEditingController();
+    _authService = authService;
     _loadVoiceSettings();
-    _loadApiKeys();
-    _loadR2Config();
-    _checkPermissions();
-    if (FeatureFlags.floatingOverlayEnabled) {
-      _checkOverlayStatus();
-    }
+    _checkOverlayPermission();
   }
 
   Future<void> _loadVoiceSettings() async {
@@ -114,294 +56,9 @@ class _SettingsScreenState extends State<SettingsScreen>
         _autoReadTts = prefs.getBool('auto_read_tts') ?? true;
         _ttsSpeechRate = prefs.getDouble('tts_speech_rate') ?? 0.5;
         _ttsPitch = prefs.getDouble('tts_pitch') ?? 1.0;
+        _liveModels = widget.aiService.cachedModels;
       });
     }
-  }
-
-  void _loadApiKeys() {
-    _allKeys = widget.aiService.allKeys;
-    // If no keys exist but settings have a key configured, create one
-    if (_allKeys.isEmpty && widget.aiService.apiKey.isNotEmpty) {
-      _syncTemporaryKeyToMultiKey();
-    }
-  }
-
-  void _syncTemporaryKeyToMultiKey() {
-    widget.aiService.saveSettings(
-      apiKey: widget.aiService.apiKey,
-      baseUrl: widget.aiService.baseUrl,
-      model: widget.aiService.model,
-      name: 'Default',
-    );
-    _allKeys = widget.aiService.allKeys;
-  }
-
-  Future<void> _switchKey(String id) async {
-    try {
-      await widget.aiService.setActiveApiKey(id);
-      setState(() {
-        _allKeys = widget.aiService.allKeys;
-        final active = widget.aiService.activeKey;
-        if (active != null) {
-          _apiKeyController.text = active.apiKey;
-          _baseUrlController.text = active.baseUrl;
-          _modelController.text = active.model;
-          _keyNameController.text = active.name;
-        }
-      });
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error selecting key: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  Future<void> _showAddKeyDialog() async {
-    final nameCtrl = TextEditingController();
-    final apiKeyCtrl = TextEditingController();
-    final baseUrlCtrl = TextEditingController(text: widget.aiService.baseUrl);
-    final modelCtrl = TextEditingController(text: widget.aiService.model);
-    bool obscure = true;
-
-    await showDialog(
-      context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Add New API Key'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      controller: nameCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Key Name',
-                        hintText: 'My API Key',
-                        prefixIcon: Icon(Icons.label_outline, size: 18),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: apiKeyCtrl,
-                      decoration: InputDecoration(
-                        labelText: 'API Key',
-                        hintText: 'sk-...',
-                        prefixIcon: const Icon(Icons.key_rounded, size: 18),
-                        suffixIcon: IconButton(
-                          icon: Icon(obscure ? Icons.visibility_off : Icons.visibility, size: 18),
-                          onPressed: () => setDialogState(() => obscure = !obscure),
-                        ),
-                      ),
-                      obscureText: obscure,
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: baseUrlCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Base URL',
-                        hintText: 'https://api.groq.com/openai/v1',
-                        prefixIcon: Icon(Icons.dns_rounded, size: 18),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    TextField(
-                      controller: modelCtrl,
-                      decoration: const InputDecoration(
-                        labelText: 'Model',
-                        hintText: 'llama-3.3-70b-versatile',
-                        prefixIcon: Icon(Icons.smart_toy_rounded, size: 18),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('Quick presets:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        ActionChip(
-                          label: const Text('Groq', style: TextStyle(fontSize: 10)),
-                          onPressed: () {
-                            baseUrlCtrl.text = AiService.groqBaseUrl;
-                            setDialogState(() {});
-                            _autoFetchModels();
-                          },
-                        ),
-                        ActionChip(
-                          label: const Text('OpenRouter', style: TextStyle(fontSize: 10)),
-                          onPressed: () {
-                            baseUrlCtrl.text = AiService.openRouterBaseUrl;
-                            setDialogState(() {});
-                            _autoFetchModels();
-                          },
-                        ),
-                        ActionChip(
-                          label: const Text('Gemini', style: TextStyle(fontSize: 10)),
-                          onPressed: () {
-                            baseUrlCtrl.text = AiService.geminiBaseUrl;
-                            setDialogState(() {});
-                            _autoFetchModels();
-                          },
-                        ),
-                        ActionChip(
-                          label: const Text('NVIDIA', style: TextStyle(fontSize: 10)),
-                          onPressed: () {
-                            baseUrlCtrl.text = AiService.nvidiaBaseUrl;
-                            setDialogState(() {});
-                            _autoFetchModels();
-                          },
-                        ),
-                        ActionChip(
-                          label: const Text('DeepSeek', style: TextStyle(fontSize: 10)),
-                          onPressed: () {
-                            baseUrlCtrl.text = 'https://api.deepseek.com';
-                            setDialogState(() {});
-                            _autoFetchModels();
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () async {
-                    final id = 'key_${DateTime.now().millisecondsSinceEpoch}_${DateTime.now().microsecondsSinceEpoch}';
-                    final newKey = ApiKeyConfig(
-                      id: id,
-                      userId: authService.userId ?? '',
-                      name: nameCtrl.text.trim().isNotEmpty ? nameCtrl.text.trim() : 'New Key',
-                      provider: 'custom',
-                      baseUrl: baseUrlCtrl.text.trim(),
-                      model: modelCtrl.text.trim(),
-                      apiKey: apiKeyCtrl.text.trim(),
-                      isActive: _allKeys.isEmpty || _allKeys.every((k) => !k.isActive),
-                    );
-                    try {
-                      await widget.aiService.addApiKey(newKey);
-                      if (mounted) {
-                        setState(() {
-                          _allKeys = widget.aiService.allKeys;
-                          final active = widget.aiService.activeKey;
-                          if (active != null && active.id == newKey.id) {
-                            _apiKeyController.text = active.apiKey;
-                            _baseUrlController.text = active.baseUrl;
-                            _modelController.text = active.model;
-                            _keyNameController.text = active.name;
-                          }
-                        });
-                      }
-                      if (mounted) {
-                        Navigator.of(dialogContext).pop();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Key added successfully'), backgroundColor: Colors.teal),
-                        );
-                      }
-                    } catch (e) {
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Error adding key: $e'), backgroundColor: Colors.red),
-                        );
-                      }
-                    }
-                  },
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-    nameCtrl.dispose();
-    apiKeyCtrl.dispose();
-    baseUrlCtrl.dispose();
-    modelCtrl.dispose();
-  }
-
-  Future<void> _deleteCurrentKey() async {
-    final active = widget.aiService.activeKey;
-    if (active == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No active key to delete'), backgroundColor: Colors.orange),
-        );
-      }
-      return;
-    }
-    try {
-      await widget.aiService.deleteApiKey(active.id);
-      if (mounted) {
-        setState(() {
-          _allKeys = widget.aiService.allKeys;
-          final nextActive = widget.aiService.activeKey;
-          if (nextActive != null) {
-            _apiKeyController.text = nextActive.apiKey;
-            _baseUrlController.text = nextActive.baseUrl;
-            _modelController.text = nextActive.model;
-            _keyNameController.text = nextActive.name;
-          } else {
-            _apiKeyController.clear();
-            _baseUrlController.clear();
-            _modelController.clear();
-            _keyNameController.clear();
-          }
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Key deleted'), backgroundColor: Colors.teal),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting key: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  Future<void> _syncKeysToCloud() async {
-    final userId = authService.userId;
-    if (userId == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sign in to sync keys to cloud'), backgroundColor: Colors.orange),
-        );
-      }
-      return;
-    }
-    try {
-      final count = await widget.aiService.syncKeysToSupabase(userId);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Synced $count key(s) to cloud'), backgroundColor: Colors.teal),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error syncing keys: $e'), backgroundColor: Colors.red),
-        );
-      }
-    }
-  }
-
-  void _autoFetchModels() {
-    Future.delayed(const Duration(milliseconds: 500), () {
-      widget.aiService.refreshCachedModels().then((_) {
-        if (mounted) setState(() {});
-      });
-    });
   }
 
   Future<void> _saveVoiceSettings() async {
@@ -411,1239 +68,202 @@ class _SettingsScreenState extends State<SettingsScreen>
     await prefs.setDouble('tts_pitch', _ttsPitch);
   }
 
-  Future<void> _loadR2Config() async {
-    final prefs = await SharedPreferences.getInstance();
-    if (mounted) {
-      setState(() {
-        _r2AccountController.text = prefs.getString('r2_account_id') ?? '';
-        _r2BucketController.text = prefs.getString('r2_bucket_name') ?? '';
-        _r2TokenController.text = prefs.getString('r2_api_token') ?? '';
-      });
-    }
-  }
-
-  Future<void> _saveR2Config() async {
+  Future<void> _checkOverlayPermission() async {
     try {
-      await StorageService.saveConfig(
-        accountId: _r2AccountController.text.trim(),
-        bucketName: _r2BucketController.text.trim(),
-        apiToken: _r2TokenController.text.trim(),
+      final granted = await FlutterOverlayWindow.isPermissionGranted();
+      if (mounted) {
+        setState(() => _isOverlayPermissionGranted = granted);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _syncCloudKeys() async {
+    if (_authService.userId == null) return;
+    setState(() => _isSyncingKeys = true);
+    await widget.aiService.loadKeysFromSupabase(_authService.userId!);
+    if (mounted) {
+      setState(() => _isSyncingKeys = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✓ API Keys auto-synced with Supabase cloud'),
+          backgroundColor: Color(0xFF10B981),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Cloudflare R2 configuration saved.'),
-            backgroundColor: Colors.teal,
-          ),
-        );
-        setState(() {});
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error saving R2 config: $e'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
     }
   }
 
-  String? _apiUrlError;
-
-  void _validateApiSettings() {
-    final url = _baseUrlController.text.trim();
-    final key = _apiKeyController.text.trim();
-    setState(() {
-      if (url.isNotEmpty && !Uri.tryParse(url)!.hasScheme) {
-        _apiUrlError = 'URL must start with http:// or https://';
-      } else if (url.isNotEmpty && !url.contains('.')) {
-        _apiUrlError = 'URL seems invalid (missing domain)';
-      } else {
-        _apiUrlError = null;
-      }
-    });
-  }
-
-  Future<void> _loadLiveModels() async {
+  Future<void> _fetchLiveModels() async {
     setState(() => _isFetchingModels = true);
-    final models = await widget.aiService.fetchLiveModels(
-      apiKey: _apiKeyController.text,
-      baseUrl: _baseUrlController.text,
-    );
+    final models = await widget.aiService.fetchLiveModels();
     if (mounted) {
       setState(() {
         _liveModels = models;
         _isFetchingModels = false;
       });
-      if (models.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Fetched ${models.length} live models! Select any model below.'),
-            backgroundColor: Colors.teal,
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not fetch models. Verify API Key and Endpoint.'),
-            backgroundColor: Colors.orange,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _checkOverlayStatus() async {
-    bool isActive = await FlutterOverlayWindow.isActive();
-    bool isGranted = await FlutterOverlayWindow.isPermissionGranted();
-    if (mounted) {
-      setState(() {
-        _floatingIconEnabled = isActive;
-        _isOverlayPermissionGranted = isGranted;
-      });
     }
   }
 
   @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    _autoSaveTimer?.cancel();
-    _apiKeyController.removeListener(_autoSave);
-    _baseUrlController.removeListener(_autoSave);
-    _modelController.removeListener(_autoSave);
-    _keyNameController.removeListener(_autoSave);
-    _telegramTokenController.removeListener(_autoSave);
-    _maxTokensController.removeListener(_autoSave);
-    _apiKeyController.dispose();
-    _baseUrlController.dispose();
-    _modelController.dispose();
-    _keyNameController.dispose();
-    _telegramTokenController.dispose();
-    _maxTokensController.dispose();
-    _r2AccountController.dispose();
-    _r2BucketController.dispose();
-    _r2TokenController.dispose();
-    super.dispose();
-  }
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final bgGradient = isDark
+        ? const LinearGradient(
+            colors: [Color(0xFF0A0E1A), Color(0xFF131B2E)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          )
+        : const LinearGradient(
+            colors: [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          );
 
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      _checkPermissions();
-      if (FeatureFlags.floatingOverlayEnabled) {
-        _checkOverlayStatus();
-      }
-    }
-  }
-
-  Future<void> _checkPermissions() async {
-    final perms = {
-      'Microphone': Permission.microphone,
-      'Contacts': Permission.contacts,
-      'Phone': Permission.phone,
-      'SMS': Permission.sms,
-      'Notifications': Permission.notification,
-    };
-
-    for (final entry in perms.entries) {
-      _permissions[entry.key] = await entry.value.status;
-    }
-    final overlayGranted = FeatureFlags.floatingOverlayEnabled
-        ? await FlutterOverlayWindow.isPermissionGranted()
-        : false;
-    if (mounted) {
-      setState(() {
-        _isOverlayPermissionGranted = overlayGranted;
-      });
-    }
-  }
-
-  Future<void> _requestPermission(String name, Permission permission) async {
-    final status = await permission.request();
-    setState(() => _permissions[name] = status);
-  }
-
-  Timer? _autoSaveTimer;
-
-  void _autoSave() {
-    final keyName = _keyNameController.text.trim();
-    widget.aiService.saveSettings(
-      apiKey: _apiKeyController.text.trim(),
-      baseUrl: _baseUrlController.text.trim(),
-      model: _modelController.text.trim(),
-      name: keyName.isNotEmpty ? keyName : null,
-    );
-
-    widget.telegramService.saveSettings(
-      botToken: _telegramTokenController.text.trim(),
-      isEnabled: _telegramEnabled,
-    );
-
-    widget.aiService.saveMaxSteps(_maxSteps.toInt());
-    widget.aiService.saveDisableMaxSteps(_disableMaxSteps);
-    widget.aiService.saveAdvancedSettings(
-      temperature: _temperature,
-      maxTokens: int.tryParse(_maxTokensController.text) ?? 1024,
-      useScreenCompression: _useScreenCompression,
-      useSystemPrompt: _useSystemPrompt,
-    );
-
-    _autoSaveTimer?.cancel();
-    _autoSaveTimer = Timer(const Duration(seconds: 1), () {
-      _syncSettingsToSupabase();
-    });
-  }
-
-  void _syncSettingsToSupabase() {
-    final userId = authService.userId;
-    if (userId == null) return;
-    DatabaseService.saveSettings(
-      userId: userId,
-      settings: {
-        'api_base_url': _baseUrlController.text.trim(),
-        'api_model': _modelController.text.trim(),
-        'api_max_steps': _maxSteps.toInt(),
-        'api_disable_max_steps': _disableMaxSteps,
-        'api_temperature': _temperature,
-        'api_max_tokens': int.tryParse(_maxTokensController.text) ?? 1024,
-        'api_use_screen_compression': _useScreenCompression,
-        'api_use_system_prompt': _useSystemPrompt,
-        'telegram_token': _telegramTokenController.text.trim(),
-        'telegram_enabled': _telegramEnabled,
-      },
-    );
-    // Sync all API keys to Supabase
-    final keys = widget.aiService.allKeys;
-    for (final key in keys) {
-      DatabaseService.saveApiKey(userId: userId, key: key);
-    }
-  }
-
-  Future<void> _fetchModels() async {
-    final baseUrl = _baseUrlController.text.trim();
-    final apiKey = _apiKeyController.text.trim();
-
-    if (baseUrl.isEmpty || apiKey.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter Base URL and API Key first.'),
+    return Scaffold(
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        title: const Text(
+          'Settings',
+          style: TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
         ),
-      );
-      return;
-    }
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+      ),
+      body: Container(
+        decoration: BoxDecoration(gradient: bgGradient),
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            children: [
+              // 1. ACCOUNT & CLOUD SYNC HEADER
+              _buildAccountCard(isDark),
+              const SizedBox(height: 16),
 
-    setState(() => _isFetchingModels = true);
-    try {
-      await widget.aiService.refreshCachedModels();
-      if (mounted) {
-        setState(() {});
-        if (widget.aiService.cachedModels.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('No models found. Check your API key and base URL.')),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Found ${widget.aiService.cachedModels.length} models')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error fetching models: $e'), backgroundColor: Colors.red),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isFetchingModels = false);
-    }
+              // 2. AI PROVIDER & SAVED KEYS
+              _buildAiProviderCard(isDark),
+              const SizedBox(height: 16),
+
+              // 3. VOICE & MULTILINGUAL SPEECH
+              _buildVoiceSettingsCard(isDark),
+              const SizedBox(height: 16),
+
+              // 4. CLOUD BACKENDS STATUS
+              _buildCloudStorageCard(isDark),
+              const SizedBox(height: 16),
+
+              // 5. DEVICE AUTOMATION & AUTHORITY
+              _buildDeviceAuthorityCard(isDark),
+              const SizedBox(height: 16),
+
+              // 6. APP PREFERENCES & THEMING
+              _buildPreferencesCard(isDark),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
-  Widget _buildSettingsCard({
-    required IconData icon,
-    required String title,
-    String? subtitle,
-    required List<Widget> children,
-    required bool isDark,
-  }) {
+  Widget _buildAccountCard(bool isDark) {
+    final email = _authService.email.isNotEmpty ? _authService.email : 'Guest Device User';
     return Card(
-      margin: const EdgeInsets.only(bottom: 28),
-      elevation: isDark ? 0 : 1.5,
-      shadowColor: Colors.black.withOpacity(isDark ? 0.4 : 0.1),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: isDark
-            ? BorderSide(color: Colors.white.withOpacity(0.04), width: 0.5)
-            : BorderSide.none,
-      ),
       child: Padding(
-        padding: const EdgeInsets.all(22),
+        padding: const EdgeInsets.all(16),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.all(10),
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)],
+                    ),
                   ),
-                  child: Icon(
-                    icon,
-                    color: Theme.of(context).primaryColor,
-                    size: 20,
-                  ),
+                  child: const Icon(Icons.person_rounded, color: Colors.white, size: 26),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
+                        email,
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            Icon(Icons.cloud_done_rounded, color: Color(0xFF10B981), size: 12),
+                            SizedBox(width: 4),
+                            Text(
+                              'Auto-Synced with Supabase',
+                              style: TextStyle(
+                                color: Color(0xFF10B981),
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      if (subtitle != null) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          subtitle,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isDark
-                                ? const Color(0xFF94A3B8)
-                                : const Color(0xFF475569),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 22),
-            ...children,
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isSyncingKeys ? null : _syncCloudKeys,
+                    icon: _isSyncingKeys
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.sync_rounded, size: 16),
+                    label: const Text('Sync Keys'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      await _authService.signOut();
+                      if (mounted) Navigator.of(context).pop();
+                    },
+                    icon: const Icon(Icons.logout_rounded, size: 16, color: Colors.redAccent),
+                    label: const Text('Sign Out', style: TextStyle(color: Colors.redAccent)),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
     );
   }
 
-  InputDecoration _buildInputDecoration({
-    required String labelText,
-    required String hintText,
-    Widget? prefixIcon,
-    Widget? suffixIcon,
-  }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return InputDecoration(
-      labelText: labelText,
-      hintText: hintText,
-      prefixIcon: prefixIcon,
-      suffixIcon: suffixIcon,
-      filled: true,
-      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
-      labelStyle: TextStyle(
-        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-        fontSize: 13,
-        fontWeight: FontWeight.w600,
-      ),
-      hintStyle: TextStyle(
-        color: isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8),
-        fontSize: 13,
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
-          width: 1.2,
-        ),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
-          width: 1.2,
-        ),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(
-          color: Theme.of(context).colorScheme.primary,
-          width: 1.8,
-        ),
-      ),
-      floatingLabelBehavior: FloatingLabelBehavior.auto,
-    );
-  }
+  Widget _buildAiProviderCard(bool isDark) {
+    final activeKey = widget.aiService.activeKey;
+    final allKeys = widget.aiService.allKeys;
 
-  @override
-  Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Settings',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 40),
-        children: [
-          // 0. Account Card
-          _buildSettingsCard(
-            icon: Icons.person_outline,
-            title: 'Account',
-            subtitle: authService.email ?? 'Signed in',
-            isDark: isDark,
-            children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    radius: 24,
-                    backgroundColor: Theme.of(context).primaryColor.withOpacity(0.15),
-                    child: Icon(Icons.person_rounded, size: 28, color: Theme.of(context).primaryColor),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          authService.email ?? 'User',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          'User ID: ${authService.userId?.substring(0, 8) ?? "..."}...',
-                          style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(Icons.logout_rounded, color: Colors.redAccent),
-                    tooltip: 'Sign out',
-                    onPressed: () async {
-                      await authService.signOut();
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          // 1. Appearance Card
-          _buildSettingsCard(
-            icon: Icons.palette_outlined,
-            title: 'Appearance',
-            subtitle: 'Choose your preferred color theme',
-            isDark: isDark,
-            children: [
-              ValueListenableBuilder<ThemeMode>(
-                valueListenable: themeNotifier,
-                builder: (context, currentMode, _) {
-                  return SizedBox(
-                    width: double.infinity,
-                    child: SegmentedButton<ThemeMode>(
-                      style: SegmentedButton.styleFrom(
-                        selectedBackgroundColor: Theme.of(
-                          context,
-                        ).colorScheme.primary,
-                        selectedForegroundColor: Colors.white,
-                        backgroundColor: isDark
-                            ? const Color(0xFF1E293B)
-                            : Colors.white,
-                        foregroundColor: isDark ? Colors.white : Colors.black87,
-                        side: BorderSide(
-                          color: isDark
-                              ? const Color(0xFF334155)
-                              : const Color(0xFFE2E8F0),
-                        ),
-                      ),
-                      segments: [
-                        ButtonSegment(
-                          value: ThemeMode.system,
-                          label: const Text(
-                            'System',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                          icon: const Icon(Icons.brightness_auto, size: 16),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.light,
-                          label: const Text(
-                            'Light',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                          icon: const Icon(Icons.light_mode, size: 16),
-                        ),
-                        ButtonSegment(
-                          value: ThemeMode.dark,
-                          label: const Text(
-                            'Dark',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
-                            ),
-                          ),
-                          icon: const Icon(Icons.dark_mode, size: 16),
-                        ),
-                      ],
-                      selected: {currentMode},
-                      onSelectionChanged: (Set<ThemeMode> newSelection) async {
-                        final mode = newSelection.first;
-                        themeNotifier.value = mode;
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setString('themeMode', mode.name);
-                      },
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-
-          // 2. AI Voice & Speech Settings Card
-          _buildSettingsCard(
-            icon: Icons.record_voice_over_rounded,
-            title: 'AI Voice & Speech Settings',
-            subtitle: 'Configure speech recognition and text-to-speech voice output',
-            isDark: isDark,
-            children: [
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Auto-read AI responses'),
-                subtitle: const Text('Automatically speak AI messages aloud when received'),
-                value: _autoReadTts,
-                onChanged: (val) {
-                  setState(() => _autoReadTts = val);
-                  _saveVoiceSettings();
-                },
-              ),
-              const Divider(height: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Speech Speed Rate', style: TextStyle(fontWeight: FontWeight.w600)),
-                      Text('${_ttsSpeechRate.toStringAsFixed(1)}x', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  Slider(
-                    value: _ttsSpeechRate,
-                    min: 0.2,
-                    max: 1.5,
-                    divisions: 13,
-                    label: '${_ttsSpeechRate.toStringAsFixed(1)}x',
-                    onChanged: (val) {
-                      setState(() => _ttsSpeechRate = val);
-                      _saveVoiceSettings();
-                    },
-                  ),
-                ],
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Voice Pitch', style: TextStyle(fontWeight: FontWeight.w600)),
-                      Text('${_ttsPitch.toStringAsFixed(1)}x', style: const TextStyle(fontWeight: FontWeight.bold)),
-                    ],
-                  ),
-                  Slider(
-                    value: _ttsPitch,
-                    min: 0.5,
-                    max: 1.5,
-                    divisions: 10,
-                    label: '${_ttsPitch.toStringAsFixed(1)}x',
-                    onChanged: (val) {
-                      setState(() => _ttsPitch = val);
-                      _saveVoiceSettings();
-                    },
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          // 3. AI Engine Configuration Card (Multi-Key Management)
-          _buildSettingsCard(
-            icon: Icons.psychology_outlined,
-            title: 'AI Engine Configuration',
-            subtitle: 'Supports any OpenAI-compatible API endpoint',
-            isDark: isDark,
-            children: [
-              // -- Key Selector Row --
-              SizedBox(
-                height: 40,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  children: [
-                    ..._allKeys.map((key) {
-                      final isActive = key.isActive;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 8),
-                        child: ChoiceChip(
-                          label: Text(
-                            key.name.isNotEmpty ? key.name : key.id.substring(0, 8),
-                            style: TextStyle(fontSize: 12, color: isActive ? Colors.white : null),
-                          ),
-                          selected: isActive,
-                          selectedColor: Theme.of(context).colorScheme.primary,
-                          onSelected: (_) => _switchKey(key.id),
-                        ),
-                      );
-                    }),
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: const Icon(Icons.add, size: 18),
-                        selected: false,
-                        onSelected: (_) => _showAddKeyDialog(),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-
-              // -- Active Key Editor --
-              TextField(
-                controller: _keyNameController,
-                decoration: _buildInputDecoration(
-                  labelText: 'Key Name',
-                  hintText: 'My API Key',
-                  prefixIcon: const Icon(Icons.label_outline, size: 18),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _apiKeyController,
-                decoration: _buildInputDecoration(
-                  labelText: 'API Key',
-                  hintText: 'sk-...',
-                  prefixIcon: const Icon(Icons.key_rounded, size: 18),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureKey ? Icons.visibility_off : Icons.visibility,
-                      size: 18,
-                    ),
-                    onPressed: () => setState(() => _obscureKey = !_obscureKey),
-                  ),
-                ),
-                obscureText: _obscureKey,
-                onChanged: (_) => _validateApiSettings(),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _baseUrlController,
-                decoration: _buildInputDecoration(
-                  labelText: 'API Base URL',
-                  hintText: 'https://api.deepseek.com',
-                  prefixIcon: const Icon(Icons.dns_rounded, size: 18),
-                ),
-                onChanged: (_) => _validateApiSettings(),
-              ),
-              if (_apiUrlError != null) ...[
-                const SizedBox(height: 6),
-                Row(
-                  children: [
-                    const Icon(Icons.info_outline, size: 14, color: Colors.orange),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _apiUrlError!,
-                        style: const TextStyle(fontSize: 11.5, color: Colors.orange),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-              const SizedBox(height: 10),
-              // -- Provider Presets --
-              Wrap(
-                spacing: 8,
-                runSpacing: 4,
-                children: [
-                  ActionChip(
-                    label: const Text('Local Server', style: TextStyle(fontSize: 11)),
-                    tooltip: 'For local Llama.cpp or LM Studio',
-                    onPressed: () =>
-                        _baseUrlController.text = 'http://192.168.1.X:8080/v1',
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.cloud_circle_rounded, size: 16, color: Colors.blue),
-                    label: const Text('Ollama Cloud', style: TextStyle(fontSize: 11)),
-                    onPressed: () {
-                      _baseUrlController.text = AiService.ollamaCloudBaseUrl;
-                      _autoFetchModels();
-                    },
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.bolt_rounded, size: 16, color: Colors.orange),
-                    label: const Text('Groq Free', style: TextStyle(fontSize: 11)),
-                    onPressed: () {
-                      _baseUrlController.text = AiService.groqBaseUrl;
-                      _autoFetchModels();
-                    },
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.public_rounded, size: 16, color: Colors.purple),
-                    label: const Text('OpenRouter Free', style: TextStyle(fontSize: 11)),
-                    onPressed: () {
-                      _baseUrlController.text = AiService.openRouterBaseUrl;
-                      _autoFetchModels();
-                    },
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.auto_awesome_rounded, size: 16, color: Colors.teal),
-                    label: const Text('Gemini Free', style: TextStyle(fontSize: 11)),
-                    onPressed: () {
-                      _baseUrlController.text = AiService.geminiBaseUrl;
-                      _autoFetchModels();
-                    },
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.memory_rounded, size: 16, color: Colors.green),
-                    label: const Text('NVIDIA NIM', style: TextStyle(fontSize: 11)),
-                    onPressed: () {
-                      _baseUrlController.text = AiService.nvidiaBaseUrl;
-                      _autoFetchModels();
-                    },
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.hub_rounded, size: 16, color: Colors.indigo),
-                    label: const Text('Together AI', style: TextStyle(fontSize: 11)),
-                    onPressed: () {
-                      _baseUrlController.text = AiService.togetherAiBaseUrl;
-                      _autoFetchModels();
-                    },
-                  ),
-                  ActionChip(
-                    avatar: const Icon(Icons.waves_rounded, size: 16, color: Colors.amber),
-                    label: const Text('Mistral AI', style: TextStyle(fontSize: 11)),
-                    onPressed: () {
-                      _baseUrlController.text = AiService.mistralAiBaseUrl;
-                      _autoFetchModels();
-                    },
-                  ),
-                  ActionChip(
-                    label: const Text('DeepSeek', style: TextStyle(fontSize: 11)),
-                    onPressed: () {
-                      _baseUrlController.text = 'https://api.deepseek.com';
-                      _autoFetchModels();
-                    },
-                  ),
-                  ActionChip(
-                    label: const Text('Custom', style: TextStyle(fontSize: 11)),
-                    tooltip: 'Clear fields',
-                    onPressed: () {
-                      _baseUrlController.clear();
-                      _apiKeyController.clear();
-                      _modelController.clear();
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // -- Model field with Autocomplete and Refresh button --
-              Row(
-                children: [
-                  Expanded(
-                    child: Autocomplete<String>(
-                      optionsBuilder: (textEditingValue) {
-                        if (textEditingValue.text.isEmpty) {
-                          return widget.aiService.cachedModels;
-                        }
-                        return widget.aiService.cachedModels.where((m) =>
-                            m.toLowerCase().contains(textEditingValue.text.toLowerCase()));
-                      },
-                      fieldViewBuilder: (context, textController, focusNode, onSubmitted) {
-                        return TextField(
-                          controller: _modelController,
-                          focusNode: focusNode,
-                          decoration: _buildInputDecoration(
-                            labelText: 'Model',
-                            hintText: 'deepseek-chat',
-                            prefixIcon: const Icon(Icons.smart_toy_rounded, size: 18),
-                          ),
-                          onChanged: (val) {
-                            // Sync to Autocomplete's internal controller so it can build options
-                            textController.text = val;
-                          },
-                        );
-                      },
-                      onSelected: (selection) {
-                        _modelController.text = selection;
-                      },
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: _fetchModels,
-                    icon: _isFetchingModels
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Icon(Icons.refresh, size: 18, color: Colors.white),
-                    label: Text(
-                      _isFetchingModels ? '...' : 'Refresh',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Theme.of(context).colorScheme.primary,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              // -- Action Buttons --
-              Row(
-                children: [
-                  OutlinedButton.icon(
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Add Key'),
-                    onPressed: _showAddKeyDialog,
-                  ),
-                  const SizedBox(width: 8),
-                  if (_allKeys.length > 1)
-                    TextButton.icon(
-                      icon: const Icon(Icons.delete_outline, size: 16, color: Colors.red),
-                      label: const Text('Delete', style: TextStyle(color: Colors.red)),
-                      onPressed: _deleteCurrentKey,
-                    ),
-                  const Spacer(),
-                  if (authService.isLoggedIn)
-                    TextButton.icon(
-                      icon: const Icon(Icons.cloud_upload, size: 16),
-                      label: const Text('Sync'),
-                      onPressed: _syncKeysToCloud,
-                    ),
-                ],
-              ),
-            ],
-          ),
-
-          // 4. Cloudflare R2 Storage Card
-          _buildSettingsCard(
-            icon: Icons.cloud_outlined,
-            title: 'Cloudflare R2 Storage',
-            subtitle: 'Store heavy data (images, files) in the cloud',
-            isDark: isDark,
-            children: [
-              TextField(
-                controller: _r2AccountController,
-                decoration: _buildInputDecoration(
-                  labelText: 'Account ID',
-                  hintText: 'Your Cloudflare Account ID',
-                  prefixIcon: const Icon(Icons.badge_outlined, size: 18),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _r2BucketController,
-                decoration: _buildInputDecoration(
-                  labelText: 'Bucket Name',
-                  hintText: 'my-bucket',
-                  prefixIcon: const Icon(Icons.folder_outlined, size: 18),
-                ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: _r2TokenController,
-                decoration: _buildInputDecoration(
-                  labelText: 'API Token',
-                  hintText: 'R2 API Token',
-                  prefixIcon: const Icon(Icons.vpn_key_outlined, size: 18),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _obscureR2Token ? Icons.visibility_off : Icons.visibility,
-                      size: 18,
-                    ),
-                    onPressed: () => setState(() => _obscureR2Token = !_obscureR2Token),
-                  ),
-                ),
-                obscureText: _obscureR2Token,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  if (StorageService.isConfigured)
-                    const Icon(Icons.check_circle, color: Colors.green, size: 18)
-                  else
-                    const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 18),
-                  const SizedBox(width: 8),
-                  Text(
-                    StorageService.isConfigured ? 'Configured' : 'Not configured',
-                    style: TextStyle(
-                      color: StorageService.isConfigured ? Colors.green : Colors.orange,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const Spacer(),
-                  ElevatedButton(
-                    onPressed: _saveR2Config,
-                    child: const Text('Save'),
-                  ),
-                ],
-              ),
-            ],
-          ),
-
-          // 5. Parameters & Tuning Card
-          _buildSettingsCard(
-            icon: Icons.tune_outlined,
-            title: 'Tuning & Boundaries',
-            subtitle: 'Configure LLM agent parameters',
-            isDark: isDark,
-            children: [
-              SwitchListTile(
-                title: const Text('Disable Maximum Steps'),
-                subtitle: const Text(
-                  '⚠️ Can cause infinite loops.',
-                  style: TextStyle(color: Colors.orange, fontSize: 12),
-                ),
-                value: _disableMaxSteps,
-                onChanged: (bool value) {
-                  setState(() {
-                    _disableMaxSteps = value;
-                  });
-                  _autoSave();
-                },
-                contentPadding: EdgeInsets.zero,
-              ),
-              if (!_disableMaxSteps) ...[
-                const SizedBox(height: 8),
-                Text(
-                  'Maximum Steps Per Task: ${_maxSteps.toInt()}',
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w500,
-                    fontSize: 13,
-                  ),
-                ),
-                Slider(
-                  value: _maxSteps,
-                  min: 5,
-                  max: 50,
-                  divisions: 45,
-                  label: _maxSteps.toInt().toString(),
-                  onChanged: (value) {
-                    setState(() {
-                      _maxSteps = value;
-                    });
-                  },
-                  onChangeEnd: (value) {
-                    _autoSave();
-                  },
-                ),
-              ],
-              const SizedBox(height: 12),
-              TextField(
-                controller: _maxTokensController,
-                keyboardType: TextInputType.number,
-                decoration: _buildInputDecoration(
-                  labelText: 'Context Limit (Max Tokens)',
-                  hintText: '1024',
-                  prefixIcon: const Icon(Icons.token_rounded, size: 18),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Temperature: ${_temperature.toStringAsFixed(2)}',
-                style: const TextStyle(
-                  fontWeight: FontWeight.w500,
-                  fontSize: 13,
-                ),
-              ),
-              Slider(
-                value: _temperature,
-                min: 0.0,
-                max: 2.0,
-                divisions: 20,
-                label: _temperature.toStringAsFixed(2),
-                onChanged: (value) {
-                  setState(() {
-                    _temperature = value;
-                  });
-                },
-                onChangeEnd: (value) {
-                  _autoSave();
-                },
-              ),
-            ],
-          ),
-
-          // 6. Behavior & Extensions Card
-          _buildSettingsCard(
-            icon: Icons.extension_outlined,
-            title: 'Behavior & Extensions',
-            subtitle: 'Additional feature flags and overlay options',
-            isDark: isDark,
-            children: [
-              SwitchListTile(
-                title: const Text('Use Screen Compression'),
-                subtitle: const Text(
-                  'Removes duplicate elements to save tokens',
-                ),
-                value: _useScreenCompression,
-                onChanged: (bool value) {
-                  setState(() {
-                    _useScreenCompression = value;
-                  });
-                  _autoSave();
-                },
-                contentPadding: EdgeInsets.zero,
-              ),
-              SwitchListTile(
-                title: const Text('Send System Prompt'),
-                subtitle: const Text('Turn off for custom LoRA fine-tunes'),
-                value: _useSystemPrompt,
-                onChanged: (bool value) {
-                  setState(() {
-                    _useSystemPrompt = value;
-                  });
-                  _autoSave();
-                },
-                contentPadding: EdgeInsets.zero,
-              ),
-              if (FeatureFlags.floatingOverlayEnabled)
-                SwitchListTile(
-                  title: const Text('Enable Floating Agent Icon'),
-                  subtitle: const Text('Assign tasks without opening the app'),
-                  value: _floatingIconEnabled,
-                  onChanged: (val) async {
-                    if (val) {
-                      bool? isGranted =
-                          await FlutterOverlayWindow.isPermissionGranted();
-                      if (isGranted != true) {
-                        bool? result =
-                            await FlutterOverlayWindow.requestPermission();
-                        if (result != true) {
-                          if (mounted) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Permission to draw over other apps is required.',
-                                ),
-                              ),
-                            );
-                          }
-                          return;
-                        }
-                      }
-                      if (await FlutterOverlayWindow.isActive() == false) {
-                        await FlutterOverlayWindow.showOverlay(
-                          enableDrag: true,
-                          overlayTitle: "AAA Private Agent",
-                          overlayContent: "AAA Private Agent - Floating Assistant",
-                          flag: OverlayFlag.focusPointer,
-                          alignment: OverlayAlignment.centerRight,
-                          visibility: NotificationVisibility.visibilitySecret,
-                          positionGravity: PositionGravity.auto,
-                          startPosition: const OverlayPosition(0, 200),
-                          width: 56,
-                          height: 56,
-                        );
-                      }
-                    } else {
-                      if (await FlutterOverlayWindow.isActive() == true) {
-                        await FlutterOverlayWindow.closeOverlay();
-                      }
-                    }
-                    setState(() => _floatingIconEnabled = val);
-                    _autoSave();
-                  },
-                  contentPadding: EdgeInsets.zero,
-                ),
-            ],
-          ),
-
-          // 7. Telegram Remote Access Card
-          _buildSettingsCard(
-            icon: Icons.send_and_archive_outlined,
-            title: 'Telegram Remote Access',
-            subtitle: 'Control your agent remotely from anywhere',
-            isDark: isDark,
-            children: [
-              TextField(
-                controller: _telegramTokenController,
-                decoration: _buildInputDecoration(
-                  labelText: 'Telegram Bot Token',
-                  hintText: '123456:ABC-DEF1234ghIkl-zyx57W2v1u123ew11',
-                  prefixIcon: const Icon(Icons.send_rounded, size: 18),
-                ),
-              ),
-              SwitchListTile(
-                title: const Text('Enable Telegram Bot'),
-                subtitle: const Text('Allows remote control via Telegram chat'),
-                value: _telegramEnabled,
-                onChanged: (val) {
-                  setState(() => _telegramEnabled = val);
-                  _autoSave();
-                },
-                contentPadding: EdgeInsets.zero,
-              ),
-            ],
-          ),
-
-          // 8. Accessibility Screen Control Card
-          _buildSettingsCard(
-            icon: Icons.visibility_outlined,
-            title: 'Screen Control (Accessibility)',
-            subtitle: 'Required to read screen and perform automated clicks',
-            isDark: isDark,
-            children: [_buildAccessibilityCard()],
-          ),
-
-          // 7. System Permissions Card
-          _buildSettingsCard(
-            icon: Icons.security_outlined,
-            title: 'App Permissions',
-            subtitle: 'Required for automation, microphone, and contacts',
-            isDark: isDark,
-            children: _buildPermissionTiles(),
-          ),
-
-          // 8. Task History Card
-          _buildSettingsCard(
-            icon: Icons.history_outlined,
-            title: 'Execution logs',
-            subtitle: 'View history of tasks and token analytics',
-            isDark: isDark,
-            children: [
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('View Task History'),
-                subtitle: const Text(
-                  'Access complete trace of execution steps',
-                ),
-                trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const TaskHistoryScreen(),
-                    ),
-                  );
-                },
-              ),
-            ],
-          ),
-
-          // 9. About / Links Card removed
-        ],
-      ),
-    );
-  }
-
-  List<Widget> _buildPermissionTiles() {
-    final permissionMap = {
-      'Microphone': Permission.microphone,
-      'Contacts': Permission.contacts,
-      'Phone': Permission.phone,
-      'SMS': Permission.sms,
-      'Notifications': Permission.notification,
-    };
-
-    final icons = {
-      'Microphone': Icons.mic,
-      'Contacts': Icons.contacts,
-      'Phone': Icons.phone,
-      'SMS': Icons.sms,
-      'Notifications': Icons.notifications,
-    };
-
-    final list = permissionMap.entries.map((entry) {
-      final status = _permissions[entry.key];
-      final isGranted = status?.isGranted ?? false;
-
-      return ListTile(
-        leading: Icon(icons[entry.key]),
-        title: Text(entry.key),
-        trailing: isGranted
-            ? Icon(
-                Icons.check_circle,
-                color: Theme.of(context).colorScheme.primary,
-              )
-            : TextButton(
-                onPressed: () => _requestPermission(entry.key, entry.value),
-                child: const Text('Grant'),
-              ),
-        subtitle: Text(
-          isGranted
-              ? 'Granted'
-              : (status?.isDenied ?? true
-                    ? 'Not granted'
-                    : 'Denied permanently'),
-          style: TextStyle(
-            color: isGranted
-                ? Theme.of(context).colorScheme.primary
-                : Colors.orange,
-            fontSize: 12,
-          ),
-        ),
-      );
-    }).toList();
-
-    if (FeatureFlags.floatingOverlayEnabled) {
-      list.add(
-        ListTile(
-          leading: const Icon(Icons.layers),
-          title: const Text('Display Over Other Apps (Floating Bubble)'),
-          trailing: _isOverlayPermissionGranted
-              ? Icon(
-                  Icons.check_circle,
-                  color: Theme.of(context).colorScheme.primary,
-                )
-              : TextButton(
-                  onPressed: () async {
-                    await FlutterOverlayWindow.requestPermission();
-                    final granted =
-                        await FlutterOverlayWindow.isPermissionGranted();
-                    setState(() {
-                      _isOverlayPermissionGranted = granted;
-                    });
-                  },
-                  child: const Text('Grant'),
-                ),
-          subtitle: Text(
-            _isOverlayPermissionGranted ? 'Granted' : 'Not granted',
-            style: TextStyle(
-              color: _isOverlayPermissionGranted
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.orange,
-              fontSize: 12,
-            ),
-          ),
-        ),
-      );
-    }
-
-    return list;
-  }
-
-  Widget _buildShizukuCard() {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1651,127 +271,533 @@ class _SettingsScreenState extends State<SettingsScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(
-                  widget.shizukuService.isAvailable
-                      ? Icons.link
-                      : Icons.link_off,
-                  color: widget.shizukuService.isAvailable
-                      ? Colors.green
-                      : Colors.grey,
+                Row(
+                  children: const [
+                    Icon(Icons.smart_toy_rounded, color: Color(0xFF818CF8), size: 20),
+                    SizedBox(width: 8),
+                    Text(
+                      'AI Provider & API Keys',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                Text(
-                  widget.shizukuService.isAvailable
-                      ? 'Shizuku is running'
-                      : 'Shizuku not detected',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w600,
-                    color: widget.shizukuService.isAvailable
-                        ? Colors.green
-                        : Colors.grey,
-                  ),
+                IconButton(
+                  icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF818CF8)),
+                  onPressed: _showAddKeyModal,
+                  tooltip: 'Add API Key',
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            if (!widget.shizukuService.isAvailable) ...[
-              const Text(
-                '1. Install Shizuku from Play Store\n'
-                '2. Open Shizuku and start it via Wireless Debugging\n'
-                '3. Come back here and tap "Check Again"',
-                style: TextStyle(fontSize: 13),
+            const Divider(height: 20),
+
+            // Active Provider Display
+            if (activeKey != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6366F1).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.key_rounded, color: Color(0xFF818CF8), size: 20),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            activeKey.name,
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                          ),
+                          Text(
+                            'Model: ${widget.aiService.model}',
+                            style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black70),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: _isFetchingModels
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.refresh_rounded, size: 18),
+                      onPressed: _fetchLiveModels,
+                      tooltip: 'Refresh Models',
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 12),
-              OutlinedButton(
-                onPressed: () async {
-                  await widget.shizukuService.checkAvailability();
-                  if (mounted) setState(() {});
-                },
-                child: const Text('Check Again'),
-              ),
-            ] else if (!widget.shizukuService.hasPermission) ...[
-              OutlinedButton(
-                onPressed: () async {
-                  await widget.shizukuService.requestPermission();
-                  if (mounted) setState(() {});
-                },
-                child: const Text('Grant Shizuku Permission'),
-              ),
-            ] else ...[
-              Row(
-                children: [
-                  const Icon(Icons.check_circle, color: Colors.green, size: 16),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Permission granted — ADB commands available',
-                    style: TextStyle(color: Colors.green[700], fontSize: 13),
-                  ),
-                ],
-              ),
             ],
+
+            // Model Selection Dropdown
+            if (_liveModels.isNotEmpty) ...[
+              DropdownButtonFormField<String>(
+                value: _liveModels.contains(widget.aiService.model) ? widget.aiService.model : null,
+                decoration: InputDecoration(
+                  labelText: 'Select Active Model',
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                items: _liveModels.map((m) {
+                  return DropdownMenuItem<String>(
+                    value: m,
+                    child: Text(m, style: const TextStyle(fontSize: 12.5)),
+                  );
+                }).toList(),
+                onChanged: (val) {
+                  if (val != null) {
+                    widget.aiService.saveSettings(
+                      widget.aiService.apiKey ?? '',
+                      widget.aiService.baseUrl,
+                      val,
+                    );
+                    setState(() {});
+                  }
+                },
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            // Saved Keys List
+            const Text('Saved Keys:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            const SizedBox(height: 8),
+            ...allKeys.map((key) {
+              final isActive = key.id == activeKey?.id;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: isActive ? const Color(0xFF10B981).withOpacity(0.08) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isActive ? const Color(0xFF10B981).withOpacity(0.4) : (isDark ? Colors.white12 : Colors.black12),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      isActive ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+                      color: isActive ? const Color(0xFF10B981) : Colors.grey,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () async {
+                          await widget.aiService.setActiveApiKey(key.id);
+                          setState(() {});
+                        },
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(key.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                            Text(
+                              key.baseUrl,
+                              style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+                      onPressed: () async {
+                        await widget.aiService.deleteApiKey(key.id);
+                        setState(() {});
+                      },
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAccessibilityCard() {
-    return FutureBuilder<bool>(
-      future: widget.screenAutomationService.isServiceRunning(),
-      builder: (context, snapshot) {
-        final isRunning = snapshot.data ?? false;
+  Widget _buildVoiceSettingsCard(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.record_voice_over_rounded, color: Color(0xFF10B981), size: 20),
+                SizedBox(width: 8),
+                Text('Voice & Multilingual Speech', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const Divider(height: 20),
 
-        return Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Auto-Read Voice Responses'),
+              subtitle: const Text('AI automatically speaks responses aloud'),
+              value: _autoReadTts,
+              onChanged: (val) {
+                setState(() => _autoReadTts = val);
+                _saveVoiceSettings();
+              },
+            ),
+
+            const SizedBox(height: 8),
+            Text('Speech Rate (${_ttsSpeechRate.toStringAsFixed(2)}x)', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            Slider(
+              value: _ttsSpeechRate,
+              min: 0.2,
+              max: 1.5,
+              divisions: 13,
+              activeColor: const Color(0xFF10B981),
+              onChanged: (val) {
+                setState(() => _ttsSpeechRate = val);
+                _saveVoiceSettings();
+              },
+            ),
+
+            Text('Voice Pitch (${_ttsPitch.toStringAsFixed(2)})', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+            Slider(
+              value: _ttsPitch,
+              min: 0.5,
+              max: 1.5,
+              divisions: 10,
+              activeColor: const Color(0xFF10B981),
+              onChanged: (val) {
+                setState(() => _ttsPitch = val);
+                _saveVoiceSettings();
+              },
+            ),
+
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withOpacity(0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: const [
+                  Text('🇧🇩 🇺🇸 🇮🇳 🇸🇦', style: TextStyle(fontSize: 16)),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Multilingual Bangla, English, Hindi & Auto-detect Language Engine Active',
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCloudStorageCard(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.cloud_sync_rounded, color: Color(0xFF00E5FF), size: 20),
+                SizedBox(width: 8),
+                Text('Triple Cloud Storage Backends', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'All heavy files & data automatically backed up across 3 clouds with zero setup.',
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black60),
+            ),
+            const Divider(height: 20),
+
+            _buildCloudStatusItem('Cloudflare R2 Storage', 'aaa-r2 bucket', const Color(0xFFF97316)),
+            const SizedBox(height: 8),
+            _buildCloudStatusItem('Supabase Storage', 'aaa-backups bucket', const Color(0xFF10B981)),
+            const SizedBox(height: 8),
+            _buildCloudStatusItem('Firebase Storage', 'aaa-infinity-ai bucket', const Color(0xFFF59E0B)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCloudStatusItem(String title, String subtitle, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.2)),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle_rounded, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Icon(
-                      isRunning ? Icons.visibility : Icons.visibility_off,
-                      color: isRunning ? Colors.green : Colors.grey,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      isRunning
-                          ? 'Screen Control is active'
-                          : 'Screen Control is disabled',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        color: isRunning ? Colors.green : Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                if (!isRunning) ...[
-                  const Text(
-                    'Tap below to open Accessibility Settings, then find "PrivateAgent Screen Control" and enable it.',
-                    style: TextStyle(fontSize: 13),
-                  ),
-                  const SizedBox(height: 12),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      await widget.screenAutomationService
-                          .openAccessibilitySettings();
-                    },
-                    icon: const Icon(Icons.settings),
-                    label: const Text('Open Accessibility Settings'),
-                  ),
-                ] else ...[
-                  Text(
-                    'Can read screen, tap, scroll, and type in other apps',
-                    style: TextStyle(color: Colors.green[700], fontSize: 13),
-                  ),
-                ],
+                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5)),
+                Text(subtitle, style: const TextStyle(fontSize: 11, color: Colors.grey)),
               ],
             ),
           ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              'Connected',
+              style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDeviceAuthorityCard(bool isDark) {
+    final shizukuActive = widget.shizukuService.isAvailable;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.developer_mode_rounded, color: Color(0xFFEC4899), size: 20),
+                SizedBox(width: 8),
+                Text('Device Automation & Authority', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const Divider(height: 20),
+
+            // Shizuku Status
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(
+                shizukuActive ? Icons.verified_user_rounded : Icons.gavel_rounded,
+                color: shizukuActive ? const Color(0xFF10B981) : Colors.orangeAccent,
+              ),
+              title: const Text('Shizuku System Authority'),
+              subtitle: Text(
+                shizukuActive
+                    ? 'Connected with elevated ADB permissions'
+                    : 'Not running — Using standard non-root intent controls',
+              ),
+              trailing: ElevatedButton(
+                onPressed: () async {
+                  await widget.shizukuService.checkPermission();
+                  setState(() {});
+                },
+                child: const Text('Check'),
+              ),
+            ),
+
+            // Overlay Window Permission
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Floating Overlay Window'),
+              subtitle: const Text('Show floating voice assistant button'),
+              value: _isOverlayPermissionGranted && _floatingIconEnabled,
+              onChanged: (val) async {
+                if (val && !_isOverlayPermissionGranted) {
+                  await FlutterOverlayWindow.requestPermission();
+                  await _checkOverlayPermission();
+                } else {
+                  setState(() => _floatingIconEnabled = val);
+                }
+              },
+            ),
+
+            // Task History Link
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.history_rounded, color: Color(0xFF818CF8)),
+              title: const Text('Task History Logs'),
+              subtitle: const Text('View executed automation steps and logs'),
+              trailing: const Icon(Icons.chevron_right_rounded),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPreferencesCard(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.palette_rounded, color: Color(0xFFA78BFA), size: 20),
+                SizedBox(width: 8),
+                Text('App Preferences', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const Divider(height: 20),
+
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Dark Mode'),
+              subtitle: const Text('Enable obsidian dark visual theme'),
+              value: isDark,
+              onChanged: (val) {
+                themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+                SharedPreferences.getInstance().then((p) => p.setString('themeMode', val ? 'dark' : 'light'));
+              },
+            ),
+
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                'AAA Private Agent v2.5 • Autonomous Operator',
+                style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.black38),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddKeyModal() {
+    final nameCtrl = TextEditingController();
+    final keyCtrl = TextEditingController();
+    final urlCtrl = TextEditingController(text: 'https://openrouter.ai/api/v1');
+    final modelCtrl = TextEditingController(text: 'meta-llama/llama-3.2-3b-instruct:free');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Padding(
+          padding: EdgeInsets.only(
+            top: 20,
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Add API Key Configuration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+              const SizedBox(height: 12),
+
+              // Provider Presets
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _presetChip('OpenRouter', 'https://openrouter.ai/api/v1', 'meta-llama/llama-3.2-3b-instruct:free', urlCtrl, modelCtrl, nameCtrl),
+                    _presetChip('Groq', 'https://api.groq.com/openai/v1', 'llama-3.3-70b-versatile', urlCtrl, modelCtrl, nameCtrl),
+                    _presetChip('Gemini', 'https://generativelanguage.googleapis.com/v1beta/openai/', 'gemini-1.5-flash', urlCtrl, modelCtrl, nameCtrl),
+                    _presetChip('NVIDIA NIM', 'https://integrate.api.nvidia.com/v1', 'z-ai/glm-5.2', urlCtrl, modelCtrl, nameCtrl),
+                    _presetChip('DeepSeek', 'https://api.deepseek.com', 'deepseek-chat', urlCtrl, modelCtrl, nameCtrl),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              TextField(
+                controller: nameCtrl,
+                decoration: const InputDecoration(labelText: 'Key Label / Name', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: keyCtrl,
+                decoration: const InputDecoration(labelText: 'API Key', border: OutlineInputBorder()),
+                obscureText: true,
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: urlCtrl,
+                decoration: const InputDecoration(labelText: 'Base URL', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: modelCtrl,
+                decoration: const InputDecoration(labelText: 'Model Name', border: OutlineInputBorder()),
+              ),
+              const SizedBox(height: 16),
+
+              SizedBox(
+                width: double.infinity,
+                height: 48,
+                child: ElevatedButton(
+                  onPressed: () async {
+                    if (keyCtrl.text.trim().isEmpty) return;
+                    final config = ApiKeyConfig(
+                      id: 'key_${DateTime.now().millisecondsSinceEpoch}',
+                      name: nameCtrl.text.trim().isEmpty ? 'Provider Key' : nameCtrl.text.trim(),
+                      apiKey: keyCtrl.text.trim(),
+                      baseUrl: urlCtrl.text.trim(),
+                      model: modelCtrl.text.trim(),
+                      isActive: true,
+                    );
+                    await widget.aiService.addApiKey(config);
+                    if (_authService.userId != null) {
+                      await widget.aiService.syncKeysToSupabase(_authService.userId!);
+                    }
+                    if (mounted) {
+                      Navigator.pop(ctx);
+                      setState(() {});
+                    }
+                  },
+                  child: const Text('Save & Activate Key', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ),
+            ],
+          ),
         );
       },
+    );
+  }
+
+  Widget _presetChip(String label, String url, String model, TextEditingController urlCtrl, TextEditingController modelCtrl, TextEditingController nameCtrl) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 6),
+      child: ChoiceChip(
+        label: Text(label, style: const TextStyle(fontSize: 12)),
+        selected: false,
+        onSelected: (_) {
+          urlCtrl.text = url;
+          modelCtrl.text = model;
+          nameCtrl.text = label;
+        },
+      ),
     );
   }
 }

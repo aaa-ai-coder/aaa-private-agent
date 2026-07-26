@@ -161,7 +161,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final assistantIndex = _messages.length - 1;
 
     try {
-      final isAgent = _mode == 'agent';
+      const isAgent = true;
       final stream = _aiService
           .sendMessageStream(text.trim(), isAgentMode: isAgent)
           .timeout(

@@ -38,8 +38,22 @@ class AuthService extends ChangeNotifier {
     SupabaseConfig.client.auth.onAuthStateChange.listen((data) {
       _user = data.session?.user;
       _session = data.session;
+      _autoSyncUserCloudData();
       notifyListeners();
     });
+  }
+
+  Future<void> _autoSyncUserCloudData() async {
+    if (_user != null) {
+      final uid = _user!.id;
+      try {
+        await AiService.instance.loadKeysFromSupabase(uid);
+      } catch (_) {}
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('onboarding_completed', true);
+      } catch (_) {}
+    }
   }
 
   Future<void> _initDeviceSha() async {
@@ -57,6 +71,7 @@ class AuthService extends ChangeNotifier {
   Future<void> _checkSession() async {
     _session = SupabaseConfig.client.auth.currentSession;
     _user = SupabaseConfig.client.auth.currentUser;
+    _autoSyncUserCloudData();
     notifyListeners();
   }
 

@@ -15,6 +15,8 @@ class AiResponse {
 }
 
 class AiService {
+  static final AiService instance = AiService();
+
   static const String _defaultBaseUrl = 'https://api.groq.com/openai/v1';
   static const String _defaultModel = 'llama-3.3-70b-versatile';
   static const String nvidiaBaseUrl = 'https://integrate.api.nvidia.com/v1';
@@ -139,6 +141,18 @@ class AiService {
       } catch (_) {
         _apiKeys = [];
       }
+    }
+    if (_apiKeys.isEmpty) {
+      _apiKeys = [
+        const ApiKeyConfig(
+          id: 'key_free_openrouter',
+          name: 'OpenRouter Free Tier',
+          apiKey: 'sk-or-v1-free-public-tier',
+          baseUrl: 'https://openrouter.ai/api/v1',
+          model: 'meta-llama/llama-3.2-3b-instruct:free',
+          isActive: true,
+        ),
+      ];
     }
     _applyActiveKeyFromList();
   }
@@ -368,11 +382,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
 🌐 MULTILINGUAL ENGINE: Always respond in the exact language used by the user (English, Bengali/Bangla, Hindi, Spanish, French, Arabic, German, Japanese, Chinese, Russian, etc.).
 ''';
 
-  static const String _chatSystemPrompt = '''
-You are AAA Private Agent, a helpful conversational AI assistant. 
-Provide direct, natural, and friendly text responses. You cannot perform device actions or run tools. 
-Answer questions, explain concepts, brainstorm, write emails/messages, and chat with the user in plain text or markdown format.
-''';
+  static const String _chatSystemPrompt = _systemPrompt;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
