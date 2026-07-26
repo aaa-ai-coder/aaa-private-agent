@@ -196,4 +196,42 @@ class ShizukuService {
   Future<String> uninstallApp(String packageName) async {
     return runCommand('pm uninstall "$packageName"');
   }
+
+  // ─── Screen & UI Automation ─────────────────────────────────────
+
+  /// Tap at screen coordinates (x, y)
+  Future<String> tapScreen(int x, int y) async {
+    return runCommand('input tap $x $y');
+  }
+
+  /// Swipe from (x1, y1) to (x2, y2) over duration in ms
+  Future<String> swipeScreen(int x1, int y1, int x2, int y2, [int durationMs = 300]) async {
+    return runCommand('input swipe $x1 $y1 $x2 $y2 $durationMs');
+  }
+
+  /// Input text into the currently focused text field
+  Future<String> inputText(String text) async {
+    final escaped = text.replaceAll(' ', '%s').replaceAll('"', '\\"');
+    return runCommand('input text "$escaped"');
+  }
+
+  /// Press Android physical key (e.g., 3=HOME, 4=BACK, 26=POWER, 187=APP_SWITCH)
+  Future<String> pressKey(int keycode) async {
+    return runCommand('input keyevent $keycode');
+  }
+
+  /// Get XML dump of current UI layout
+  Future<String> getUiDump() async {
+    return runCommand('uiautomator dump /sdcard/window_dump.xml && cat /sdcard/window_dump.xml');
+  }
+
+  /// List all third-party installed apps
+  Future<String> listInstalledApps() async {
+    return runCommand('pm list packages -3');
+  }
+
+  /// Grant permission to an app
+  Future<String> grantPermission(String packageName, String permission) async {
+    return runCommand('pm grant $packageName $permission');
+  }
 }

@@ -317,13 +317,20 @@ No markdown, no code fences, no extra text around the JSON.
 - clear_app_data: {"package_name": "com.example"} - Clear app data/cache
 - install_apk: {"apk_path": "/sdcard/Download/app.apk"} - Install an APK file
 - uninstall_app: {"package_name": "com.example"} - Uninstall an app
+- list_installed_apps: {} - List all installed apps and packages
+- grant_permission: {"package_name": "com.example", "permission": "android.permission.CAMERA"} - Grant app permission
 
-👆 SCREEN AUTOMATION (requires Accessibility Service)
+👆 SCREEN & UI AUTOMATION (Shizuku & Accessibility)
 - read_screen: {} - Read and describe everything visible on screen
 - press_back: {} - Press the back button
 - click_element: {"text": "Submit"} - Click/tap any button or text on screen
 - type_on_screen: {"text": "hello", "field_hint": "Search"} - Type text into a field
 - scroll_screen: {"direction": "down"} - Scroll the screen (up/down/left/right)
+- tap_screen: {"x": 500, "y": 1000} - Tap at screen coordinates (x, y)
+- swipe_screen: {"x1": 500, "y1": 1500, "x2": 500, "y2": 500, "duration": 300} - Swipe on screen
+- input_text: {"text": "Hello"} - Type text into active input field
+- press_key: {"keycode": 4} - Press key (3=Home, 4=Back, 26=Power, 187=App Switch)
+- get_ui_dump: {} - Get XML layout dump of current screen
 
 🔧 ADVANCED
 - execute_task: {"goal": "description of the full task"} - For COMPLEX multi-step tasks

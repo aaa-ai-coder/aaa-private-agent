@@ -199,6 +199,50 @@ class ActionHandler {
           );
           break;
 
+        case 'tap_screen':
+          result = await _shizuku.tapScreen(
+            _parseInt(action.params['x'], 0),
+            _parseInt(action.params['y'], 0),
+          );
+          break;
+
+        case 'swipe_screen':
+          result = await _shizuku.swipeScreen(
+            _parseInt(action.params['x1'], 0),
+            _parseInt(action.params['y1'], 0),
+            _parseInt(action.params['x2'], 0),
+            _parseInt(action.params['y2'], 0),
+            _parseInt(action.params['duration'], 300),
+          );
+          break;
+
+        case 'input_text':
+          result = await _shizuku.inputText(
+            action.params['text'] as String? ?? '',
+          );
+          break;
+
+        case 'press_key':
+          result = await _shizuku.pressKey(
+            _parseInt(action.params['keycode'], 4), // Default 4 = BACK
+          );
+          break;
+
+        case 'get_ui_dump':
+          result = await _shizuku.getUiDump();
+          break;
+
+        case 'list_installed_apps':
+          result = await _shizuku.listInstalledApps();
+          break;
+
+        case 'grant_permission':
+          result = await _shizuku.grantPermission(
+            action.params['package_name'] as String? ?? '',
+            action.params['permission'] as String? ?? '',
+          );
+          break;
+
         case 'clear_app_data':
           result = await _shizuku.clearAppData(
             action.params['package_name'] as String? ?? '',

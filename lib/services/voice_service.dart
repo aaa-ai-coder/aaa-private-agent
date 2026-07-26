@@ -22,12 +22,55 @@ class VoiceService {
   Future<void> setLanguage(LanguageConfig lang) async {
     _currentLanguage = lang;
     if (_ttsInitialized) {
+      await _applyLanguageToTts(lang);
+    }
+  }
+
+  Future<void> _applyLanguageToTts(LanguageConfig lang) async {
+    final localesToTry = [
+      lang.locale, // e.g. "bn-BD"
+      lang.sttLocale, // e.g. "bn_BD"
+      lang.code, // e.g. "bn"
+      '${lang.code}-IN', // e.g. "bn-IN"
+    ];
+
+    bool setOk = false;
+    for (final loc in localesToTry) {
+      try {
+        final available = await _tts.isLanguageAvailable(loc);
+        if (available == true) {
+          await _tts.setLanguage(loc);
+          developer.log('TTS set language to: $loc', name: 'VoiceService');
+          setOk = true;
+          break;
+        }
+      } catch (_) {}
+    }
+
+    if (!setOk) {
       try {
         await _tts.setLanguage(lang.locale);
-        developer.log('TTS language set to: ${lang.locale}', name: 'VoiceService');
-      } catch (e) {
-        developer.log('TTS setLanguage error: $e', name: 'VoiceService');
+      } catch (_) {}
+    }
+
+    // Try finding specific voice matching language
+    try {
+      final voices = await _tts.getVoices;
+      if (voices is List) {
+        for (final v in voices) {
+          if (v is Map) {
+            final locStr = (v['locale'] ?? '').toString().toLowerCase();
+            final nameStr = (v['name'] ?? '').toString().toLowerCase();
+            if (locStr.contains(lang.code) || nameStr.contains(lang.code)) {
+              await _tts.setVoice({"name": v['name'], "locale": v['locale']});
+              developer.log('TTS set voice to: ${v['name']}', name: 'VoiceService');
+              break;
+            }
+          }
+        }
       }
+    } catch (e) {
+      developer.log('TTS setVoice error: $e', name: 'VoiceService');
     }
   }
 
