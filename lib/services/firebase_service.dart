@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'dart:developer' as developer;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -240,7 +241,7 @@ class FirebaseService {
     try {
       final ref = _storage.ref().child(path);
       final uploadTask = ref.putData(
-        bytes,
+        Uint8List.fromList(bytes),
         SettableMetadata(contentType: contentType ?? 'application/octet-stream'),
       );
       final snapshot = await uploadTask;
