@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
+import '../models/language_config.dart';
 import '../services/ai_service.dart';
 import '../services/action_handler.dart';
 import '../services/voice_service.dart';
@@ -86,6 +87,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (!prefs.containsKey('auto_read_tts')) {
       await prefs.setBool('auto_read_tts', true);
     }
+
+    // Load saved voice language
+    final langCode = prefs.getString('voice_language') ?? 'en';
+    final savedLang = LanguageConfig.findByCode(langCode);
+    await _voiceService.setLanguage(savedLang);
 
     if (mounted) {
       setState(() {});
@@ -250,6 +256,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final prefs = await SharedPreferences.getInstance();
         final autoRead = prefs.getBool('auto_read_tts') ?? true;
         if (autoRead || _continuousVoiceMode) {
+          // Detect AI response language and switch TTS
+          final detectedLang = LanguageConfig.detectFromText(accumulated);
+          if (detectedLang.code != _voiceService.currentLanguage.code) {
+            await _voiceService.setLanguage(detectedLang);
+            await prefs.setString('voice_language', detectedLang.code);
+          }
           _voiceService.speak(
             accumulated,
             onComplete: () {

@@ -3,6 +3,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:speech_to_text/speech_recognition_result.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import '../models/language_config.dart';
 
 class VoiceService {
   final stt.SpeechToText _speech = stt.SpeechToText();
@@ -14,6 +15,21 @@ class VoiceService {
   bool _isListening = false;
   bool _isSpeaking = false;
   Function()? _onSpeakCompletion;
+  LanguageConfig _currentLanguage = LanguageConfig.supportedLanguages.first;
+
+  LanguageConfig get currentLanguage => _currentLanguage;
+
+  Future<void> setLanguage(LanguageConfig lang) async {
+    _currentLanguage = lang;
+    if (_ttsInitialized) {
+      try {
+        await _tts.setLanguage(lang.locale);
+        developer.log('TTS language set to: ${lang.locale}', name: 'VoiceService');
+      } catch (e) {
+        developer.log('TTS setLanguage error: $e', name: 'VoiceService');
+      }
+    }
+  }
 
   bool get isListening => _isListening;
   bool get isSpeaking => _isSpeaking;
@@ -55,7 +71,7 @@ class VoiceService {
     try {
       // Do NOT use awaitSpeakCompletion(true) — it conflicts with the
       // completion handler approach. We rely on setCompletionHandler instead.
-      await _tts.setLanguage('en-US');
+      await _tts.setLanguage(_currentLanguage.locale);
       await _tts.setSpeechRate(0.5);
       await _tts.setVolume(1.0);
       await _tts.setPitch(1.0);
@@ -157,7 +173,7 @@ class VoiceService {
             onDone();
           }
         },
-        localeId: 'en_US',
+        localeId: _currentLanguage.sttLocale,
         listenOptions: stt.SpeechListenOptions(
           listenMode: stt.ListenMode.confirmation,
           partialResults: false,

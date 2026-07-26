@@ -6,10 +6,12 @@ import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:developer';
 import 'config/feature_flags.dart';
 import 'config/supabase_config.dart';
 import 'services/auth_service.dart';
+import 'services/firebase_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
@@ -53,6 +55,9 @@ final AuthService authService = AuthService();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  // Register the FCM background handler BEFORE Firebase.initializeApp()
+  FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+
   await Firebase.initializeApp();
 
   FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
@@ -60,6 +65,9 @@ void main() async {
     FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
     return true;
   };
+
+  // Initialize Firebase services (FCM, Firestore, Storage)
+  await FirebaseService.init();
 
   await SupabaseConfig.init();
 

@@ -328,6 +328,24 @@ No markdown, no code fences, no extra text around the JSON.
 🔧 ADVANCED
 - execute_task: {"goal": "description of the full task"} - For COMPLEX multi-step tasks
 
+📋 DEVICE INFO & UTILITIES (no root needed)
+- get_device_info: {} - Get device model, Android version, manufacturer
+- get_battery: {} - Get battery percentage
+- get_storage: {} - Get storage usage info
+- copy_clipboard: {"text": "Hello"} - Copy text to clipboard
+- paste_clipboard: {} - Read and return clipboard contents
+- get_memory: {} - Get RAM usage info
+
+☁️ CLOUD & SYNC (Firebase + Cloudflare R2)
+- fcm_subscribe: {"topic": "news"} - Subscribe to push notification topics
+- fcm_unsubscribe: {"topic": "news"} - Unsubscribe from push topics
+- list_storage_files: {"prefix": "screenshots/"} - List files in cloud storage
+- get_storage_url: {"path": "screenshots/photo.jpg"} - Get download link for a cloud file
+- save_message_to_cloud: {"text": "Buy milk", "label": "notes"} - Save a note/message to the cloud
+- r2_upload: {"content": "File contents", "file_name": "note.txt", "folder": "notes"} - Upload text content to Cloudflare R2
+- r2_list: {"prefix": "notes/"} - List files in Cloudflare R2 storage
+- r2_delete: {"path": "notes/old.txt"} - Delete a file from Cloudflare R2
+
 🎯 EXECUTE_TASK USE: For ANY request with multiple steps like:
   "Open YouTube and search for cats"
   "Create a new alarm for 7 AM"
@@ -339,6 +357,13 @@ No markdown, no code fences, no extra text around the JSON.
   "Turn on WiFi, connect to HomeWiFi, then open YouTube"
 
 💬 For normal conversation (questions, chat, info requests), respond with PLAIN TEXT naturally.
+
+🌐 MULTILINGUAL SUPPORT: Always detect the user's language and RESPOND IN THE SAME LANGUAGE.
+- If user speaks English → respond in English
+- If user speaks Bengali (Bangla) → respond in Bengali
+- If user speaks Spanish → respond in Spanish
+- If user speaks Hindi → respond in Hindi
+- Support ALL languages naturally without being asked
 ''';
 
   static const String _chatSystemPrompt = '''

@@ -9,6 +9,7 @@ import 'package:passkeys/authenticator.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../config/supabase_config.dart';
+import 'firebase_service.dart';
 
 class AuthService extends ChangeNotifier {
   sb.User? _user;
@@ -71,6 +72,7 @@ class AuthService extends ChangeNotifier {
       _user = response.user;
       _session = response.session;
       await _linkDevice();
+      await _registerFcm();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -94,6 +96,7 @@ class AuthService extends ChangeNotifier {
       _user = response.user;
       _session = response.session;
       await _linkDevice();
+      await _registerFcm();
       _isLoading = false;
       notifyListeners();
       return true;
@@ -103,6 +106,13 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  Future<void> _registerFcm() async {
+    if (_user == null) return;
+    try {
+      await FirebaseService.registerUserToken(_user!.id);
+    } catch (_) {}
   }
 
   Future<void> _linkDevice() async {
@@ -143,11 +153,11 @@ class AuthService extends ChangeNotifier {
         _session = response.session;
       }
       await _linkDevice();
+      await _registerFcm();
       _isLoading = false;
       notifyListeners();
       return _user != null;
     } catch (e) {
-      _error = 'Device sign in error: ${e.toString().replaceFirst('Exception: ', '')}';
       _isLoading = false;
       notifyListeners();
       return false;
@@ -178,6 +188,7 @@ class AuthService extends ChangeNotifier {
         _user = response.user;
         _session = response.session;
         await _linkDevice();
+        await _registerFcm();
         _isLoading = false;
         notifyListeners();
         return _user != null;
@@ -228,6 +239,7 @@ class AuthService extends ChangeNotifier {
           _user = response.user;
           _session = response.session;
           await _linkDevice();
+          await _registerFcm();
           _isLoading = false;
           notifyListeners();
           return _user != null;
@@ -252,6 +264,7 @@ class AuthService extends ChangeNotifier {
       _user = response.user;
       _session = response.session;
       await _linkDevice();
+      await _registerFcm();
       _isLoading = false;
       notifyListeners();
       return _user != null;
@@ -317,6 +330,9 @@ class AuthService extends ChangeNotifier {
   }
 
   Future<void> signOut() async {
+    if (_user != null) {
+      await FirebaseService.unregisterUserToken(_user!.id);
+    }
     await fb.FirebaseAuth.instance.signOut();
     await SupabaseConfig.client.auth.signOut();
     _user = null;

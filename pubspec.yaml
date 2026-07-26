@@ -23,6 +23,9 @@ dependencies:
   passkeys: ^2.21.0
   google_sign_in: ^6.2.1
   crypto: ^3.0.3
+  firebase_messaging: ^15.0.0
+  firebase_storage: ^12.0.0
+  device_info_plus: ^11.0.0
 
   # Voice
   speech_to_text: ^7.0.0

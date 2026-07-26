@@ -1,3 +1,5 @@
+import 'dart:io' show Platform, File;
+import 'dart:convert' show utf8;
 import '../models/agent_action.dart';
 import '../models/chat_message.dart';
 import 'app_launcher_service.dart';
@@ -9,6 +11,10 @@ import 'shizuku_service.dart';
 import 'screen_automation_service.dart';
 import 'task_executor.dart';
 import 'ai_service.dart';
+import 'clipboard_service.dart';
+import 'device_info_service.dart';
+import 'firebase_service.dart';
+import 'storage_service.dart';
 
 class ActionHandler {
   final AppLauncherService _appLauncher = AppLauncherService();
@@ -18,6 +24,8 @@ class ActionHandler {
   final SystemControlService _systemControl = SystemControlService();
   final ShizukuService _shizuku = ShizukuService();
   final ScreenAutomationService _screenAutomation = ScreenAutomationService();
+  final ClipboardService _clipboard = ClipboardService();
+  final DeviceInfoService _deviceInfo = DeviceInfoService();
 
   ShizukuService get shizuku => _shizuku;
   ScreenAutomationService get screenAutomation => _screenAutomation;
@@ -258,6 +266,112 @@ class ActionHandler {
           );
           result = await _currentExecutor!.executeTask(goal);
           _currentExecutor = null;
+          break;
+
+        // ─── Non-Root Device Actions ──────────────────────────
+
+        case 'get_device_info':
+          final deviceInfo = await _deviceInfo.getDeviceInfo();
+          final batteryInfo = await _deviceInfo.getBatteryLevel();
+          final storageInfo = await _deviceInfo.getStorageInfo();
+          final memInfo = await _deviceInfo.getMemoryInfo();
+          result = 'Device: $deviceInfo\nBattery: $batteryInfo\nStorage: $storageInfo\nRAM: $memInfo';
+          break;
+
+        case 'copy_clipboard':
+          result = await _clipboard.copyToClipboard(
+            action.params['text'] as String? ?? '',
+          );
+          break;
+
+        case 'paste_clipboard':
+          result = await _clipboard.pasteFromClipboard();
+          break;
+
+        case 'get_battery':
+          result = await _deviceInfo.getBatteryLevel();
+          break;
+
+        case 'get_storage':
+          result = await _deviceInfo.getStorageInfo();
+          break;
+
+        // ─── Firebase / Cloud Actions ─────────────────────────
+
+        case 'fcm_subscribe':
+          final topic = action.params['topic'] as String? ?? '';
+          final success = await FirebaseService.subscribeToTopic(topic);
+          result = success
+              ? 'Subscribed to topic: $topic'
+              : 'Failed to subscribe to topic: $topic';
+          break;
+
+        case 'fcm_unsubscribe':
+          final topic = action.params['topic'] as String? ?? '';
+          final success = await FirebaseService.unsubscribeFromTopic(topic);
+          result = success
+              ? 'Unsubscribed from topic: $topic'
+              : 'Failed to unsubscribe from topic: $topic';
+          break;
+
+        case 'list_storage_files':
+          final prefix = action.params['prefix'] as String? ?? '';
+          final files = await FirebaseService.listStorageFiles(prefix);
+          result = files.isNotEmpty
+              ? 'Files in "$prefix":\n${files.join('\n')}'
+              : 'No files found in "$prefix"';
+          break;
+
+        case 'get_storage_url':
+          final path = action.params['path'] as String? ?? '';
+          final url = await FirebaseService.getStorageUrl(path);
+          result = url ?? 'Could not get URL for: $path';
+          break;
+
+        case 'save_message_to_cloud':
+          final text = action.params['text'] as String? ?? '';
+          final label = action.params['label'] as String? ?? 'note';
+          final success = await FirebaseService.saveMessageFragment(
+            'shared',
+            {'text': text, 'label': label},
+          );
+          result = success
+              ? 'Saved message to cloud: "$text"'
+              : 'Failed to save message to cloud';
+          break;
+
+        // ─── Cloudflare R2 Actions ────────────────────────────
+
+        case 'r2_upload':
+          final text = action.params['content'] as String? ?? '';
+          final fileName = action.params['file_name'] as String? ?? 'note.txt';
+          final folder = action.params['folder'] as String? ?? 'notes';
+          final bytes = utf8.encode(text);
+          final url = await StorageService.uploadBytes(
+            bytes: bytes,
+            fileName: fileName,
+            folder: folder,
+            contentType: 'text/plain',
+          );
+          result = url != null
+              ? 'Uploaded to R2: $url'
+              : 'Failed to upload. Is R2 configured?';
+          break;
+
+        case 'r2_list':
+          final prefix = action.params['prefix'] as String? ?? '';
+          final files = await StorageService.listFiles(prefix);
+          result = files.isNotEmpty
+              ? 'Files in "$prefix":\n${files.join('\n')}'
+              : 'No files found in "$prefix"';
+          break;
+
+        case 'r2_delete':
+          final path = action.params['path'] as String? ?? '';
+          final deleted = await StorageService.deleteFile(path);
+          result = deleted
+              ? 'Deleted: $path'
+              : 'Failed to delete: $path';
           break;
 
         default:
