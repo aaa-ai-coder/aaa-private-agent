@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../config/supabase_config.dart';
 import 'firebase_service.dart';
+import 'ai_service.dart';
 
 class AuthService extends ChangeNotifier {
   sb.User? _user;

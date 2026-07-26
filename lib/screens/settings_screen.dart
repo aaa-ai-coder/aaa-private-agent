@@ -315,7 +315,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ),
                           Text(
                             'Model: ${widget.aiService.model}',
-                            style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black70),
+                            style: TextStyle(fontSize: 12, color: isDark ? Colors.white70 : Colors.black54),
                           ),
                         ],
                       ),
@@ -355,9 +355,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (val) {
                   if (val != null) {
                     widget.aiService.saveSettings(
-                      widget.aiService.apiKey ?? '',
-                      widget.aiService.baseUrl,
-                      val,
+                      apiKey: widget.aiService.apiKey ?? '',
+                      baseUrl: widget.aiService.baseUrl,
+                      model: val,
                     );
                     setState(() {});
                   }
@@ -523,7 +523,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 4),
             Text(
               'All heavy files & data automatically backed up across 3 clouds with zero setup.',
-              style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black60),
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
             ),
             const Divider(height: 20),
 
@@ -607,7 +607,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
               trailing: ElevatedButton(
                 onPressed: () async {
-                  await widget.shizukuService.checkPermission();
+                  await widget.shizukuService.checkAvailability();
                   setState(() {});
                 },
                 child: const Text('Check'),
@@ -761,7 +761,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (keyCtrl.text.trim().isEmpty) return;
                     final config = ApiKeyConfig(
                       id: 'key_${DateTime.now().millisecondsSinceEpoch}',
+                      userId: _authService.userId ?? 'local',
                       name: nameCtrl.text.trim().isEmpty ? 'Provider Key' : nameCtrl.text.trim(),
+                      provider: 'custom',
                       apiKey: keyCtrl.text.trim(),
                       baseUrl: urlCtrl.text.trim(),
                       model: modelCtrl.text.trim(),

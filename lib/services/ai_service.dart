@@ -144,9 +144,11 @@ class AiService {
     }
     if (_apiKeys.isEmpty) {
       _apiKeys = [
-        const ApiKeyConfig(
+        ApiKeyConfig(
           id: 'key_free_openrouter',
+          userId: 'default',
           name: 'OpenRouter Free Tier',
+          provider: 'openrouter',
           apiKey: 'sk-or-v1-free-public-tier',
           baseUrl: 'https://openrouter.ai/api/v1',
           model: 'meta-llama/llama-3.2-3b-instruct:free',
