@@ -57,3 +57,6 @@ google-services.json
 
 # Local credentials bundled only into developer test builds
 /assets/local_config/ai_test_config.json
+firebase-service-account.json
+.env
+
