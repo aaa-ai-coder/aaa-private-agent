@@ -55,21 +55,28 @@ final AuthService authService = AuthService();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Register the FCM background handler BEFORE Firebase.initializeApp()
-  FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+  try {
+    // Register the FCM background handler BEFORE Firebase.initializeApp()
+    FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
+    await Firebase.initializeApp();
 
-  await Firebase.initializeApp();
+    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
 
-  FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
-  PlatformDispatcher.instance.onError = (error, stack) {
-    FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
-    return true;
-  };
+    // Initialize Firebase services (FCM, Firestore, Storage)
+    await FirebaseService.init();
+  } catch (e) {
+    log('Firebase initialization warning: $e');
+  }
 
-  // Initialize Firebase services (FCM, Firestore, Storage)
-  await FirebaseService.init();
-
-  await SupabaseConfig.init();
+  try {
+    await SupabaseConfig.init();
+  } catch (e) {
+    log('Supabase initialization warning: $e');
+  }
 
   if (FeatureFlags.floatingOverlayEnabled) {
     FlutterOverlayWindow.overlayListener.listen((event) {

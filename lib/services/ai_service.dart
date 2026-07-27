@@ -618,7 +618,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
             headers: {
               'Content-Type': 'application/json',
               'Authorization': 'Bearer $_apiKey',
-              'HTTP-Referer': 'https://github.com/orailnoor/private-agent',
+              'HTTP-Referer': 'https://github.com/aaa-ai-coder/aaa-private-agent',
               'X-Title': 'AAA Private Agent',
             },
             body: requestBody,
