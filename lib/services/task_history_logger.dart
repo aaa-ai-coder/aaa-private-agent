@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../config/supabase_config.dart';
@@ -13,7 +14,7 @@ class TaskHistoryLogger {
   static Future<void> logTask(String goal, String status, int totalTokens, int steps, List<String> trace) async {
     try {
       final file = await _localFile;
-      
+
       final data = {
         "goal": goal.trim(),
         "status": status,
@@ -22,7 +23,7 @@ class TaskHistoryLogger {
         "trace": trace,
         "timestamp": DateTime.now().toIso8601String(),
       };
-      
+
       await file.writeAsString('${jsonEncode(data)}\n', mode: FileMode.append);
 
       // Sync to Supabase
@@ -34,11 +35,13 @@ class TaskHistoryLogger {
           'status': status,
           'total_tokens': totalTokens,
           'steps_taken': steps,
-          'trace': trace != null ? jsonEncode(trace) : null,
-        }).then((_) {}).catchError((_) {});
+          'trace': jsonEncode(trace),
+        }).then((_) {}).catchError((e) {
+          developer.log('Failed to sync task history: $e', name: 'TaskHistory');
+        });
       }
     } catch (e) {
-      print('Failed to write task history: $e');
+      developer.log('Failed to write task history: $e', name: 'TaskHistory');
     }
   }
 
@@ -56,7 +59,7 @@ class TaskHistoryLogger {
           .reversed
           .toList(); // newest first
     } catch (e) {
-      print('Failed to read task history: $e');
+      developer.log('Failed to read task history: $e', name: 'TaskHistory');
       return [];
     }
   }
@@ -69,7 +72,7 @@ class TaskHistoryLogger {
         await file.delete();
       }
     } catch (e) {
-      print('Failed to clear task history: $e');
+      developer.log('Failed to clear task history: $e', name: 'TaskHistory');
     }
   }
 

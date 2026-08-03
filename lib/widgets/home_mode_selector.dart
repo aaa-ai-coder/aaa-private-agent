@@ -26,7 +26,7 @@ class HomeModeSelector extends StatelessWidget {
           color: activeBg,
           borderRadius: BorderRadius.circular(30),
           border: Border.all(
-            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.06),
+            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
           ),
         ),
         child: Row(
@@ -59,7 +59,7 @@ class HomeModeSelector extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: t.colorScheme.primary.withOpacity(0.25),
+                    color: t.colorScheme.primary.withValues(alpha: 0.25),
                     blurRadius: 12,
                     offset: const Offset(0, 4),
                   ),

@@ -11,11 +11,6 @@ class AppLauncherService {
     return _cachedApps!;
   }
 
-  /// Clear app cache
-  void clearCache() {
-    _cachedApps = null;
-  }
-
   /// Find apps matching a query
   Future<List<AppInfo>> searchApps(String query) async {
     final apps = await getInstalledApps();

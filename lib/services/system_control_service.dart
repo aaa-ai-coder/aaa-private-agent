@@ -19,16 +19,6 @@ class SystemControlService {
     }
   }
 
-  /// Get current volume (0-100)
-  Future<int> getVolume() async {
-    try {
-      final volume = await VolumeController().getVolume();
-      return (volume * 100).round();
-    } catch (e) {
-      return -1;
-    }
-  }
-
   /// Set screen brightness (0-100)
   Future<String> setBrightness(int level) async {
     try {
@@ -37,16 +27,6 @@ class SystemControlService {
       return 'Brightness set to $level%';
     } catch (e) {
       return 'Error setting brightness: $e';
-    }
-  }
-
-  /// Get current brightness (0-100)
-  Future<int> getBrightness() async {
-    try {
-      final brightness = await ScreenBrightness().current;
-      return (brightness * 100).round();
-    } catch (e) {
-      return -1;
     }
   }
 

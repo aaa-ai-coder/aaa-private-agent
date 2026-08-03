@@ -53,7 +53,11 @@ class ScreenAutomationService {
 
   /// Open Android accessibility settings so user can enable the service
   Future<void> openAccessibilitySettings() async {
-    await _channel.invokeMethod('openAccessibilitySettings');
+    try {
+      await _invoke<void>('openAccessibilitySettings');
+    } catch (e) {
+      developer.log('openAccessibilitySettings failed: $e', name: 'PrivateAgent');
+    }
   }
 
   /// Dump the current screen — returns a list of UI elements
@@ -61,7 +65,7 @@ class ScreenAutomationService {
   /// isEditable, isScrollable, bounds, index, depth
   Future<List<Map<String, dynamic>>> dumpScreen() async {
     try {
-      final result = await _channel.invokeMethod<List>('dumpScreen');
+      final result = await _invoke<List>('dumpScreen');
       if (result == null) return [];
       return result.map((e) => Map<String, dynamic>.from(e as Map)).toList();
     } catch (e) {
@@ -73,7 +77,7 @@ class ScreenAutomationService {
   /// Note: Requires Android 11 (API 30) or higher.
   Future<String?> takeScreenshot() async {
     try {
-      final result = await _channel.invokeMethod<String>('takeScreenshot');
+      final result = await _invoke<String>('takeScreenshot');
       return result;
     } catch (e) {
       return null;
@@ -93,9 +97,6 @@ class ScreenAutomationService {
       buffer.writeln('Current app: $pkg');
     }
     buffer.writeln('Screen elements:');
-
-    int count = 0;
-    // Limit removed as requested by user. Kotlin now filters invisibles, so this is safe.
 
     for (final node in nodes) {
       final index = node['index'];
@@ -124,17 +125,20 @@ class ScreenAutomationService {
       final label = displayText.isNotEmpty ? '"$displayText"' : '(no text)';
       final type = className.isNotEmpty ? '[$className]' : '';
       final tagStr = tags.isNotEmpty ? '{${tags.join(", ")}}' : '';
-      
+
       String boundsStr = '';
-      if (node['bounds'] != null) {
-        final b = node['bounds'];
-        final centerX = (b['left'] + b['right']) / 2;
-        final centerY = (b['top'] + b['bottom']) / 2;
-        boundsStr = ' bounds:[${b['left']},${b['top']},${b['right']},${b['bottom']}] center:(${centerX.round()},${centerY.round()})';
+      final b = node['bounds'];
+      if (b is Map) {
+        final left = (b['left'] as num?)?.toDouble() ?? 0;
+        final right = (b['right'] as num?)?.toDouble() ?? 0;
+        final top = (b['top'] as num?)?.toDouble() ?? 0;
+        final bottom = (b['bottom'] as num?)?.toDouble() ?? 0;
+        final centerX = ((left + right) / 2).round();
+        final centerY = ((top + bottom) / 2).round();
+        boundsStr = ' bounds:[$left,$top,$right,$bottom] center:($centerX,$centerY)';
       }
 
       buffer.writeln('  [$index] $type $label $tagStr$boundsStr');
-      count++;
     }
 
     return buffer.toString();
@@ -196,13 +200,21 @@ class ScreenAutomationService {
 
       // Simplify type
       String type = className.split('.').last;
-      if (type == 'TextView') type = 'text';
-      else if (type == 'Button') type = 'btn';
-      else if (type == 'Switch') type = 'toggle';
-      else if (type == 'ImageView') type = 'img';
-      else if (type == 'EditText') type = 'input';
-      else if (type == 'FrameLayout' || type == 'LinearLayout') type = 'view';
-      else type = type.toLowerCase();
+      if (type == 'TextView') {
+        type = 'text';
+      } else if (type == 'Button') {
+        type = 'btn';
+      } else if (type == 'Switch') {
+        type = 'toggle';
+      } else if (type == 'ImageView') {
+        type = 'img';
+      } else if (type == 'EditText') {
+        type = 'input';
+      } else if (type == 'FrameLayout' || type == 'LinearLayout') {
+        type = 'view';
+      } else {
+        type = type.toLowerCase();
+      }
 
       final label = displayText.isNotEmpty ? '"$displayText"' : '';
       final tagStr = tags.isNotEmpty ? '[${tags.join(",")}]' : '';
@@ -221,11 +233,15 @@ class ScreenAutomationService {
       final targetMark = isTarget ? '*' : '';
 
       String boundsStr = '';
-      if (node['bounds'] != null) {
-        final b = node['bounds'];
-        final centerX = (b['left'] + b['right']) / 2;
-        final centerY = (b['top'] + b['bottom']) / 2;
-        boundsStr = ' center:(${centerX.round()},${centerY.round()})';
+      final b = node['bounds'];
+      if (b is Map) {
+        final left = (b['left'] as num?)?.toDouble() ?? 0;
+        final right = (b['right'] as num?)?.toDouble() ?? 0;
+        final top = (b['top'] as num?)?.toDouble() ?? 0;
+        final bottom = (b['bottom'] as num?)?.toDouble() ?? 0;
+        final centerX = ((left + right) / 2).round();
+        final centerY = ((top + bottom) / 2).round();
+        boundsStr = ' center:($centerX,$centerY)';
       }
 
       buffer.writeln('[$index]$targetMark $type $label $tagStr$boundsStr'.trim().replaceAll(RegExp(r'\s+'), ' '));
@@ -239,8 +255,7 @@ class ScreenAutomationService {
   /// Click an element by its visible text
   Future<bool> clickByText(String text) async {
     try {
-      return await _channel.invokeMethod<bool>('clickByText', {'text': text}) ??
-          false;
+      return await _invoke<bool>('clickByText', {'text': text}) ?? false;
     } catch (e) {
       return false;
     }
@@ -249,9 +264,7 @@ class ScreenAutomationService {
   /// Click at specific screen coordinates
   Future<bool> clickAt(double x, double y) async {
     try {
-      return await _channel
-              .invokeMethod<bool>('clickAt', {'x': x, 'y': y}) ??
-          false;
+      return await _invoke<bool>('clickAt', {'x': x, 'y': y}) ?? false;
     } catch (e) {
       return false;
     }
@@ -260,7 +273,7 @@ class ScreenAutomationService {
   /// Type text into an editable field
   Future<bool> typeText(String text, {String? fieldHint}) async {
     try {
-      return await _channel.invokeMethod<bool>(
+      return await _invoke<bool>(
               'typeText', {'text': text, 'fieldHint': fieldHint}) ??
           false;
     } catch (e) {
@@ -271,7 +284,7 @@ class ScreenAutomationService {
   /// Press the Enter/Search key on the keyboard
   Future<bool> pressEnter() async {
     try {
-      return await _channel.invokeMethod<bool>('pressEnter') ?? false;
+      return await _invoke<bool>('pressEnter') ?? false;
     } catch (e) {
       return false;
     }
@@ -280,7 +293,7 @@ class ScreenAutomationService {
   /// Scroll in a direction ("down", "up")
   Future<bool> scroll(String direction, {String? target}) async {
     try {
-      return await _channel.invokeMethod<bool>(
+      return await _invoke<bool>(
               'scroll', {'direction': direction, 'target': target}) ??
           false;
     } catch (e) {
@@ -292,7 +305,7 @@ class ScreenAutomationService {
   Future<bool> swipe(
       double startX, double startY, double endX, double endY) async {
     try {
-      return await _channel.invokeMethod<bool>('swipe', {
+      return await _invoke<bool>('swipe', {
             'startX': startX,
             'startY': startY,
             'endX': endX,
@@ -307,7 +320,7 @@ class ScreenAutomationService {
   /// Press the back button
   Future<bool> pressBack() async {
     try {
-      return await _channel.invokeMethod<bool>('pressBack') ?? false;
+      return await _invoke<bool>('pressBack') ?? false;
     } catch (e) {
       return false;
     }
@@ -316,7 +329,7 @@ class ScreenAutomationService {
   /// Press the home button
   Future<bool> pressHome() async {
     try {
-      return await _channel.invokeMethod<bool>('pressHome') ?? false;
+      return await _invoke<bool>('pressHome') ?? false;
     } catch (e) {
       return false;
     }
@@ -325,7 +338,7 @@ class ScreenAutomationService {
   /// Show a native Android Toast message
   Future<void> showToast(String message) async {
     try {
-      await _channel.invokeMethod('showToast', {'message': message});
+      await _invoke<void>('showToast', {'message': message});
     } catch (e) {
       // ignore
     }
@@ -334,7 +347,7 @@ class ScreenAutomationService {
   /// Open notifications panel
   Future<bool> openNotifications() async {
     try {
-      return await _channel.invokeMethod<bool>('openNotifications') ?? false;
+      return await _invoke<bool>('openNotifications') ?? false;
     } catch (e) {
       return false;
     }
@@ -343,7 +356,7 @@ class ScreenAutomationService {
   /// Get current foreground app package name
   Future<String?> getCurrentPackage() async {
     try {
-      return await _channel.invokeMethod<String>('getCurrentPackage');
+      return await _invoke<String>('getCurrentPackage');
     } catch (e) {
       return null;
     }

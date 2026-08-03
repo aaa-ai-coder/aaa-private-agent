@@ -18,8 +18,15 @@ class AiResponse {
 class AiService {
   static final AiService instance = AiService();
 
-  static const String _defaultBaseUrl = 'https://api.groq.com/openai/v1';
-  static const String _defaultModel = 'llama-3.3-70b-versatile';
+  /// Free, keyless, OpenAI-compatible chat endpoint. Used as the out-of-the-box
+  /// default so the agent works with zero configuration. Best-effort: if the
+  /// keyless backend is unreachable, the ARI failover engine surfaces a clear
+  /// error that nudges the user to add their own API key in Settings.
+  static const String keylessBaseUrl = 'https://text.pollinations.ai/openai';
+  static const String keylessDefaultModel = 'openai-fast';
+
+  static const String _defaultBaseUrl = keylessBaseUrl;
+  static const String _defaultModel = keylessDefaultModel;
   static const String nvidiaBaseUrl = 'https://integrate.api.nvidia.com/v1';
   static const String nvidiaDefaultModel = 'z-ai/glm-5.2';
   static const String ollamaCloudBaseUrl = 'https://api.ollama.com/v1';
@@ -54,6 +61,9 @@ class AiService {
     return uri?.host.toLowerCase() == 'integrate.api.nvidia.com';
   }
 
+  /// True when the active endpoint is the free keyless backend.
+  bool get _isKeyless => _baseUrl.trim().contains('text.pollinations.ai');
+
   static List<String> filterNvidiaFreeModels(Iterable<String> models) {
     final availableModels = models.toSet();
     return nvidiaFreeChatModels
@@ -71,6 +81,11 @@ class AiService {
   bool _useScreenCompression = true;
   bool _useSystemPrompt = true;
   final List<Map<String, String>> _conversationHistory = [];
+
+  /// Separate history for the Telegram channel. Kept independent from the
+  /// in-app chat so a Telegram exchange never pollutes the home-chat context
+  /// (and vice versa).
+  final List<Map<String, String>> _telegramHistory = [];
 
   // ─── Model Cache ────────────────────────────────────────────────
   static const String _modelsCacheKey = 'cached_models';
@@ -116,10 +131,12 @@ class AiService {
   List<ApiKeyConfig> get allKeys => List.unmodifiable(_apiKeys);
 
   /// The currently active key, or null if none
-  ApiKeyConfig? get activeKey => _apiKeys.cast<ApiKeyConfig?>().firstWhere(
-    (k) => k!.isActive,
-    orElse: () => null,
-  );
+  ApiKeyConfig? get activeKey {
+    for (final key in _apiKeys) {
+      if (key.isActive) return key;
+    }
+    return null;
+  }
 
   /// Generate a simple unique ID for local use before Supabase sync
   static String _genKeyId() {
@@ -142,9 +159,6 @@ class AiService {
       } catch (_) {
         _apiKeys = [];
       }
-    }
-    if (_apiKeys.isEmpty) {
-      _apiKeys = [];
     }
     _applyActiveKeyFromList();
   }
@@ -312,12 +326,10 @@ No surrounding markdown block code fences, no introductory or trailing text arou
 - lock_screen: {} - Lock the device
 - take_screenshot: {} - Take screenshot and save to storage
 - set_ringer_mode: {"mode": 2} - 0=silent, 1=vibrate, 2=normal
-- toggle_flashlight: {"enable": true} - Turn flashlight on/off
 
 📶 NETWORK & CONNECTIVITY
 - scan_wifi: {} - Scan and list ALL available WiFi networks
 - connect_wifi: {"ssid": "MyWiFi", "password": "pass123"} - Connect to a WiFi network
-- get_wifi_password: {"ssid": "MyWiFi"} - Get saved WiFi password for a network
 - get_current_wifi: {} - Show current WiFi network name
 - toggle_wifi: {"enable": true} - Turn WiFi on or off
 - toggle_mobile_data: {"enable": true} - Turn mobile data on or off
@@ -350,7 +362,6 @@ No surrounding markdown block code fences, no introductory or trailing text arou
 - copy_clipboard: {"text": "Hello"} - Copy text to clipboard
 - paste_clipboard: {} - Read and return clipboard contents
 - get_memory: {} - Get RAM usage info
-- export_chat: {"title": "Session"} - Export chat session to Markdown file
 
 ☁️ CLOUD & SYNC (Firebase + Cloudflare R2 + Supabase)
 - fcm_subscribe: {"topic": "news"} - Subscribe to push notification topics
@@ -501,12 +512,23 @@ No surrounding markdown block code fences, no introductory or trailing text arou
       ).timeout(const Duration(seconds: 12));
 
       if (response.statusCode == 200) {
-        final Map<String, dynamic> data = jsonDecode(response.body);
-        final List<dynamic> modelList = data['data'] ?? data['models'] ?? [];
+        final dynamic decoded = jsonDecode(response.body);
+        final List<dynamic> modelList;
+        if (decoded is List) {
+          // Some providers (e.g. Pollinations) return a bare array.
+          modelList = decoded;
+        } else if (decoded is Map<String, dynamic>) {
+          modelList = decoded['data'] ?? decoded['models'] ?? [];
+        } else {
+          modelList = [];
+        }
         final List<String> modelIds = [];
         for (final item in modelList) {
           if (item is Map && item.containsKey('id') && item['id'] is String) {
             modelIds.add(item['id'] as String);
+          } else if (item is Map && item['name'] is String) {
+            // Pollinations-style listing: top-level array of {name, aliases}
+            modelIds.addAll((item['aliases'] as List?)?.cast<String>() ?? [item['name'] as String]);
           } else if (item is String) {
             modelIds.add(item);
           }
@@ -523,7 +545,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
     return [];
   }
 
-  bool get isConfigured => _apiKey != null && _apiKey!.isNotEmpty;
+  bool get isConfigured => _isKeyless || (_apiKey != null && _apiKey!.isNotEmpty);
   String get baseUrl => _baseUrl;
   String get model => _model;
   String get apiKey => _apiKey ?? '';
@@ -548,6 +570,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
 
   void clearHistory() {
     _conversationHistory.clear();
+    _telegramHistory.clear();
   }
 
   void addHistoryMessage(String role, String content) {
@@ -567,16 +590,16 @@ No surrounding markdown block code fences, no introductory or trailing text arou
   }
 
   Future<String> sendMessage(String message, {bool isAgentMode = true}) async {
-    if (_apiKey == null || _apiKey!.isEmpty) {
+    if ((_apiKey == null || _apiKey!.isEmpty) && !_isKeyless) {
       throw Exception('API Key is not configured. Please go to Settings.');
     }
 
-    // Add ONLY the text to the persistent conversation history to save tokens.
-    _conversationHistory.add({'role': 'user', 'content': message});
+    // Add ONLY the text to the Telegram conversation history to save tokens.
+    _telegramHistory.add({'role': 'user', 'content': message});
 
     // Keep conversation history manageable (last 20 messages)
-    if (_conversationHistory.length > 20) {
-      _conversationHistory.removeRange(0, _conversationHistory.length - 20);
+    if (_telegramHistory.length > 20) {
+      _telegramHistory.removeRange(0, _telegramHistory.length - 20);
     }
 
     try {
@@ -584,7 +607,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
       final systemPrompt = isAgentMode ? _systemPrompt : _chatSystemPrompt;
       final messages = [
         if (_useSystemPrompt) {'role': 'system', 'content': systemPrompt},
-        ..._conversationHistory,
+        ..._telegramHistory,
       ];
 
       final requestUrl = _buildChatUrl(_baseUrl);
@@ -597,7 +620,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
       });
 
       developer.log(
-        'API Request: $requestUrl\n$requestBody',
+        'API Request: $requestUrl model=$_model',
         name: 'AiService',
       );
 
@@ -606,7 +629,8 @@ No surrounding markdown block code fences, no introductory or trailing text arou
             Uri.parse(requestUrl),
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': 'Bearer $_apiKey',
+              if (_apiKey != null && _apiKey!.isNotEmpty)
+                'Authorization': 'Bearer $_apiKey',
               'HTTP-Referer': 'https://github.com/aaa-ai-coder/aaa-private-agent',
               'X-Title': 'AAA Private Agent',
             },
@@ -615,7 +639,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
           .timeout(const Duration(minutes: 30));
 
       developer.log(
-        'API Response [${response.statusCode}]: ${response.body}',
+        'API Response [${response.statusCode}]',
         name: 'AiService',
       );
 
@@ -656,16 +680,16 @@ No surrounding markdown block code fences, no introductory or trailing text arou
         );
       }
 
-      _conversationHistory.add({
+      _telegramHistory.add({
         'role': 'assistant',
         'content': assistantMessage,
       });
 
       return assistantMessage;
     } catch (e) {
-      if (_conversationHistory.isNotEmpty &&
-          _conversationHistory.last['role'] == 'user') {
-        _conversationHistory.removeLast();
+      if (_telegramHistory.isNotEmpty &&
+          _telegramHistory.last['role'] == 'user') {
+        _telegramHistory.removeLast();
       }
       if (e is Exception) rethrow;
       throw Exception('Network error: $e');
@@ -728,7 +752,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
   /// Send a task execution message — no conversation history, low temperature, limited tokens.
   /// This is much faster and cheaper than sendMessage.
   Future<AiResponse> sendTaskMessage(String systemPrompt, String prompt) async {
-    if (_apiKey == null || _apiKey!.isEmpty) {
+    if ((_apiKey == null || _apiKey!.isEmpty) && !_isKeyless) {
       throw Exception('API Key is not configured. Please go to Settings.');
     }
 
@@ -750,7 +774,8 @@ No surrounding markdown block code fences, no introductory or trailing text arou
               Uri.parse(requestUrl),
               headers: {
                 'Content-Type': 'application/json',
-                'Authorization': 'Bearer $_apiKey',
+                if (_apiKey != null && _apiKey!.isNotEmpty)
+                  'Authorization': 'Bearer $_apiKey',
                 'HTTP-Referer': 'https://github.com/aaa-ai-coder/aaa-private-agent',
                 'X-Title': 'PrivateAgent',
               },
@@ -895,8 +920,11 @@ No surrounding markdown block code fences, no introductory or trailing text arou
         if (data is Map && data.containsKey('data')) {
           final modelsList = data['data'] as List;
           for (var m in modelsList) {
-            if (m is Map && m['id'] != null) models.add(m['id'].toString());
-            else if (m is String) models.add(m);
+            if (m is Map && m['id'] != null) {
+              models.add(m['id'].toString());
+            } else if (m is String) {
+              models.add(m);
+            }
           }
         } else if (data is Map && data.containsKey('models')) {
           final modelsList = data['models'] as List;
@@ -912,8 +940,11 @@ No surrounding markdown block code fences, no introductory or trailing text arou
           }
         } else if (data is List) {
           for (var m in data) {
-            if (m is Map && m['id'] != null) models.add(m['id'].toString());
-            else if (m is String) models.add(m);
+            if (m is Map && m['id'] != null) {
+              models.add(m['id'].toString());
+            } else if (m is String) {
+              models.add(m);
+            }
           }
         }
 

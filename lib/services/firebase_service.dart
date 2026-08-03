@@ -129,56 +129,7 @@ class FirebaseService {
     }
   }
 
-  // ─── Firestore: User Settings Sync ───────────────────────────────
-
-  /// Save user settings to Firestore for cross-device sync.
-  /// Note: API keys are NEVER synced to Firestore — only non-sensitive settings.
-  static Future<bool> syncSettingsToFirestore(
-    String userId,
-    Map<String, dynamic> settings,
-  ) async {
-    try {
-      // Strip any sensitive keys before syncing
-      final safeSettings = Map<String, dynamic>.from(settings);
-      safeSettings.remove('api_key'); // Never sync API keys
-      safeSettings.remove('r2_api_token');
-
-      await _firestore.collection('user_settings').doc(userId).set({
-        ...safeSettings,
-        'updated_at': FieldValue.serverTimestamp(),
-      }, SetOptions(merge: true));
-      return true;
-    } catch (e) {
-      developer.log('Firestore settings sync error: $e', name: 'FirebaseService');
-      return false;
-    }
-  }
-
-  /// Load user settings from Firestore.
-  static Future<Map<String, dynamic>?> loadSettingsFromFirestore(
-    String userId,
-  ) async {
-    try {
-      final doc = await _firestore.collection('user_settings').doc(userId).get();
-      if (doc.exists) {
-        return doc.data();
-      }
-      return null;
-    } catch (e) {
-      developer.log('Firestore settings load error: $e', name: 'FirebaseService');
-      return null;
-    }
-  }
-
-  /// Listen to real-time settings changes from Firestore.
-  /// Returns a Stream that emits settings whenever they change on another device.
-  static Stream<Map<String, dynamic>?> listenToSettingsChanges(String userId) {
-    return _firestore
-        .collection('user_settings')
-        .doc(userId)
-        .snapshots()
-        .map((snapshot) => snapshot.data());
-  }
+  // ─── Firestore: Cross-Device Message Fragments ───────────────────
 
   /// Save a message fragment (for cross-device handoff).
   static Future<bool> saveMessageFragment(
@@ -202,35 +153,6 @@ class FirebaseService {
   }
 
   // ─── Firebase Storage (Heavy Files) ──────────────────────────────
-
-  /// Upload a file to Firebase Storage.
-  /// Returns the download URL on success, null on failure.
-  static Future<String?> uploadToStorage({
-    required File file,
-    required String path,
-    Map<String, String>? metadata,
-  }) async {
-    try {
-      final ref = _storage.ref().child(path);
-      final uploadTask = ref.putFile(
-        file,
-        SettableMetadata(
-          customMetadata: metadata,
-          contentType: _contentType(path),
-        ),
-      );
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
-      developer.log(
-        'Firebase Storage upload: $path -> $downloadUrl',
-        name: 'FirebaseService',
-      );
-      return downloadUrl;
-    } catch (e) {
-      developer.log('Firebase Storage upload error: $e', name: 'FirebaseService');
-      return null;
-    }
-  }
 
   /// Upload bytes directly to Firebase Storage.
   static Future<String?> uploadBytesToStorage({
@@ -315,31 +237,6 @@ class FirebaseService {
     final data = message.data;
     if (data['action'] != null) {
       developer.log('FCM action data: ${data['action']}', name: 'FirebaseService');
-    }
-  }
-
-  static String _contentType(String path) {
-    final ext = path.split('.').last.toLowerCase();
-    switch (ext) {
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'gif':
-        return 'image/gif';
-      case 'mp4':
-        return 'video/mp4';
-      case 'mp3':
-        return 'audio/mpeg';
-      case 'wav':
-        return 'audio/wav';
-      case 'pdf':
-        return 'application/pdf';
-      case 'json':
-        return 'application/json';
-      default:
-        return 'application/octet-stream';
     }
   }
 }

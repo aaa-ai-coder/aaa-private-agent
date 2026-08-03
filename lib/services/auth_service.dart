@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:developer';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:firebase_auth/firebase_auth.dart' as fb;
@@ -17,6 +16,7 @@ class AuthService extends ChangeNotifier {
   sb.Session? _session;
   bool _isLoading = false;
   String? _error;
+  StreamSubscription<sb.AuthState>? _authSubscription;
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     serverClientId: '844358886395-tsh4o7eo55r14e6cbrs6oc1faisu6l33.apps.googleusercontent.com',
@@ -36,25 +36,33 @@ class AuthService extends ChangeNotifier {
   AuthService() {
     _initDeviceSha();
     _checkSession();
-    SupabaseConfig.client.auth.onAuthStateChange.listen((data) {
+    _authSubscription = SupabaseConfig.client.auth.onAuthStateChange.listen((
+      data,
+    ) {
       _user = data.session?.user;
       _session = data.session;
-      _autoSyncUserCloudData();
+      _syncUserCloudKeys();
       notifyListeners();
     });
   }
 
-  Future<void> _autoSyncUserCloudData() async {
-    if (_user != null) {
-      final uid = _user!.id;
-      try {
-        await AiService.instance.loadKeysFromSupabase(uid);
-      } catch (_) {}
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('onboarding_completed', true);
-      } catch (_) {}
+  /// Sync API keys from Supabase for the signed-in user. Onboarding progress
+  /// is intentionally left untouched here — it is only set when the user
+  /// actually completes the onboarding flow.
+  Future<void> _syncUserCloudKeys() async {
+    final user = _user;
+    if (user == null) return;
+    try {
+      await AiService.instance.loadKeysFromSupabase(user.id);
+    } catch (e) {
+      // Cloud sync is best-effort; the local key cache remains usable offline.
     }
+  }
+
+  @override
+  void dispose() {
+    _authSubscription?.cancel();
+    super.dispose();
   }
 
   Future<void> _initDeviceSha() async {
@@ -72,7 +80,7 @@ class AuthService extends ChangeNotifier {
   Future<void> _checkSession() async {
     _session = SupabaseConfig.client.auth.currentSession;
     _user = SupabaseConfig.client.auth.currentUser;
-    _autoSyncUserCloudData();
+    _syncUserCloudKeys();
     notifyListeners();
   }
 
@@ -296,15 +304,6 @@ class AuthService extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-  }
-
-  /// Validate password strength
-  static String? validatePassword(String password) {
-    if (password.isEmpty) return 'Password is required';
-    if (password.length < 6) return 'Password must be at least 6 characters';
-    if (!password.contains(RegExp(r'[A-Za-z]'))) return 'Password must contain a letter';
-    if (!password.contains(RegExp(r'[0-9]'))) return 'Password must contain a number';
-    return null;
   }
 
   /// Send password reset email

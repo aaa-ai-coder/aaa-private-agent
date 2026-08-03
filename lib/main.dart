@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -27,13 +26,12 @@ void overlayMain() {
         canvasColor: Colors.transparent,
         scaffoldBackgroundColor: Colors.transparent,
         cardColor: Colors.white,
-        dialogBackgroundColor: Colors.transparent,
+        dialogTheme: const DialogThemeData(backgroundColor: Colors.transparent),
         primaryColor: const Color(0xFF4F46E5),
         useMaterial3: true,
         colorScheme: const ColorScheme.light(
-          background: Colors.transparent,
+          surface: Colors.transparent,
           primary: Color(0xFF4F46E5),
-          surface: Colors.white,
           onSurface: Color(0xFF1E293B),
           onPrimary: Colors.white,
         ),
@@ -98,6 +96,8 @@ void main() async {
   } else {
     themeNotifier.value = ThemeMode.light;
   }
+  FeatureFlags.floatingIconEnabled =
+      prefs.getBool('floating_icon_enabled') ?? true;
 
   runApp(const PrivateAgentApp());
 }
@@ -208,7 +208,7 @@ class _PrivateAgentAppState extends State<PrivateAgentApp> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
                 side: BorderSide(
-                  color: const Color(0xFF00E5FF).withOpacity(0.2),
+                  color: const Color(0xFF00E5FF).withValues(alpha: 0.2),
                   width: 1.2,
                 ),
               ),

@@ -483,11 +483,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 gradient: RadialGradient(
                   colors: [
                     isDark
-                        ? const Color(0xFF6366F1).withOpacity(0.18)
-                        : const Color(0xFF4F46E5).withOpacity(0.08),
+                        ? const Color(0xFF6366F1).withValues(alpha: 0.18)
+                        : const Color(0xFF4F46E5).withValues(alpha: 0.08),
                     isDark
-                        ? const Color(0xFF6366F1).withOpacity(0)
-                        : const Color(0xFF4F46E5).withOpacity(0),
+                        ? const Color(0xFF6366F1).withValues(alpha: 0)
+                        : const Color(0xFF4F46E5).withValues(alpha: 0),
                   ],
                 ),
               ),
@@ -504,11 +504,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 gradient: RadialGradient(
                   colors: [
                     isDark
-                        ? const Color(0xFF38BDF8).withOpacity(0.15)
-                        : const Color(0xFF0EA5E9).withOpacity(0.06),
+                        ? const Color(0xFF38BDF8).withValues(alpha: 0.15)
+                        : const Color(0xFF0EA5E9).withValues(alpha: 0.06),
                     isDark
-                        ? const Color(0xFF38BDF8).withOpacity(0)
-                        : const Color(0xFF0EA5E9).withOpacity(0),
+                        ? const Color(0xFF38BDF8).withValues(alpha: 0)
+                        : const Color(0xFF0EA5E9).withValues(alpha: 0),
                   ],
                 ),
               ),
@@ -540,7 +540,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 color: isActive
                     ? Theme.of(context).primaryColor
                     : isCompleted
-                    ? Theme.of(context).primaryColor.withOpacity(0.5)
+                    ? Theme.of(context).primaryColor.withValues(alpha: 0.5)
                     : (isDark
                           ? const Color(0xFF1E293B)
                           : const Color(0xFFE2E8F0)),
@@ -549,7 +549,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                         BoxShadow(
                           color: Theme.of(
                             context,
-                          ).primaryColor.withOpacity(0.25),
+                          ).primaryColor.withValues(alpha: 0.25),
                           blurRadius: 8,
                           offset: const Offset(0, 2),
                         ),
@@ -609,7 +609,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 height: 170,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Theme.of(context).primaryColor.withOpacity(0.12),
+                  color: Theme.of(context).primaryColor.withValues(alpha: 0.12),
                 ),
               ),
               Container(
@@ -620,13 +620,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   color: isDark ? const Color(0xFF151D30) : Colors.white,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(isDark ? 0.25 : 0.08),
+                      color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
                       blurRadius: 25,
                       offset: const Offset(0, 10),
                     ),
                   ],
                   border: Border.all(
-                    color: Theme.of(context).primaryColor.withOpacity(0.15),
+                    color: Theme.of(context).primaryColor.withValues(alpha: 0.15),
                     width: 1.5,
                   ),
                 ),
@@ -688,7 +688,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 BoxShadow(
                   color: Theme.of(
                     context,
-                  ).colorScheme.primary.withOpacity(0.25),
+                  ).colorScheme.primary.withValues(alpha: 0.25),
                   blurRadius: 15,
                   offset: const Offset(0, 6),
                 ),
@@ -744,7 +744,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.06),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.06),
           width: 1.2,
         ),
       ),
@@ -753,7 +753,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: Theme.of(context).primaryColor.withOpacity(0.12),
+              color: Theme.of(context).primaryColor.withValues(alpha: 0.12),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 22, color: Theme.of(context).primaryColor),
@@ -923,7 +923,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           BoxShadow(
                             color: Theme.of(
                               context,
-                            ).colorScheme.primary.withOpacity(0.25),
+                            ).colorScheme.primary.withValues(alpha: 0.25),
                             blurRadius: 10,
                             offset: const Offset(0, 4),
                           ),
@@ -1001,13 +1001,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
           color: isGranted
-              ? Colors.green.withOpacity(0.3)
-              : Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+              ? Colors.green.withValues(alpha: 0.3)
+              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.2 : 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -1025,7 +1025,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).primaryColor.withOpacity(0.12),
+                      color: Theme.of(context).primaryColor.withValues(alpha: 0.12),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -1206,10 +1206,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withOpacity(0.1),
+                      color: Colors.redAccent.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.redAccent.withOpacity(0.2),
+                        color: Colors.redAccent.withValues(alpha: 0.2),
                       ),
                     ),
                     child: Text(
@@ -1265,7 +1265,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                           BoxShadow(
                             color: Theme.of(
                               context,
-                            ).colorScheme.primary.withOpacity(0.25),
+                            ).colorScheme.primary.withValues(alpha: 0.25),
                             blurRadius: 12,
                             offset: const Offset(0, 5),
                           ),
@@ -1331,7 +1331,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         border: Border.all(
           color: isSelected
               ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
           width: isSelected ? 2 : 1.2,
         ),
         boxShadow: isSelected
@@ -1339,7 +1339,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 BoxShadow(
                   color: Theme.of(
                     context,
-                  ).colorScheme.primary.withOpacity(0.15),
+                  ).colorScheme.primary.withValues(alpha: 0.15),
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -1350,7 +1350,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         margin: EdgeInsets.zero,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         color: isSelected
-            ? Theme.of(context).colorScheme.primary.withOpacity(0.12)
+            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.12)
             : Theme.of(context).colorScheme.surface,
         child: InkWell(
           borderRadius: BorderRadius.circular(18),
@@ -1399,12 +1399,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.08),
+          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
           width: 1.2,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(isDark ? 0.15 : 0.02),
+            color: Colors.black.withValues(alpha: isDark ? 0.15 : 0.02),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

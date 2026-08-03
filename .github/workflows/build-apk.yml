@@ -34,6 +34,18 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Generate local credentials file
+        run: |
+          cp lib/config/credentials.example.dart lib/config/credentials.dart
+          # If the repo owner has configured the corresponding GitHub secrets,
+          # substitute real values so the release APK is fully functional.
+          if [ -n "${{ secrets.R2_ACCOUNT_ID }}" ]; then
+            sed -i "s|your_cloudflare_account_id|${{ secrets.R2_ACCOUNT_ID }}|" lib/config/credentials.dart
+            sed -i "s|your_cloudflare_email|${{ secrets.R2_AUTH_EMAIL }}|" lib/config/credentials.dart
+            sed -i "s|your_cloudflare_api_key|${{ secrets.R2_GLOBAL_KEY }}|" lib/config/credentials.dart
+            sed -i "s|aaa-r2|${{ secrets.R2_BUCKET_NAME }}|" lib/config/credentials.dart
+          fi
+
       - name: Generate Release Keystore
         run: |
           keytool -genkey -v -keystore android/app/release.keystore -alias release -keyalg RSA -keysize 2048 -validity 10000 -storepass privateagent123 -keypass privateagent123 -dname "CN=AAA Private Agent, OU=Agent, O=AAA, L=City, S=State, C=US"

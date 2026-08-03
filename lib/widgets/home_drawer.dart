@@ -40,7 +40,6 @@ class _HomeDrawerState extends State<HomeDrawer> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final drawerBg = widget.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
     final textStyle = TextStyle(
       color: widget.isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
@@ -115,13 +114,13 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   children: [
                     CircleAvatar(
                       radius: 14,
-                      backgroundColor: const Color(0xFF7C3AED).withOpacity(0.15),
+                      backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.15),
                       child: const Icon(Icons.person_rounded, size: 16, color: Color(0xFFA78BFA)),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        _authService.email ?? 'User Account',
+                        _authService.email.isEmpty ? 'User Account' : _authService.email,
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
@@ -131,7 +130,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                       ),
                     ),
                     IconButton(
-                      icon: Icon(Icons.logout_rounded, size: 18, color: Colors.redAccent.withOpacity(0.7)),
+                      icon: Icon(Icons.logout_rounded, size: 18, color: Colors.redAccent.withValues(alpha: 0.7)),
                       tooltip: 'Sign out',
                       onPressed: () async {
                         Navigator.pop(context);
@@ -156,7 +155,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF7C3AED).withOpacity(0.3),
+                    color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -297,12 +296,12 @@ class _HomeDrawerState extends State<HomeDrawer> {
                       margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
                       decoration: BoxDecoration(
                         color: isCurrent
-                            ? const Color(0xFF7C3AED).withOpacity(0.12)
+                            ? const Color(0xFF7C3AED).withValues(alpha: 0.12)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(12),
                         border: isCurrent
                             ? Border.all(
-                                color: const Color(0xFF7C3AED).withOpacity(0.3),
+                                color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
                               )
                             : null,
                       ),
@@ -331,7 +330,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                           icon: Icon(
                             Icons.delete_outline_rounded,
                             size: 16,
-                            color: Colors.redAccent.withOpacity(0.7),
+                            color: Colors.redAccent.withValues(alpha: 0.7),
                           ),
                           onPressed: () async {
                             await DatabaseService.deleteSession(sessionId);
@@ -415,10 +414,10 @@ class _CloudBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: color.withValues(alpha: 0.3),
           width: 0.8,
         ),
       ),
@@ -439,7 +438,7 @@ class _CloudBadge extends StatelessWidget {
             style: TextStyle(
               fontSize: 9.5,
               fontWeight: FontWeight.bold,
-              color: isDark ? color : color.withOpacity(0.9),
+              color: isDark ? color : color.withValues(alpha: 0.9),
             ),
           ),
         ],

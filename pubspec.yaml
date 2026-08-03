@@ -42,6 +42,9 @@ dependencies:
   # Permissions
   permission_handler: ^11.4.0
 
+  # Battery
+  battery_plus: ^6.0.0
+
   # Storage
   shared_preferences: ^2.3.0
   path_provider: ^2.1.0

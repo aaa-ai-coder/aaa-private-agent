@@ -1,12 +1,13 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
-  final FlutterLocalNotificationsPlugin _notificationsPlugin =
+  // Shared across instances so re-initialization is skipped and notification
+  // IDs never reset to 1000 for every new TaskExecutor.
+  static final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
-
-  bool _initialized = false;
-  bool? _notificationsAllowed;
-  int _nextNotificationId = 1000;
+  static bool _initialized = false;
+  static bool? _notificationsAllowed;
+  static int _nextNotificationId = 1000;
 
   Future<void> init() async {
     if (_initialized) return;

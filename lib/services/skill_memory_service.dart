@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../config/supabase_config.dart';
@@ -28,7 +29,7 @@ class SkillMemoryService {
           .toList();
       _isLoaded = true;
     } catch (e) {
-      print('Failed to load skills: $e');
+      developer.log('Failed to load skills: $e', name: 'SkillMemory');
     }
   }
 
@@ -38,7 +39,7 @@ class SkillMemoryService {
       final lines = _skills.map((s) => jsonEncode(s.toJson())).join('\n');
       await file.writeAsString(lines + (lines.isNotEmpty ? '\n' : ''));
     } catch (e) {
-      print('Failed to save skills: $e');
+      developer.log('Failed to save skills: $e', name: 'SkillMemory');
     }
   }
 

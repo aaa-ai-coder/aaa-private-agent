@@ -1,31 +1,61 @@
-import 'dart:developer';
+import 'dart:async';
+import 'dart:io';
 import 'package:shizuku_api/shizuku_api.dart';
 
 class ShizukuService {
   final ShizukuApi _shizuku = ShizukuApi();
   bool _isAvailable = false;
   bool _hasPermission = false;
+  bool _rootAvailable = false;
+
+  /// Maximum time a binder command may run before it is treated as failed.
+  /// Prevents a wedged binder call from freezing the whole task loop.
+  static const _commandTimeout = Duration(seconds: 10);
 
   bool get isAvailable => _isAvailable;
   bool get hasPermission => _hasPermission;
 
-  /// Check if Shizuku is installed and running
+  /// Whether the device is rooted (or has an app with root access, e.g.
+  /// Magisk granting this app). When true, privileged commands can run via
+  /// `su` even if Shizuku is unavailable.
+  bool get isRootAvailable => _rootAvailable;
+
+  /// Probe whether `su` (root shell) is usable from this app.
+  Future<bool> _probeRoot() async {
+    try {
+      final result = await Process.run('su', ['-c', 'echo ok'])
+          .timeout(const Duration(seconds: 3));
+      _rootAvailable = result.exitCode == 0;
+    } catch (_) {
+      _rootAvailable = false;
+    }
+    return _rootAvailable;
+  }
+
+  /// Check if Shizuku is installed and running (also refreshes root status).
   Future<bool> checkAvailability() async {
     try {
       _isAvailable = await _shizuku.pingBinder() ?? false;
       if (_isAvailable) {
         _hasPermission = await _shizuku.checkPermission() ?? false;
+      } else {
+        _hasPermission = false;
       }
+      await _probeRoot();
       return _isAvailable;
     } catch (e) {
       _isAvailable = false;
       _hasPermission = false;
-      return false;
+      await _probeRoot();
+      return _isAvailable;
     }
   }
 
   /// Request Shizuku permission
   Future<bool> requestPermission() async {
+    if (!_isAvailable) {
+      await checkAvailability();
+    }
     if (!_isAvailable) return false;
     try {
       _hasPermission = await _shizuku.requestPermission() ?? false;
@@ -35,24 +65,59 @@ class ShizukuService {
     }
   }
 
-  /// Run an ADB shell command via Shizuku
-  Future<String> runCommand(String command) async {
-    if (!_isAvailable) {
-      return 'Shizuku is not running. Please start Shizuku first.';
+  /// Run a privileged command via the `su` root shell.
+  Future<String> _runAsRoot(String command) async {
+    try {
+      final result = await Process.run('su', ['-c', command]).timeout(
+        _commandTimeout,
+        onTimeout: () => throw TimeoutException('Root command timed out'),
+      );
+      if (result.exitCode == 0) {
+        final out = (result.stdout as String).trim();
+        return out.isEmpty ? 'Command executed (no output)' : out;
+      }
+      return 'Root command failed (exit ${result.exitCode}): ${result.stderr}';
+    } catch (e) {
+      return 'Error running root command: $e';
     }
-    if (!_hasPermission) {
-      final granted = await requestPermission();
-      if (!granted) {
-        return 'Shizuku permission denied.';
+  }
+
+  /// Run an ADB shell command via Shizuku (or root fallback).
+  ///
+  /// Automatically re-checks Shizuku connectivity before giving up, and falls
+  /// back to the root shell when Shizuku is unavailable or its permission is
+  /// denied, so privileged actions keep working on both rooted and
+  /// non-rooted devices.
+  Future<String> runCommand(String command) async {
+    // Shizuku may have been started after this app launched: re-check first.
+    if (!_isAvailable) {
+      await checkAvailability();
+    }
+
+    if (_isAvailable) {
+      if (!_hasPermission) {
+        final granted = await requestPermission();
+        if (!granted) {
+          if (_rootAvailable) return _runAsRoot(command);
+          return 'Shizuku permission denied.';
+        }
+      }
+
+      try {
+        final result = await _shizuku.runCommand(command).timeout(
+          _commandTimeout,
+          onTimeout: () => throw TimeoutException('Command timed out'),
+        );
+        return result ?? 'Command executed (no output)';
+      } catch (e) {
+        // Binder may have died mid-command: try the root shell as fallback.
+        if (_rootAvailable) return _runAsRoot(command);
+        return 'Error running command: $e';
       }
     }
 
-    try {
-      final result = await _shizuku.runCommand(command);
-      return result ?? 'Command executed (no output)';
-    } catch (e) {
-      return 'Error running command: $e';
-    }
+    if (_rootAvailable) return _runAsRoot(command);
+    return 'Shizuku is not running. Please start Shizuku first.';
   }
 
   // ─── Network Management ────────────────────────────────────────
@@ -158,20 +223,6 @@ class ShizukuService {
     final modeStr = mode == 0 ? 'silent' : (mode == 1 ? 'vibrate' : 'normal');
     return runCommand('cmd audio set-ringer-mode $modeStr 2>/dev/null || '
         'settings put system volume_ring $mode');
-  }
-
-  /// Toggle flashlight via camera service
-  Future<String> toggleFlashlight(bool enable) async {
-    return runCommand(
-      'cmd battery $enable 2>/dev/null; '
-      'echo "Flashlight control requires system-level access"',
-    );
-  }
-
-  /// Set screen brightness (0-255)
-  Future<String> setScreenBrightness(int brightness) async {
-    final clamped = brightness.clamp(0, 255);
-    return runCommand('settings put system screen_brightness $clamped');
   }
 
   /// Lock the device screen

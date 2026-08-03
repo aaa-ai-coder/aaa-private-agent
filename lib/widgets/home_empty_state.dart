@@ -122,13 +122,13 @@ class HomeEmptyState extends StatelessWidget {
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: isDark
-                                ? const Color(0xFF243049).withOpacity(0.4)
+                                ? const Color(0xFF243049).withValues(alpha: 0.4)
                                 : const Color(0xFFE2E8F0),
                             width: 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withOpacity(isDark ? 0.1 : 0.02),
+                              color: Colors.black.withValues(alpha: isDark ? 0.1 : 0.02),
                               blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),

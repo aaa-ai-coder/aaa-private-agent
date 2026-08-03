@@ -38,7 +38,7 @@ class QuickActions extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withOpacity(0.15),
+                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
@@ -116,10 +116,10 @@ class _ActionChip extends StatelessWidget {
     final primary = isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED);
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1B4B).withOpacity(0.4) : const Color(0xFFF1F5F9),
+        color: isDark ? const Color(0xFF1E1B4B).withValues(alpha: 0.4) : const Color(0xFFF1F5F9),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? const Color(0xFF8B5CF6).withOpacity(0.2) : const Color(0xFFCBD5E1),
+          color: isDark ? const Color(0xFF8B5CF6).withValues(alpha: 0.2) : const Color(0xFFCBD5E1),
           width: 1.0,
         ),
       ),
@@ -128,7 +128,7 @@ class _ActionChip extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(20),
-          splashColor: primary.withOpacity(0.15),
+          splashColor: primary.withValues(alpha: 0.15),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Row(

@@ -10,7 +10,6 @@ import '../models/language_config.dart';
 import '../services/ai_service.dart';
 import '../services/action_handler.dart';
 import '../services/voice_service.dart';
-import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../widgets/message_bubble.dart';
 import '../widgets/quick_actions.dart';
@@ -59,8 +58,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   String _sessionId = 'local_${DateTime.now().millisecondsSinceEpoch}';
   String _sessionTitle = '';
 
-  final AuthService _authService = authService;
-
   AppLifecycleState _appLifecycleState = AppLifecycleState.resumed;
   Timer? _overlayHistoryTimer;
 
@@ -72,7 +69,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _initServices();
     _startOverlayHistorySync();
     // Register as the handler for overlay bubble tasks
-    onOverlayTask = (task) => _sendMessage(task);
+    onOverlayTask = _onOverlayTask;
   }
 
   Future<void> _initServices() async {
@@ -140,7 +137,18 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await ChatHistoryService.saveSession(session);
   }
 
+  /// Wraps [_saveSession] so a Supabase sync failure can never block the chat
+  /// or leave the UI stuck in a loading state.
+  Future<void> _safeSaveSession() async {
+    try {
+      await _saveSession();
+    } catch (e) {
+      developer.log('Failed to save session: $e', name: 'PrivateAgent');
+    }
+  }
+
   Future<void> _sendMessage(String text) async {
+    if (!mounted) return;
     if (text.trim().isEmpty) return;
 
     final userMessage = ChatMessage(role: 'user', content: text.trim());
@@ -151,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _updateOverlayState();
     _textController.clear();
     _scrollToBottom();
-    await _saveSession();
+    await _safeSaveSession();
 
     // Add empty placeholder assistant message for streaming
     final assistantMessage = ChatMessage(role: 'assistant', content: '');
@@ -161,7 +169,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final assistantIndex = _messages.length - 1;
 
     try {
-      const isAgent = true;
+      // In Chat mode the model receives a plain chat prompt; in Agent mode it
+      // gets the full device-automation action catalog.
+      final isAgent = _mode == 'agent';
       final stream = _aiService
           .sendMessageStream(text.trim(), isAgentMode: isAgent)
           .timeout(
@@ -189,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           _scrollToBottom();
         }
       }
-      await _saveSession();
+      await _safeSaveSession();
 
       // Check if it's an action
       final action = _aiService.parseAction(accumulated);
@@ -250,7 +260,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     : 'Agent could not complete the task.'),
           );
         }
-        await _saveSession();
+        await _safeSaveSession();
       } else {
         // Plain text response, speak if auto-read or continuous voice mode is enabled
         final prefs = await SharedPreferences.getInstance();
@@ -299,6 +309,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _showTaskProgressOverlay(String message) async {
     if (!FeatureFlags.floatingOverlayEnabled) return;
+    if (!FeatureFlags.floatingIconEnabled) return;
     if (!await FlutterOverlayWindow.isPermissionGranted()) return;
 
     // Never cover PrivateAgent itself. The lifecycle observer will create the
@@ -392,7 +403,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
-  void _exportChatSession() {
+  Future<void> _exportChatSession() async {
     if (_messages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No chat history to export.')),
@@ -411,25 +422,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     final exportedText = buffer.toString();
-    Share.share(exportedText, subject: 'AAA Private Agent Chat Export');
-  }
-
-  void _loadChatSession(ChatSession session) {
-    setState(() {
-      _sessionId = session.id;
-      _sessionTitle = session.title;
-      _messages.clear();
-      for (final m in session.messages) {
-        _messages.add(ChatMessage.fromJson(m));
-      }
-
-      _aiService.clearHistory();
-      for (final m in _messages) {
-        if (m.actionResult != null) continue;
-        _aiService.addHistoryMessage(m.role, m.content);
-      }
-    });
-    _scrollToBottom();
+    await SharePlus.instance.share(
+      ShareParams(text: exportedText, subject: 'AAA Private Agent Chat Export'),
+    );
   }
 
   Future<void> _loadSessionMessages(String sessionId, String title) async {
@@ -468,11 +463,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _overlayHistoryTimer?.cancel();
+    // Never leave a dangling handler that could call setState on a disposed state.
+    if (onOverlayTask != null && identical(onOverlayTask, _onOverlayTask)) {
+      onOverlayTask = null;
+    }
     _textController.dispose();
     _scrollController.dispose();
     _voiceService.dispose();
     _telegramService.dispose();
     super.dispose();
+  }
+
+  void _onOverlayTask(String task) {
+    _sendMessage(task);
   }
 
   @override
@@ -525,7 +528,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         _messages.addAll(imported);
       });
       _scrollToBottom();
-      await _saveSession();
+      await _safeSaveSession();
     } finally {
       _importingOverlayHistory = false;
     }
@@ -536,6 +539,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Future<void> _updateOverlayState() async {
     if (!FeatureFlags.floatingOverlayEnabled) return;
+    if (!FeatureFlags.floatingIconEnabled) return;
     final generation = ++_overlayUpdateGeneration;
     final isBackground = _appLifecycleState == AppLifecycleState.paused;
     final shouldBeActive = isBackground;
@@ -846,7 +850,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       Container(
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.redAccent.withOpacity(0.3)),
+                          border: Border.all(color: Colors.redAccent.withValues(alpha: 0.3)),
                         ),
                         child: TextButton.icon(
                           onPressed: () {

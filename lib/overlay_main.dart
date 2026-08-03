@@ -390,7 +390,7 @@ class _OverlayAppState extends State<OverlayApp> with WidgetsBindingObserver {
               shape: BoxShape.circle,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(_isDark ? 0.35 : 0.25),
+                  color: Colors.black.withValues(alpha: _isDark ? 0.35 : 0.25),
                   blurRadius: 8,
                   spreadRadius: 1,
                   offset: const Offset(0, 2),
@@ -422,7 +422,7 @@ class _OverlayAppState extends State<OverlayApp> with WidgetsBindingObserver {
           border: Border.all(color: c._border, width: 1),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(_isDark ? 0.4 : 0.15),
+              color: Colors.black.withValues(alpha: _isDark ? 0.4 : 0.15),
               blurRadius: 12,
               spreadRadius: 2,
               offset: const Offset(0, 4),

@@ -27,9 +27,11 @@ class ChatExportService {
       final file = File('${dir.path}/$fileName');
       await file.writeAsString(buffer.toString());
 
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        text: 'Exported chat session "$title"',
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [XFile(file.path)],
+          text: 'Exported chat session "$title"',
+        ),
       );
 
       return 'Chat exported successfully to ${file.path}';

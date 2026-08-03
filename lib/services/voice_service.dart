@@ -219,8 +219,8 @@ class VoiceService {
             onDone();
           }
         },
-        localeId: _currentLanguage.sttLocale,
         listenOptions: stt.SpeechListenOptions(
+          localeId: _currentLanguage.sttLocale,
           listenMode: stt.ListenMode.confirmation,
           partialResults: false,
           cancelOnError: true,

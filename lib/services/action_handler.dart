@@ -1,4 +1,3 @@
-import 'dart:io' show Platform, File;
 import 'dart:convert' show utf8;
 import '../models/agent_action.dart';
 import '../models/chat_message.dart';
@@ -15,7 +14,6 @@ import 'clipboard_service.dart';
 import 'device_info_service.dart';
 import 'firebase_service.dart';
 import 'storage_service.dart';
-import 'chat_export_service.dart';
 
 class ActionHandler {
   final AppLauncherService _appLauncher = AppLauncherService();
@@ -137,12 +135,6 @@ class ActionHandler {
               : 'No networks found or scan failed.';
           break;
 
-        case 'get_wifi_password':
-          result = await _shizuku.getWifiPassword(
-            action.params['ssid'] as String? ?? '',
-          );
-          break;
-
         case 'connect_wifi':
           result = await _shizuku.connectToWifi(
             action.params['ssid'] as String? ?? '',
@@ -177,12 +169,6 @@ class ActionHandler {
         case 'set_ringer_mode':
           result = await _shizuku.setRingerMode(
             _parseInt(action.params['mode'], 2),
-          );
-          break;
-
-        case 'toggle_flashlight':
-          result = await _shizuku.toggleFlashlight(
-            action.params['enable'] as bool? ?? true,
           );
           break;
 
@@ -314,6 +300,10 @@ class ActionHandler {
             result = 'AI service not available for task execution.';
             break;
           }
+          if (_currentExecutor != null) {
+            result = 'Another task is already running. Wait for it to finish or stop it first.';
+            break;
+          }
           _currentExecutor = TaskExecutor(
             aiService: aiService,
             screenService: _screenAutomation,
@@ -321,8 +311,11 @@ class ActionHandler {
             shizukuService: _shizuku,
             onProgress: onProgress,
           );
-          result = await _currentExecutor!.executeTask(goal);
-          _currentExecutor = null;
+          try {
+            result = await _currentExecutor!.executeTask(goal);
+          } finally {
+            _currentExecutor = null;
+          }
           break;
 
         // ─── Non-Root Device Actions ──────────────────────────
@@ -343,14 +336,6 @@ class ActionHandler {
 
         case 'paste_clipboard':
           result = await _clipboard.pasteFromClipboard();
-          break;
-
-        case 'export_chat':
-          final title = action.params['title'] as String? ?? 'Chat Export';
-          result = await ChatExportService.exportChatToMarkdown(
-            title: title,
-            messages: [],
-          );
           break;
 
         case 'get_battery':

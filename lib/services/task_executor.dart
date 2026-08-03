@@ -50,6 +50,29 @@ class TaskExecutor {
     }
   }
 
+  /// Report a user-initiated cancellation and log it.
+  Future<void> _reportCancelled(
+    String userGoal,
+    List<String> results,
+    int totalTokens,
+    int step,
+  ) async {
+    results.add('Task cancelled by user.');
+    _report('Task cancelled.');
+    await _notificationService.showTaskCompleteNotification(
+      'Task Cancelled',
+      'Task was stopped by the user.',
+    );
+    await TaskHistoryLogger.logTask(
+      userGoal,
+      'Cancelled',
+      totalTokens,
+      step,
+      results,
+    );
+    await _screenService.showToast('Task Cancelled');
+  }
+
   static const String _taskSystemPrompt = '''
 You are a phone automation agent. You are given a TASK and the current SCREEN content.
 You must decide what single action to take next to accomplish the task.
@@ -210,22 +233,14 @@ Rules:
     for (int step = 0; step < _aiService.maxSteps; step++) {
       // Check for cancellation
       if (_cancelled) {
-        results.add('Task cancelled by user.');
-        _report('Task cancelled.');
-        await _notificationService.showTaskCompleteNotification(
-          'Task Cancelled',
-          'Task was stopped by the user.',
-        );
-        await TaskHistoryLogger.logTask(
-          userGoal,
-          'Cancelled',
-          totalTokens,
-          step,
-          results,
-        );
-        await _screenService.showToast('Task Cancelled');
+        await _reportCancelled(userGoal, results, totalTokens, step);
         return 'Task cancelled.';
       }
+
+      // Fresh cancel completer for this iteration. Created BEFORE the wait and
+      // screen-read windows so Stop works even while the agent is idle-waiting
+      // or reading the screen.
+      _cancelCompleter = Completer<void>();
 
       // Adaptive delay: give Android apps time to transition screens, load data, or open keyboards
       int delay = 1200; // Default 1.2s delay for most actions
@@ -241,6 +256,12 @@ Rules:
       }
       await Future.delayed(Duration(milliseconds: delay));
 
+      // Don't send an AI request if the user cancelled while we were waiting.
+      if (_cancelled) {
+        await _reportCancelled(userGoal, results, totalTokens, step);
+        return 'Task cancelled.';
+      }
+
       // 1. Read the current screen text
       final screenContent = _aiService.useScreenCompression
           ? await _screenService.getCompressedScreenDescription(userGoal)
@@ -249,6 +270,12 @@ Rules:
         '=== SCREEN DUMP (Step ${step + 1}) ===\n$screenContent',
         name: 'PrivateAgent',
       );
+
+      // Don't send an AI request if the user cancelled during the screen read.
+      if (_cancelled) {
+        await _reportCancelled(userGoal, results, totalTokens, step);
+        return 'Task cancelled.';
+      }
 
       // Determine previous result string
       final prevResultStr = step > 0 && results.isNotEmpty
@@ -275,7 +302,6 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
       // 3. Get AI response — races against cancel signal so Stop works immediately
       String response;
       try {
-        _cancelCompleter = Completer<void>();
         final aiFuture = _aiService.sendTaskMessage(_taskSystemPrompt, prompt);
 
         // Race: whichever finishes first wins
@@ -285,24 +311,11 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
         ]);
 
         if (result == null || _cancelled) {
-          results.add('Task cancelled by user.');
-          _report('Task cancelled.');
-          await _notificationService.showTaskCompleteNotification(
-            'Task Cancelled',
-            'Task was stopped by the user.',
-          );
-          await TaskHistoryLogger.logTask(
-            userGoal,
-            'Cancelled',
-            totalTokens,
-            step,
-            results,
-          );
-          await _screenService.showToast('Task Cancelled');
+          await _reportCancelled(userGoal, results, totalTokens, step);
           return 'Task cancelled.';
         }
 
-        final aiResponse = result as AiResponse;
+        final aiResponse = result;
         response = aiResponse.content;
         totalTokens += aiResponse.totalTokens;
 
@@ -312,21 +325,7 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
         );
       } catch (e) {
         if (_cancelled) {
-          results.add('Task cancelled by user.');
-          _report('Task cancelled.');
-          await _notificationService.showTaskCompleteNotification(
-            'Task Cancelled',
-            'Task was stopped by the user.',
-          );
-          await TaskHistoryLogger.logTask(
-            userGoal,
-            'Cancelled',
-            totalTokens,
-            step,
-            results,
-          );
-          await _screenService.showToast('Task Cancelled');
-          await Future.delayed(const Duration(seconds: 2));
+          await _reportCancelled(userGoal, results, totalTokens, step);
           return 'Task cancelled.';
         }
         results.add('AI error: $e');
@@ -349,32 +348,16 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
 
       // Check for cancellation after AI response
       if (_cancelled) {
-        results.add('Task cancelled by user.');
-        _report('Task cancelled.');
-        await _notificationService.showTaskCompleteNotification(
-          'Task Cancelled',
-          'Task was stopped by the user.',
-        );
-        await TaskHistoryLogger.logTask(
-          userGoal,
-          'Cancelled',
-          totalTokens,
-          step,
-          results,
-        );
-        await _screenService.showToast('Task Cancelled');
-        await Future.delayed(const Duration(seconds: 2));
+        await _reportCancelled(userGoal, results, totalTokens, step);
         return 'Task cancelled.';
       }
 
       // 4. Parse the action (with one retry on failure)
       Map<String, dynamic>? actionJson;
-      String? parsedJsonStr;
       try {
         String jsonStr = _extractJson(response);
 
         actionJson = jsonDecode(jsonStr) as Map<String, dynamic>;
-        parsedJsonStr = jsonStr;
       } catch (firstError) {
         // First attempt failed — retry once
         developer.log(
@@ -384,11 +367,25 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
         _report('Retrying step ${step + 1}...\n(Failed to parse: $firstError)');
         // Wait 2 seconds before retrying to prevent rate-limit spam
         await Future.delayed(const Duration(seconds: 2));
+        if (_cancelled) {
+          await _reportCancelled(userGoal, results, totalTokens, step);
+          return 'Task cancelled.';
+        }
         try {
-          final retryResponse = await _aiService.sendTaskMessage(
+          // Race the retry against the cancel signal too.
+          final retryFuture = _aiService.sendTaskMessage(
             _taskSystemPrompt,
             prompt,
           );
+          final retryResult = await Future.any([
+            retryFuture.then((r) => r),
+            _cancelCompleter!.future.then((_) => null),
+          ]);
+          if (retryResult == null || _cancelled) {
+            await _reportCancelled(userGoal, results, totalTokens, step);
+            return 'Task cancelled.';
+          }
+          final retryResponse = retryResult;
           totalTokens += retryResponse.totalTokens;
           developer.log(
             '=== RETRY AI RESPONSE ===\n${retryResponse.content}',
@@ -397,12 +394,11 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
 
           String jsonStr = _extractJson(retryResponse.content);
           actionJson = jsonDecode(jsonStr) as Map<String, dynamic>;
-          parsedJsonStr = jsonStr;
         } catch (e) {
           results.add('Step ${step + 1}: Error after retry: $e');
 
           String debugInfo = 'Error: $e';
-          _report('AI Error: $debugInfo\n\nRaw output:\n${response}');
+          _report('AI Error: $debugInfo\n\nRaw output:\n$response');
 
           await _notificationService.showTaskCompleteNotification(
             'Task Error',
@@ -709,14 +705,15 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
 
       // Delay before executing each step
       int delay = 1200;
-      if (step.action == 'open_app')
+      if (step.action == 'open_app') {
         delay = 3000;
-      else if (step.action == 'type_text')
+      } else if (step.action == 'type_text') {
         delay = 2000;
-      else if (step.action == 'click_text' || step.action == 'click_at')
+      } else if (step.action == 'click_text' || step.action == 'click_at') {
         delay = 1500;
-      else if (step.action == 'scroll')
+      } else if (step.action == 'scroll') {
         delay = 1000;
+      }
 
       await Future.delayed(Duration(milliseconds: delay));
 
@@ -783,9 +780,9 @@ Step ${step + 1}/${_aiService.maxSteps}. Look at the text dump and coordinates. 
           success = true;
           break;
         case 'done':
-          success = true;
-          actionResult = 'Done step reached';
-          break;
+          // Task marked complete — stop replaying any remaining saved steps.
+          results.add('Memory Replay Step ${i + 1}: done');
+          return true;
         default:
           success = false;
           actionResult = 'Unknown action: ${step.action}';

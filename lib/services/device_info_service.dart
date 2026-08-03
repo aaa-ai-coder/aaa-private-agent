@@ -1,8 +1,10 @@
 import 'dart:io' show Platform;
+import 'package:battery_plus/battery_plus.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 
 class DeviceInfoService {
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
+  final Battery _battery = Battery();
 
   /// Get device model, manufacturer, OS version.
   Future<String> getDeviceInfo() async {
@@ -20,16 +22,11 @@ class DeviceInfoService {
     }
   }
 
-  /// Get battery level info.
+  /// Get battery level (0-100).
   Future<String> getBatteryLevel() async {
     try {
-      if (Platform.isAndroid) {
-        final info = await _deviceInfo.androidInfo;
-        // Battery percentage was removed from device_info_plus 10+
-        // Report available RAM as proxy or just note limitation
-        return 'Battery info available via system APIs only';
-      }
-      return 'Battery info only available on Android';
+      final level = await _battery.batteryLevel;
+      return '$level%';
     } catch (e) {
       return 'Error reading battery: $e';
     }

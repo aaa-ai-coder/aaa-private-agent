@@ -21,25 +21,37 @@ class AriProviderConfig {
 class AriAiEngine {
   static final AriAiEngine instance = AriAiEngine();
 
-  /// Execute streaming chat completion using the user-configured API key
+  /// Execute streaming chat completion using the user-configured API key.
+  /// When no usable key is configured (or the configured provider fails), the
+  /// free keyless backend is used as an automatic fallback so the agent keeps
+  /// working out of the box.
   Stream<String> executeStreamWithFailover({
     required List<Map<String, String>> messages,
     required double temperature,
     required int maxTokens,
     ApiKeyConfig? activeCustomKey,
+    String keylessBaseUrl = 'https://text.pollinations.ai/openai',
+    String keylessModel = 'openai-fast',
   }) async* {
-    if (activeCustomKey == null || activeCustomKey.apiKey.trim().isEmpty) {
-      throw Exception('API Key is not configured. Please go to Settings and enter your API key.');
+    final candidates = <AriProviderConfig>[];
+
+    if (activeCustomKey != null && activeCustomKey.apiKey.trim().isNotEmpty) {
+      candidates.add(AriProviderConfig(
+        name: activeCustomKey.name.isNotEmpty ? activeCustomKey.name : 'Configured Key',
+        baseUrl: activeCustomKey.baseUrl,
+        model: activeCustomKey.model,
+        apiKey: activeCustomKey.apiKey,
+      ));
     }
 
-    final provider = AriProviderConfig(
-      name: activeCustomKey.name.isNotEmpty ? activeCustomKey.name : 'Configured Key',
-      baseUrl: activeCustomKey.baseUrl,
-      model: activeCustomKey.model,
-      apiKey: activeCustomKey.apiKey,
-    );
+    // Always append the free keyless provider as the final fallback.
+    candidates.add(AriProviderConfig(
+      name: 'Free Keyless AI',
+      baseUrl: keylessBaseUrl,
+      model: keylessModel,
+      apiKey: null,
+    ));
 
-    final candidates = [provider];
     Object? lastError;
 
     for (final provider in candidates) {
@@ -65,10 +77,17 @@ class AriAiEngine {
 
         final request = http.Request('POST', Uri.parse(url))..headers.addAll(headers)..body = body;
         final client = http.Client();
-        final response = await client.send(request).timeout(const Duration(seconds: 12));
+        http.StreamedResponse response;
+        try {
+          response = await client.send(request).timeout(const Duration(seconds: 12));
+        } catch (e) {
+          client.close();
+          rethrow;
+        }
 
         if (response.statusCode != 200) {
           final errBody = await response.stream.bytesToString();
+          client.close();
           throw Exception('HTTP ${response.statusCode}: $errBody');
         }
 
@@ -78,6 +97,7 @@ class AriAiEngine {
           emittedAny = true;
           yield chunk;
         }
+        client.close();
 
         if (emittedAny) {
           // Success! Return cleanly
@@ -104,33 +124,29 @@ class AriAiEngine {
   }
 
   Stream<String> _parseSseStream(Stream<List<int>> stream) async* {
-    String buffer = '';
-    await for (final bytes in stream) {
-      buffer += utf8.decode(bytes, allowMalformed: true);
-      final lines = buffer.split('\n');
-      buffer = lines.removeLast();
+    // Decode incrementally so multi-byte UTF-8 characters split across
+    // network chunks (emojis, Bengali/Hindi text) are never corrupted.
+    final lines = stream.transform(utf8.decoder).transform(const LineSplitter());
+    await for (final line in lines) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty || trimmed.startsWith(':')) continue;
 
-      for (final line in lines) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty || trimmed.startsWith(':')) continue;
+      if (trimmed.startsWith('data:')) {
+        final data = trimmed.substring(5).trim();
+        if (data == '[DONE]') return;
 
-        if (trimmed.startsWith('data:')) {
-          final data = trimmed.substring(5).trim();
-          if (data == '[DONE]') return;
-
-          try {
-            final json = jsonDecode(data);
-            if (json is Map<String, dynamic> && json.containsKey('choices')) {
-              final choices = json['choices'] as List;
-              if (choices.isNotEmpty) {
-                final delta = choices[0]['delta'];
-                if (delta != null && delta['content'] != null) {
-                  yield delta['content'].toString();
-                }
+        try {
+          final json = jsonDecode(data);
+          if (json is Map<String, dynamic> && json.containsKey('choices')) {
+            final choices = json['choices'] as List;
+            if (choices.isNotEmpty) {
+              final delta = choices[0]['delta'];
+              if (delta != null && delta['content'] != null) {
+                yield delta['content'].toString();
               }
             }
-          } catch (_) {}
-        }
+          }
+        } catch (_) {}
       }
     }
   }

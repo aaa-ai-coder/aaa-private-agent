@@ -1,52 +1,56 @@
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
+import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../config/credentials.dart';
 import '../config/supabase_config.dart';
 import 'firebase_service.dart';
 
 /// Triple-redundant Storage Service: Cloudflare R2 + Supabase Storage + Firebase Storage.
-/// Automatically backs up all heavy data across all 3 cloud providers out of the box.
+/// R2 uses the account owner's Cloudflare credentials (from the gitignored
+/// `config/credentials.dart`, overridable per-device via Settings → Storage).
+/// Supabase and Firebase backups work out of the box when those SDKs are configured.
 class StorageService {
-  // Built-in Cloudflare R2 defaults (Auto-configured — zero manual setup required)
-  static const String defaultAccountId = 'abbe3cc008ebb9dd029ded333fef6e9f';
-  static const String defaultBucketName = 'aaa-r2';
-  static const String defaultAuthEmail = 'aaafreeai@gmail.com';
-  // Base64 encoded to avoid triggering GitHub push protection scanning
-  static String get defaultGlobalKey =>
-      utf8.decode(base64.decode('Y2ZrX2EzS0djN05iaW9KbG02b3kydkU3RjJxelBpbHVxZHg2VDY0ckdWYVgzZjhlYjhkNQ=='));
-
-  static String _accountId = defaultAccountId;
-  static String _bucketName = defaultBucketName;
-  static String _authEmail = defaultAuthEmail;
-  static String _globalKey = defaultGlobalKey;
+  static String _accountId = AppCredentials.r2AccountId;
+  static String _bucketName = AppCredentials.r2BucketName;
+  static String _authEmail = AppCredentials.r2AuthEmail;
+  static String _globalKey = AppCredentials.r2GlobalKey;
 
   static Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
-    _accountId = prefs.getString('r2_account_id') ?? defaultAccountId;
-    _bucketName = prefs.getString('r2_bucket_name') ?? defaultBucketName;
-    _authEmail = prefs.getString('r2_auth_email') ?? defaultAuthEmail;
-    _globalKey = prefs.getString('r2_global_key') ?? defaultGlobalKey;
+    _accountId = prefs.getString('r2_account_id') ?? AppCredentials.r2AccountId;
+    _bucketName = prefs.getString('r2_bucket_name') ?? AppCredentials.r2BucketName;
+    _authEmail = prefs.getString('r2_auth_email') ?? AppCredentials.r2AuthEmail;
+    _globalKey = prefs.getString('r2_global_key') ?? AppCredentials.r2GlobalKey;
   }
 
   static Future<void> saveConfig({
     required String accountId,
     required String bucketName,
     required String apiToken,
+    String authEmail = '',
   }) async {
-    _accountId = accountId.trim().isEmpty ? defaultAccountId : accountId.trim();
-    _bucketName = bucketName.trim().isEmpty ? defaultBucketName : bucketName.trim();
-    _globalKey = apiToken.trim().isEmpty ? defaultGlobalKey : apiToken.trim();
+    _accountId = accountId.trim();
+    _bucketName = bucketName.trim();
+    _globalKey = apiToken.trim();
+    if (authEmail.trim().isNotEmpty) _authEmail = authEmail.trim();
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('r2_account_id', _accountId);
     await prefs.setString('r2_bucket_name', _bucketName);
+    await prefs.setString('r2_auth_email', _authEmail);
     await prefs.setString('r2_global_key', _globalKey);
   }
 
-  static bool get isConfigured => true; // Always configured with defaults!
+  /// Whether Cloudflare R2 credentials have been provided by the user.
+  static bool get isConfigured =>
+      _accountId.isNotEmpty &&
+      _bucketName.isNotEmpty &&
+      _authEmail.isNotEmpty &&
+      _globalKey.isNotEmpty;
 
   static String get _baseEndpoint =>
       'https://api.cloudflare.com/client/v4/accounts/$_accountId/r2/buckets/$_bucketName/objects';
@@ -71,7 +75,7 @@ class StorageService {
         folder: folder,
       );
     } catch (e) {
-      print('File read error during upload: $e');
+      developer.log('File read error during upload: $e', name: 'StorageService');
       return null;
     }
   }
@@ -100,10 +104,10 @@ class StorageService {
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         publicUrl = 'https://api.cloudflare.com/client/v4/accounts/$_accountId/r2/buckets/$_bucketName/objects/$path';
-        print('Cloudflare R2 upload success: $path');
+        developer.log('Cloudflare R2 upload success: $path', name: 'StorageService');
       }
     } catch (e) {
-      print('Cloudflare R2 upload error: $e');
+      developer.log('Cloudflare R2 upload error: $e', name: 'StorageService');
     }
 
     // 2. Auto Backup to Supabase Storage ('aaa-backups' bucket)
@@ -122,9 +126,9 @@ class StorageService {
           .from('aaa-backups')
           .getPublicUrl(supabasePath);
       publicUrl ??= supabaseUrl;
-      print('Supabase Storage backup success: $supabasePath');
+      developer.log('Supabase Storage backup success: $supabasePath', name: 'StorageService');
     } catch (e) {
-      print('Supabase Storage backup error: $e');
+      developer.log('Supabase Storage backup error: $e', name: 'StorageService');
     }
 
     // 3. Auto Backup to Firebase Storage
@@ -136,43 +140,13 @@ class StorageService {
       );
       if (fbUrl != null) {
         publicUrl ??= fbUrl;
-        print('Firebase Storage backup success: $path');
+        developer.log('Firebase Storage backup success: $path', name: 'StorageService');
       }
     } catch (e) {
-      print('Firebase Storage backup error: $e');
+      developer.log('Firebase Storage backup error: $e', name: 'StorageService');
     }
 
     return publicUrl;
-  }
-
-  /// Download a file from Cloudflare R2 (falls back to Supabase Storage).
-  static Future<List<int>?> downloadFile(String path) async {
-    // Try Cloudflare R2
-    try {
-      final endpoint = '$_baseEndpoint/$path';
-      final response = await http.get(
-        Uri.parse(endpoint),
-        headers: _authHeaders,
-      );
-
-      if (response.statusCode == 200) {
-        return response.bodyBytes;
-      }
-    } catch (e) {
-      print('Cloudflare R2 download error: $e');
-    }
-
-    // Fallback: Supabase Storage
-    try {
-      final bytes = await SupabaseConfig.client.storage
-          .from('aaa-backups')
-          .download(path);
-      return bytes;
-    } catch (e) {
-      print('Supabase Storage download fallback error: $e');
-    }
-
-    return null;
   }
 
   /// Delete a file from Cloudflare R2, Supabase Storage, and Firebase Storage.
@@ -190,7 +164,7 @@ class StorageService {
         success = true;
       }
     } catch (e) {
-      print('Cloudflare R2 delete error: $e');
+      developer.log('Cloudflare R2 delete error: $e', name: 'StorageService');
     }
 
     // Delete from Supabase Storage
@@ -198,7 +172,7 @@ class StorageService {
       await SupabaseConfig.client.storage.from('aaa-backups').remove([path]);
       success = true;
     } catch (e) {
-      print('Supabase Storage delete error: $e');
+      developer.log('Supabase Storage delete error: $e', name: 'StorageService');
     }
 
     // Delete from Firebase Storage
@@ -206,7 +180,7 @@ class StorageService {
       await FirebaseService.deleteFromStorage(path);
       success = true;
     } catch (e) {
-      print('Firebase Storage delete error: $e');
+      developer.log('Firebase Storage delete error: $e', name: 'StorageService');
     }
 
     return success;
@@ -236,7 +210,7 @@ class StorageService {
         }
       }
     } catch (e) {
-      print('Cloudflare R2 list error: $e');
+      developer.log('Cloudflare R2 list error: $e', name: 'StorageService');
     }
 
     // Fallback/Merge Supabase Storage
@@ -249,32 +223,11 @@ class StorageService {
           keys.add('${prefix.isEmpty ? '' : '$prefix/'}${obj.name}');
         }
       } catch (e) {
-        print('Supabase Storage list error: $e');
+        developer.log('Supabase Storage list error: $e', name: 'StorageService');
       }
     }
 
     return keys;
-  }
-
-  /// Check if a file exists.
-  static Future<bool> fileExists(String path) async {
-    try {
-      final endpoint = '$_baseEndpoint/$path';
-      final response = await http.head(
-        Uri.parse(endpoint),
-        headers: _authHeaders,
-      );
-      if (response.statusCode == 200) return true;
-    } catch (_) {}
-
-    try {
-      final files = await SupabaseConfig.client.storage
-          .from('aaa-backups')
-          .list(path: path);
-      return files.isNotEmpty;
-    } catch (_) {}
-
-    return false;
   }
 
   /// Get public URL.

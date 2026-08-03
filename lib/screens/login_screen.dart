@@ -123,19 +123,6 @@ class _LoginScreenState extends State<LoginScreen>
     }
   }
 
-  Future<void> _signInWithPasskey() async {
-    widget.authService.clearError();
-    final success = await widget.authService.signInWithPasskey();
-    if (!success && mounted && widget.authService.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(widget.authService.error!),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    }
-  }
-
   Future<void> _showForgotPasswordDialog() async {
     final emailCtrl = TextEditingController();
     final result = await showDialog<bool>(
@@ -212,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(colors: [
-                  isDark ? const Color(0xFF6366F1).withOpacity(0.25) : const Color(0xFF4F46E5).withOpacity(0.12),
+                  isDark ? const Color(0xFF6366F1).withValues(alpha: 0.25) : const Color(0xFF4F46E5).withValues(alpha: 0.12),
                   Colors.transparent,
                 ]),
               ),
@@ -227,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(colors: [
-                  isDark ? const Color(0xFF38BDF8).withOpacity(0.2) : const Color(0xFF0EA5E9).withOpacity(0.1),
+                  isDark ? const Color(0xFF38BDF8).withValues(alpha: 0.2) : const Color(0xFF0EA5E9).withValues(alpha: 0.1),
                   Colors.transparent,
                 ]),
               ),
@@ -258,13 +245,13 @@ class _LoginScreenState extends State<LoginScreen>
                             color: isDark ? const Color(0xFF151D30) : Colors.white,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.15),
+                                color: Colors.black.withValues(alpha: 0.15),
                                 blurRadius: 28,
                                 offset: const Offset(0, 10),
                               )
                             ],
                             border: Border.all(
-                              color: Theme.of(context).primaryColor.withOpacity(0.25),
+                              color: Theme.of(context).primaryColor.withValues(alpha: 0.25),
                               width: 1.5,
                             ),
                           ),
@@ -459,9 +446,9 @@ class _LoginScreenState extends State<LoginScreen>
                             width: double.infinity,
                             padding: const EdgeInsets.all(12),
                             decoration: BoxDecoration(
-                              color: Colors.redAccent.withOpacity(0.1),
+                              color: Colors.redAccent.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: Colors.redAccent.withOpacity(0.2)),
+                              border: Border.all(color: Colors.redAccent.withValues(alpha: 0.2)),
                             ),
                             child: Text(
                               auth.error!,

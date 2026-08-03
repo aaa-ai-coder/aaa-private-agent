@@ -22,7 +22,7 @@ class ModelPickerSheet {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Theme.of(ctx).primaryColor.withOpacity(0.12),
+                      color: Theme.of(ctx).primaryColor.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
@@ -48,6 +48,16 @@ class ModelPickerSheet {
               ),
               const SizedBox(height: 16),
               const Divider(height: 1),
+              _buildOption(
+                ctx, aiService, onChanged,
+                icon: Icons.auto_awesome_rounded,
+                iconColor: Colors.amber,
+                title: 'Free Keyless AI (no key needed)',
+                subtitle: 'Works out of the box; add a key anytime for better models',
+                baseUrl: AiService.keylessBaseUrl,
+                model: AiService.keylessDefaultModel,
+                switchMessage: 'Switched to Free Keyless AI',
+              ),
               _buildOption(
                 ctx, aiService, onChanged,
                 icon: Icons.bolt_rounded,
@@ -121,7 +131,7 @@ class ModelPickerSheet {
       leading: Container(
         padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
-          color: iconColor.withOpacity(0.12),
+          color: iconColor.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Icon(icon, color: iconColor, size: 20),
@@ -134,6 +144,7 @@ class ModelPickerSheet {
           baseUrl: baseUrl,
           model: model,
         );
+        if (!context.mounted) return;
         Navigator.pop(context);
         onChanged();
         ScaffoldMessenger.of(context).showSnackBar(

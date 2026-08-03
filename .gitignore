@@ -60,3 +60,6 @@ google-services.json
 firebase-service-account.json
 .env
 
+# Never commit real credentials
+lib/config/credentials.dart
+

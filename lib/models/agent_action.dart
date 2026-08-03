@@ -16,18 +16,4 @@ class AgentAction {
       response: json['response'] as String? ?? '',
     );
   }
-
-  static const List<String> availableActions = [
-    'open_app',
-    'make_call',
-    'send_sms',
-    'search_contact',
-    'set_alarm',
-    'set_volume',
-    'set_brightness',
-    'read_notifications',
-    'read_screen',
-    'run_adb_command',
-    'general_query',
-  ];
 }

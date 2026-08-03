@@ -17,10 +17,10 @@ class ApiWarningBanner extends StatelessWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.orangeAccent.withOpacity(0.15),
+        color: Colors.orangeAccent.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.orangeAccent.withOpacity(0.3),
+          color: Colors.orangeAccent.withValues(alpha: 0.3),
         ),
       ),
       child: Row(
@@ -36,7 +36,7 @@ class ApiWarningBanner extends StatelessWidget {
           Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.orangeAccent.withOpacity(0.4)),
+              border: Border.all(color: Colors.orangeAccent.withValues(alpha: 0.4)),
             ),
             child: TextButton(
               onPressed: onConfigure,

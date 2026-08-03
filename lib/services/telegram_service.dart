@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'action_handler.dart';
@@ -8,7 +9,7 @@ import 'ai_service.dart';
 class TelegramService {
   final ActionHandler _actionHandler;
   final AiService _aiService;
-  
+
   String _botToken = '';
   bool _isEnabled = false;
   int _lastUpdateId = 0;
@@ -18,7 +19,6 @@ class TelegramService {
   TelegramService(this._actionHandler, this._aiService);
 
   String get botToken => _botToken;
-  bool get isEnabled => _isEnabled;
 
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -60,15 +60,19 @@ class TelegramService {
 
     try {
       final url = Uri.parse('https://api.telegram.org/bot$_botToken/getUpdates');
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'offset': _lastUpdateId + 1,
-          'timeout': 30, // Long polling timeout
-          'allowed_updates': ['message'],
-        }),
-      );
+      // Long-poll request can legitimately hang for up to ~30s. Give the HTTP
+      // call its own timeout so a dropped connection can never stall the loop.
+      final response = await http
+          .post(
+            url,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'offset': _lastUpdateId + 1,
+              'timeout': 30, // Long polling timeout
+              'allowed_updates': ['message'],
+            }),
+          )
+          .timeout(const Duration(seconds: 35));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -79,7 +83,7 @@ class TelegramService {
             if (update['message'] != null && update['message']['text'] != null) {
               final text = update['message']['text'];
               final chatId = update['message']['chat']['id'];
-              
+
               // Process message asynchronously so we don't block the polling loop
               _handleIncomingMessage(chatId.toString(), text);
             }
@@ -87,12 +91,12 @@ class TelegramService {
         }
       }
     } catch (e) {
-      print('Telegram polling error: $e');
-    }
-
-    // Continue polling
-    if (_isPolling) {
-      _pollingTimer = Timer(const Duration(seconds: 1), _pollUpdates);
+      developer.log('Telegram polling error: $e', name: 'TelegramService');
+    } finally {
+      // Always reschedule, even after an error, so polling can never die.
+      if (_isPolling) {
+        _pollingTimer = Timer(const Duration(seconds: 1), _pollUpdates);
+      }
     }
   }
 
@@ -140,7 +144,7 @@ class TelegramService {
         }),
       );
     } catch (e) {
-      print('Failed to send telegram message: $e');
+      developer.log('Failed to send telegram message: $e', name: 'TelegramService');
     }
   }
 

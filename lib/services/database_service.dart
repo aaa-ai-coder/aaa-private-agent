@@ -1,8 +1,7 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../config/supabase_config.dart';
-import '../models/chat_message.dart';
-import '../models/saved_skill.dart';
 import '../models/api_key_config.dart';
 
 class DatabaseService {
@@ -188,7 +187,7 @@ class DatabaseService {
           .maybeSingle();
       return data;
     } catch (e) {
-      print('Error loading settings from Supabase: $e');
+      developer.log('Error loading settings from Supabase: $e', name: 'DatabaseService');
       return null;
     }
   }
@@ -204,7 +203,7 @@ class DatabaseService {
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'user_id');
     } catch (e) {
-      print('Error saving settings to Supabase: $e');
+      developer.log('Error saving settings to Supabase: $e', name: 'DatabaseService');
     }
   }
 
@@ -220,7 +219,7 @@ class DatabaseService {
           .order('created_at', ascending: false);
       return data.map((json) => ApiKeyConfig.fromJson(json)).toList();
     } catch (e) {
-      print('Error loading API keys: $e');
+      developer.log('Error loading API keys: $e', name: 'DatabaseService');
       return [];
     }
   }
@@ -243,7 +242,7 @@ class DatabaseService {
         'updated_at': DateTime.now().toIso8601String(),
       }, onConflict: 'id');
     } catch (e) {
-      print('Error saving API key: $e');
+      developer.log('Error saving API key: $e', name: 'DatabaseService');
     }
   }
 
@@ -252,7 +251,7 @@ class DatabaseService {
     try {
       await _db.from('api_keys').delete().eq('id', keyId);
     } catch (e) {
-      print('Error deleting API key: $e');
+      developer.log('Error deleting API key: $e', name: 'DatabaseService');
     }
   }
 
@@ -262,7 +261,7 @@ class DatabaseService {
       await _db.from('api_keys').update({'is_active': false}).eq('user_id', userId);
       await _db.from('api_keys').update({'is_active': true}).eq('id', keyId);
     } catch (e) {
-      print('Error setting active API key: $e');
+      developer.log('Error setting active API key: $e', name: 'DatabaseService');
     }
   }
 

@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
+import '../config/feature_flags.dart';
 import '../services/auth_service.dart';
 import '../services/ai_service.dart';
 import '../services/shizuku_service.dart';
@@ -57,6 +57,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _ttsSpeechRate = prefs.getDouble('tts_speech_rate') ?? 0.5;
         _ttsPitch = prefs.getDouble('tts_pitch') ?? 1.0;
         _liveModels = widget.aiService.cachedModels;
+        _floatingIconEnabled = prefs.getBool('floating_icon_enabled') ?? true;
       });
     }
   }
@@ -200,9 +201,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withOpacity(0.15),
+                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -297,9 +298,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1).withOpacity(0.1),
+                  color: const Color(0xFF6366F1).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF6366F1).withOpacity(0.3)),
+                  border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
@@ -340,7 +341,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Model Selection Dropdown
             if (_liveModels.isNotEmpty) ...[
               DropdownButtonFormField<String>(
-                value: _liveModels.contains(widget.aiService.model) ? widget.aiService.model : null,
+                initialValue: _liveModels.contains(widget.aiService.model) ? widget.aiService.model : null,
                 decoration: InputDecoration(
                   labelText: 'Select Active Model',
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -355,7 +356,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 onChanged: (val) {
                   if (val != null) {
                     widget.aiService.saveSettings(
-                      apiKey: widget.aiService.apiKey ?? '',
+                      apiKey: widget.aiService.apiKey,
                       baseUrl: widget.aiService.baseUrl,
                       model: val,
                     );
@@ -375,10 +376,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isActive ? const Color(0xFF10B981).withOpacity(0.08) : Colors.transparent,
+                  color: isActive ? const Color(0xFF10B981).withValues(alpha: 0.08) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isActive ? const Color(0xFF10B981).withOpacity(0.4) : (isDark ? Colors.white12 : Colors.black12),
+                    color: isActive ? const Color(0xFF10B981).withValues(alpha: 0.4) : (isDark ? Colors.white12 : Colors.black12),
                   ),
                 ),
                 child: Row(
@@ -419,7 +420,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -484,7 +485,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withOpacity(0.08),
+                color: const Color(0xFF10B981).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -542,9 +543,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.2)),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -562,7 +563,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -577,6 +578,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _buildDeviceAuthorityCard(bool isDark) {
     final shizukuActive = widget.shizukuService.isAvailable;
+    final rootActive = widget.shizukuService.isRootAvailable;
+    final authorityActive = shizukuActive || rootActive;
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -596,14 +599,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Icon(
-                shizukuActive ? Icons.verified_user_rounded : Icons.gavel_rounded,
-                color: shizukuActive ? const Color(0xFF10B981) : Colors.orangeAccent,
+                authorityActive ? Icons.verified_user_rounded : Icons.gavel_rounded,
+                color: authorityActive ? const Color(0xFF10B981) : Colors.orangeAccent,
               ),
               title: const Text('Shizuku System Authority'),
               subtitle: Text(
                 shizukuActive
                     ? 'Connected with elevated ADB permissions'
-                    : 'Not running — Using standard non-root intent controls',
+                    : rootActive
+                        ? 'Shizuku not running — using ROOT fallback'
+                        : 'Not running — Using standard non-root intent controls',
               ),
               trailing: ElevatedButton(
                 onPressed: () async {
@@ -624,9 +629,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (val && !_isOverlayPermissionGranted) {
                   await FlutterOverlayWindow.requestPermission();
                   await _checkOverlayPermission();
-                } else {
-                  setState(() => _floatingIconEnabled = val);
+                  if (!_isOverlayPermissionGranted) return;
                 }
+                setState(() => _floatingIconEnabled = val);
+                FeatureFlags.floatingIconEnabled = val;
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setBool('floating_icon_enabled', val);
               },
             ),
 
@@ -773,7 +781,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (_authService.userId != null) {
                       await widget.aiService.syncKeysToSupabase(_authService.userId!);
                     }
-                    if (mounted) {
+                    if (ctx.mounted) {
                       Navigator.pop(ctx);
                       setState(() {});
                     }
