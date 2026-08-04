@@ -1,0 +1,19 @@
+name = "aaa-supabase-keepalive"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+# Keep the Supabase project awake and snapshot the DB to R2 daily.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Heavy file storage: logical DB backups land under db-backup/
+[[r2_buckets]]
+binding = "BACKUPS"
+bucket_name = "aaa-r2"
+
+# Public (non-secret) config. The service_role key is injected as a secret:
+#   wrangler secret put SUPABASE_SERVICE_ROLE
+[vars]
+SUPABASE_URL = "https://sznibdidlqcumvgeinxy.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN6bmliZGlkbHFjdW12Z2Vpbnh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ3MjE0MjYsImV4cCI6MjEwMDI5NzQyNn0.0bbZ4ZLUSV9Es-Q-mvgsITiyn8zTCF9SZis4_V5B8lE"
+BACKUP_TABLES = "api_keys,chat_messages,chat_sessions,profiles,saved_skills,task_history,user_devices,user_settings"

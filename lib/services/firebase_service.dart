@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:developer' as developer;
@@ -5,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'chat_history_service.dart';
 
 /// Centralized Firebase integration for FCM, Firestore, and Storage.
 /// Complements Supabase — Firestore for real-time cross-device sync,
@@ -150,6 +152,64 @@ class FirebaseService {
       developer.log('Firestore message save error: $e', name: 'FirebaseService');
       return false;
     }
+  }
+
+  // ─── Firestore: Chat Backup (Firebase = backup layer) ───────────
+
+  /// Mirror every chat session to Firestore under `user_chats/<uid>/sessions`.
+  /// Called by BackupService so the user's chats exist in Firebase as well as
+  /// Supabase, surviving any single cloud outage.
+  static Future<bool> backupChatsToFirestore(
+    String userId,
+    List<ChatSession> sessions,
+  ) async {
+    try {
+      final col = _firestore
+          .collection('user_chats')
+          .doc(userId)
+          .collection('sessions');
+      await Future.wait(sessions.map((session) {
+        return col.doc(session.id).set(
+          {
+            'json': jsonEncode(session.toJson()),
+            'updated_at': FieldValue.serverTimestamp(),
+          },
+          SetOptions(merge: true),
+        );
+      }));
+      return true;
+    } catch (e) {
+      developer.log('Firestore chat backup error: $e', name: 'FirebaseService');
+      return false;
+    }
+  }
+
+  /// Load the chat sessions mirrored in Firestore for a user.
+  static Future<List<ChatSession>> restoreChatsFromFirestore(
+    String userId,
+  ) async {
+    final sessions = <ChatSession>[];
+    try {
+      final snap = await _firestore
+          .collection('user_chats')
+          .doc(userId)
+          .collection('sessions')
+          .get();
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        final json = data['json'];
+        if (json is String) {
+          try {
+            sessions.add(ChatSession.fromJson(jsonDecode(json)));
+          } catch (_) {
+            // skip malformed session
+          }
+        }
+      }
+    } catch (e) {
+      developer.log('Firestore chat restore error: $e', name: 'FirebaseService');
+    }
+    return sessions;
   }
 
   // ─── Firebase Storage (Heavy Files) ──────────────────────────────

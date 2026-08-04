@@ -5,6 +5,9 @@ import '../main.dart';
 import '../config/feature_flags.dart';
 import '../services/auth_service.dart';
 import '../services/ai_service.dart';
+import '../services/backup_service.dart';
+import '../services/chat_history_service.dart';
+import '../services/firebase_service.dart';
 import '../services/shizuku_service.dart';
 import '../services/screen_automation_service.dart';
 import '../services/telegram_service.dart';
@@ -40,6 +43,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   List<String> _liveModels = [];
   bool _isFetchingModels = false;
   bool _isSyncingKeys = false;
+  bool _isBackingUp = false;
+  bool _isRestoring = false;
+  bool _autoBackup = true;
 
   @override
   void initState() {
@@ -58,6 +64,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _ttsPitch = prefs.getDouble('tts_pitch') ?? 1.0;
         _liveModels = widget.aiService.cachedModels;
         _floatingIconEnabled = prefs.getBool('floating_icon_enabled') ?? true;
+        _autoBackup = prefs.getBool('auto_backup_enabled') ?? true;
       });
     }
   }
@@ -152,11 +159,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _buildCloudStorageCard(isDark),
               const SizedBox(height: 16),
 
-              // 5. DEVICE AUTOMATION & AUTHORITY
+              // 5. BACKUP & KEEP-ALIVE
+              _buildBackupCard(isDark),
+              const SizedBox(height: 16),
+
+              // 6. DEVICE AUTOMATION & AUTHORITY
               _buildDeviceAuthorityCard(isDark),
               const SizedBox(height: 16),
 
-              // 6. APP PREFERENCES & THEMING
+              // 7. APP PREFERENCES & THEMING
               _buildPreferencesCard(isDark),
               const SizedBox(height: 24),
             ],
@@ -537,6 +548,133 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildBackupCard(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.backup_rounded, color: Color(0xFF6366F1), size: 20),
+                SizedBox(width: 8),
+                Text('Backup & Keep-Alive', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Chats mirror to Firebase, JSON exports go to R2 + Supabase + '
+              'Firebase Storage, and a Cloudflare Worker keeps Supabase awake '
+              '24/7 and snapshots the database to R2 daily.',
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+            ),
+            const Divider(height: 20),
+
+            _buildCloudStatusItem(
+              'Cloudflare Worker',
+              'keepalive + daily DB snapshot',
+              const Color(0xFFF97316),
+            ),
+            const SizedBox(height: 12),
+
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: _isBackingUp ? null : _runBackup,
+                    icon: _isBackingUp
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.cloud_upload_rounded, size: 18),
+                    label: Text(_isBackingUp ? 'Backing up…' : 'Backup Now'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: _isRestoring ? null : _restoreFromCloud,
+                    icon: const Icon(Icons.cloud_download_rounded, size: 18),
+                    label: Text(_isRestoring ? 'Restoring…' : 'Restore'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: const Text('Auto-backup on chat save',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              subtitle: const Text(
+                'Mirror every chat session to Firestore automatically',
+                style: TextStyle(fontSize: 11),
+              ),
+              value: _autoBackup,
+              onChanged: _toggleAutoBackup,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _runBackup() async {
+    setState(() => _isBackingUp = true);
+    final result = await BackupService.backupNow(userId: _authService.userId);
+    if (!mounted) return;
+    setState(() => _isBackingUp = false);
+
+    final firestoreOk = result['firestore'] == true;
+    final fileOk = result['file'] is String;
+    final dbOk = result['db_snapshot'] is String;
+    final msg = firestoreOk && fileOk
+        ? 'Backup complete: Firestore ✓ R2/Supabase/Firebase ✓'
+        : dbOk
+            ? 'Backup saved to cloud (partial)'
+            : 'Backup failed — check cloud credentials';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: fileOk ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _restoreFromCloud() async {
+    setState(() => _isRestoring = true);
+    final restored = await BackupService.restoreFromCloud();
+    if (!mounted) return;
+    setState(() => _isRestoring = false);
+
+    final msg = restored < 0
+        ? 'No cloud backup found'
+        : restored == 0
+            ? 'Backup was empty — nothing restored'
+            : 'Restored $restored chat session(s)';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: restored >= 0 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _toggleAutoBackup(bool value) async {
+    setState(() => _autoBackup = value);
+    await BackupService.setAutoBackupEnabled(value);
+    final uid = _authService.userId;
+    if (value && uid != null) {
+      final sessions = await ChatHistoryService.loadSessions();
+      await FirebaseService.backupChatsToFirestore(uid, sessions);
+    }
   }
 
   Widget _buildCloudStatusItem(String title, String subtitle, Color color) {

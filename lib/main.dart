@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -10,7 +11,9 @@ import 'dart:developer';
 import 'config/feature_flags.dart';
 import 'config/supabase_config.dart';
 import 'services/auth_service.dart';
+import 'services/cloudflare_service.dart';
 import 'services/firebase_service.dart';
+import 'services/storage_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
 import 'screens/login_screen.dart';
@@ -74,6 +77,15 @@ void main() async {
     await SupabaseConfig.init();
   } catch (e) {
     log('Supabase initialization warning: $e');
+  }
+
+  // Load storage credentials and wake the Supabase project via the
+  // Cloudflare keep-alive worker (fire-and-forget).
+  try {
+    await StorageService.init();
+    unawaited(CloudflareService.pingKeepalive());
+  } catch (e) {
+    log('Storage/keepalive initialization warning: $e');
   }
 
   if (FeatureFlags.floatingOverlayEnabled) {

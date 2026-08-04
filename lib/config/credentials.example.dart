@@ -10,8 +10,9 @@ class AppCredentials {
   static const String r2AuthEmail = 'your_cloudflare_email';
   static const String r2GlobalKey = 'your_cloudflare_api_key';
 
-  /// Supabase service-role key. Only used for privileged admin operations.
+  /// Supabase management-API personal access token. Only used for privileged
+  /// admin operations against api.supabase.com (NOT a PostgREST client key).
   /// The app's normal client flows use the public anon key in
   /// `supabase_config.dart`.
-  static const String supabaseServiceRoleKey = '';
+  static const String supabaseManagementToken = '';
 }

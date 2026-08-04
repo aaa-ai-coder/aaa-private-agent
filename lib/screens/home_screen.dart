@@ -9,6 +9,7 @@ import '../models/chat_message.dart';
 import '../models/language_config.dart';
 import '../services/ai_service.dart';
 import '../services/action_handler.dart';
+import '../services/backup_service.dart';
 import '../services/voice_service.dart';
 import '../services/database_service.dart';
 import '../widgets/message_bubble.dart';
@@ -135,6 +136,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       messages: _messages.map((m) => m.toJson()).toList(),
     );
     await ChatHistoryService.saveSession(session);
+
+    // Fire-and-forget: mirror to Firebase when auto-backup is enabled.
+    await BackupService.maybeAutoBackup(userId);
   }
 
   /// Wraps [_saveSession] so a Supabase sync failure can never block the chat

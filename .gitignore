@@ -62,4 +62,6 @@ firebase-service-account.json
 
 # Never commit real credentials
 lib/config/credentials.dart
+workers/**/.dev.vars
+workers/**/.wrangler/
 
