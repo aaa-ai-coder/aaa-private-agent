@@ -41,7 +41,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   final TextEditingController _textController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final AiService _aiService = AiService();
+  final AiService _aiService = AiService.instance;
   final ActionHandler _actionHandler = ActionHandler();
   final VoiceService _voiceService = VoiceService();
   final NotificationService _notificationService = NotificationService();

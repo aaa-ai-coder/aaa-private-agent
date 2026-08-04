@@ -50,7 +50,7 @@ class _OverlayAppState extends State<OverlayApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _speech.initialize();
 
-    _aiService = AiService();
+    _aiService = AiService.instance;
     _screenService = ScreenAutomationService();
     _appLauncher = AppLauncherService();
     _shizukuService = ShizukuService();

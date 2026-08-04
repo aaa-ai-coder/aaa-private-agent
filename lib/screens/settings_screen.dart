@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../config/feature_flags.dart';
+import '../services/app_lock_service.dart';
 import '../services/auth_service.dart';
 import '../services/ai_service.dart';
 import '../services/backup_service.dart';
@@ -13,8 +15,11 @@ import '../services/firebase_service.dart';
 import '../services/shizuku_service.dart';
 import '../services/screen_automation_service.dart';
 import '../services/telegram_service.dart';
+import '../services/storage_service.dart';
 import '../models/api_key_config.dart';
 import 'task_history_screen.dart';
+import 'accounts_screen.dart';
+import 'app_lock_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -50,6 +55,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isCleaning = false;
   bool _autoBackup = true;
   int _retentionDays = 30;
+  bool _appLockEnabled = false;
 
   @override
   void initState() {
@@ -61,6 +67,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadVoiceSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    final appLockEnabled = await AppLockService.isEnabled();
     if (mounted) {
       setState(() {
         _autoReadTts = prefs.getBool('auto_read_tts') ?? true;
@@ -70,6 +77,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _floatingIconEnabled = prefs.getBool('floating_icon_enabled') ?? true;
         _autoBackup = prefs.getBool('auto_backup_enabled') ?? true;
         _retentionDays = prefs.getInt(RetentionService.retentionDaysKey) ?? 30;
+        _appLockEnabled = appLockEnabled;
       });
     }
   }
@@ -150,6 +158,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               // 1. ACCOUNT & CLOUD SYNC HEADER
               _buildAccountCard(isDark),
+              const SizedBox(height: 16),
+
+              // 1b. ACCOUNTS & CLOUD HEALTH
+              _buildAccountsHealthCard(isDark),
+              const SizedBox(height: 16),
+
+              // 1c. SECURITY & PRIVACY
+              _buildSecurityCard(isDark),
               const SizedBox(height: 16),
 
               // 2. AI PROVIDER & SAVED KEYS
@@ -275,6 +291,139 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+  }
+
+  Widget _buildAccountsHealthCard(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.troubleshoot_rounded, color: Color(0xFF22D3EE), size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Accounts & Cloud Health',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Live status for every connected service: AI provider, Supabase, '
+              'Firebase, FCM, keep-alive Worker, R2 and Telegram.',
+              style: TextStyle(fontSize: 12, color: isDark ? Colors.white60 : Colors.black54),
+            ),
+            const Divider(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _openAccounts,
+                icon: const Icon(Icons.health_and_safety_rounded, size: 18),
+                label: const Text('Open Accounts & Health'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecurityCard(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.shield_rounded, color: Color(0xFF34D399), size: 20),
+                SizedBox(width: 8),
+                Text(
+                  'Security & Privacy',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ],
+            ),
+            const Divider(height: 20),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('App Lock (PIN)'),
+              subtitle: Text(
+                _appLockEnabled
+                    ? 'App locks when backgrounded'
+                    : 'Protect chats & keys with a 6-digit PIN',
+              ),
+              value: _appLockEnabled,
+              onChanged: _toggleAppLock,
+            ),
+            if (_appLockEnabled) ...[
+              const SizedBox(height: 4),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                leading: const Icon(Icons.password_rounded, color: Color(0xFF34D399)),
+                title: const Text('Change PIN'),
+                subtitle: const Text('Set a new 6-digit unlock code'),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: _changePin,
+              ),
+            ],
+            const SizedBox(height: 4),
+            Text(
+              'Your PIN is stored as a salted SHA-256 hash on this device only. '
+              'Use a code you will remember.',
+              style: TextStyle(fontSize: 11, color: isDark ? Colors.white54 : Colors.black54),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openAccounts() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => AccountsScreen(
+          aiService: widget.aiService,
+          telegramService: widget.telegramService,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _toggleAppLock(bool value) async {
+    if (value) {
+      // Enabling → run the setup flow (enter + confirm a new PIN).
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute(builder: (_) => const AppLockScreen(setupMode: true)),
+      );
+      if (saved == true && mounted) {
+        setState(() => _appLockEnabled = true);
+      }
+      return;
+    }
+    // Disabling → require the current PIN first.
+    final verified = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const AppLockScreen()),
+    );
+    if (verified == true && mounted) {
+      await AppLockService.disable();
+      setState(() => _appLockEnabled = false);
+    }
+  }
+
+  Future<void> _changePin() async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => const AppLockScreen(setupMode: true)),
+    );
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('PIN updated successfully')),
+      );
+    }
   }
 
   Widget _buildAiProviderCard(bool isDark) {
@@ -544,11 +693,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const Divider(height: 20),
 
-            _buildCloudStatusItem('Cloudflare R2 Storage', 'aaa-r2 bucket', const Color(0xFFF97316)),
+            _buildCloudStatusItem(
+              'Cloudflare R2 Storage',
+              'aaa-r2 bucket',
+              const Color(0xFFF97316),
+              status: StorageService.isConfigured ? 'Configured' : 'Off',
+            ),
             const SizedBox(height: 8),
-            _buildCloudStatusItem('Supabase Storage', 'aaa-backups bucket', const Color(0xFF10B981)),
+            _buildCloudStatusItem(
+              'Supabase Storage',
+              'aaa-backups bucket',
+              const Color(0xFF10B981),
+              status: _authService.isLoggedIn ? 'Synced' : 'Signed out',
+            ),
             const SizedBox(height: 8),
-            _buildCloudStatusItem('Firebase Storage', 'aaa-infinity-ai bucket', const Color(0xFFF59E0B)),
+            _buildCloudStatusItem(
+              'Firebase Storage',
+              'aaa-infinity-ai bucket',
+              const Color(0xFFF59E0B),
+              status: Firebase.apps.isNotEmpty ? 'Active' : 'Not set up',
+            ),
           ],
         ),
       ),
@@ -755,7 +919,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  Widget _buildCloudStatusItem(String title, String subtitle, Color color) {
+  Widget _buildCloudStatusItem(
+    String title,
+    String subtitle,
+    Color color, {
+    String status = 'Connected',
+  }) {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -765,7 +934,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ),
       child: Row(
         children: [
-          Icon(Icons.check_circle_rounded, color: color, size: 18),
+          Icon(Icons.circle_rounded, color: color, size: 12),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -783,7 +952,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
-              'Connected',
+              status,
               style: TextStyle(color: color, fontSize: 10.5, fontWeight: FontWeight.bold),
             ),
           ),
@@ -903,7 +1072,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             Center(
               child: Text(
-                'AAA Private Agent v2.5 • Autonomous Operator',
+                'AAA Private Agent v2.0 • Nebula Edition',
                 style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.black38),
               ),
             ),

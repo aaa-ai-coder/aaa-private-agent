@@ -20,6 +20,12 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
 - Automated backup cleanup: the Cloudflare Worker drops R2 DB snapshots
   older than 30 days on its daily schedule
 - Dark/Light theme with Material 3
+- Nebula design language: unified light/dark theme across the whole app
+- PIN App Lock: salted SHA-256 PIN, auto-locks when the app is backgrounded
+- Accounts & Cloud Health screen: live status for AI, Supabase, Firebase, FCM,
+  keep-alive Worker, R2 and Telegram with one-tap R2/Telegram configuration
+- Keyless free AI by default (Pollinations) with anonymous `X-User-ID` to beat
+  rate limits, plus ARI failover to your own keys when configured
 
 ## Setup
 

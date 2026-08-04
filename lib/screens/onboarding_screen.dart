@@ -22,7 +22,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   final PageController _pageController = PageController();
   final ScreenAutomationService _screenAutomationService =
       ScreenAutomationService();
-  final AiService _aiService = AiService();
+  final AiService _aiService = AiService.instance;
 
   int _currentStep = 0;
   bool _isAccessibilityGranted = false;
@@ -665,7 +665,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           _buildFeatureCard(
             Icons.vpn_key_outlined,
             'Local & Private',
-            'Full support for local-first execution. Keys remain encrypted locally.',
+            'Local-first execution. Keys live on your device and sync only to your private Supabase account.',
             isDark,
           ),
           const SizedBox(height: 12),

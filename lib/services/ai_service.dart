@@ -64,6 +64,26 @@ class AiService {
   /// True when the active endpoint is the free keyless backend.
   bool get _isKeyless => _baseUrl.trim().contains('text.pollinations.ai');
 
+  String? _pollinationsUserId;
+
+  /// Stable anonymous identity for the keyless backend. Pollinations uses this
+  /// header to treat requests as a single user instead of throwing every call
+  /// into the anonymous rate-limit pool.
+  Future<String> _getAnonymousUserId() async {
+    if (_pollinationsUserId != null) return _pollinationsUserId!;
+    final prefs = await SharedPreferences.getInstance();
+    var id = prefs.getString('pollinations_user_id');
+    if (id == null || id.isEmpty) {
+      final r = Random.secure();
+      id = List.generate(16, (_) {
+        return r.nextInt(256).toRadixString(16).padLeft(2, '0');
+      }).join();
+      await prefs.setString('pollinations_user_id', id);
+    }
+    _pollinationsUserId = id;
+    return id;
+  }
+
   static List<String> filterNvidiaFreeModels(Iterable<String> models) {
     final availableModels = models.toSet();
     return nvidiaFreeChatModels
@@ -669,6 +689,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
               'Content-Type': 'application/json',
               if (_apiKey != null && _apiKey!.isNotEmpty)
                 'Authorization': 'Bearer $_apiKey',
+              if (_isKeyless) 'X-User-ID': await _getAnonymousUserId(),
               'HTTP-Referer': 'https://github.com/aaa-ai-coder/aaa-private-agent',
               'X-Title': 'AAA Private Agent',
             },
@@ -814,6 +835,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
                 'Content-Type': 'application/json',
                 if (_apiKey != null && _apiKey!.isNotEmpty)
                   'Authorization': 'Bearer $_apiKey',
+                if (_isKeyless) 'X-User-ID': await _getAnonymousUserId(),
                 'HTTP-Referer': 'https://github.com/aaa-ai-coder/aaa-private-agent',
                 'X-Title': 'PrivateAgent',
               },

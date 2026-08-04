@@ -56,6 +56,11 @@ class StorageService {
       (_apiToken.isNotEmpty ||
           (_authEmail.isNotEmpty && _globalKey.isNotEmpty));
 
+  static String get accountId => _accountId;
+  static String get bucketName => _bucketName;
+  static String get authEmail => _authEmail;
+  static String get apiToken => _apiToken;
+
   static String get _baseEndpoint =>
       'https://api.cloudflare.com/client/v4/accounts/$_accountId/r2/buckets/$_bucketName/objects';
 

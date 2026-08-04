@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/api_key_config.dart';
 
 class AriProviderConfig {
@@ -20,6 +22,23 @@ class AriProviderConfig {
 
 class AriAiEngine {
   static final AriAiEngine instance = AriAiEngine();
+
+  static const String _userIdPrefsKey = 'pollinations_user_id';
+
+  /// Stable anonymous identity shared with AiService so the keyless backend
+  /// recognizes the same user across every request.
+  Future<String> _anonymousUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    var id = prefs.getString(_userIdPrefsKey);
+    if (id == null || id.isEmpty) {
+      final r = Random.secure();
+      id = List.generate(16, (_) {
+        return r.nextInt(256).toRadixString(16).padLeft(2, '0');
+      }).join();
+      await prefs.setString(_userIdPrefsKey, id);
+    }
+    return id;
+  }
 
   /// Execute streaming chat completion using the user-configured API key.
   /// When no usable key is configured (or the configured provider fails), the
@@ -63,6 +82,7 @@ class AriAiEngine {
           'Content-Type': 'application/json',
           if (provider.apiKey != null && provider.apiKey!.isNotEmpty)
             'Authorization': 'Bearer ${provider.apiKey}',
+          if (provider.apiKey == null) 'X-User-ID': await _anonymousUserId(),
           'HTTP-Referer': 'https://github.com/aaa-ai-coder/aaa-private-agent',
           'X-Title': 'ARI AI Engine',
         };
