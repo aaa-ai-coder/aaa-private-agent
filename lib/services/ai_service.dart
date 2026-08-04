@@ -127,6 +127,13 @@ class AiService {
   static const String _keysCacheKey = 'api_keys_cache';
   List<ApiKeyConfig> _apiKeys = [];
 
+  /// User id keys are permanently synced to Supabase for (null when signed out).
+  String? _syncUserId;
+
+  /// Bind (or unbind, with null) the signed-in user so every key mutation is
+  /// persisted to Supabase permanently, not only cached on the device.
+  void setSyncUserId(String? userId) => _syncUserId = userId;
+
   /// All configured API keys
   List<ApiKeyConfig> get allKeys => List.unmodifiable(_apiKeys);
 
@@ -194,6 +201,7 @@ class AiService {
       _applyActiveKeyFromList();
     }
     await _saveKeysCache();
+    await _syncKeyToSupabase(newKey);
   }
 
   /// Update an existing API key configuration
@@ -211,6 +219,7 @@ class AiService {
       _applyActiveKeyFromList();
     }
     await _saveKeysCache();
+    await _syncKeyToSupabase(updated);
   }
 
   /// Delete an API key by ID
@@ -224,6 +233,15 @@ class AiService {
     }
     _applyActiveKeyFromList();
     await _saveKeysCache();
+
+    final userId = _syncUserId;
+    if (userId != null) {
+      try {
+        await DatabaseService.deleteApiKey(id);
+      } catch (e) {
+        developer.log('Failed to delete key $id from Supabase: $e', name: 'AiService');
+      }
+    }
   }
 
   /// Set the active API key by ID
@@ -237,6 +255,26 @@ class AiService {
     if (found) {
       _applyActiveKeyFromList();
       await _saveKeysCache();
+
+      final userId = _syncUserId;
+      if (userId != null) {
+        try {
+          await DatabaseService.setActiveApiKey(userId, id);
+        } catch (e) {
+          developer.log('Failed to activate key $id in Supabase: $e', name: 'AiService');
+        }
+      }
+    }
+  }
+
+  /// Persist a single key to Supabase permanently for the signed-in user.
+  Future<void> _syncKeyToSupabase(ApiKeyConfig key) async {
+    final userId = _syncUserId;
+    if (userId == null) return;
+    try {
+      await DatabaseService.saveApiKey(userId: userId, key: key);
+    } catch (e) {
+      developer.log('Failed to sync key ${key.id} to Supabase: $e', name: 'AiService');
     }
   }
 

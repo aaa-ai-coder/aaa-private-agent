@@ -45,6 +45,27 @@ class DatabaseService {
     await _db.from('chat_sessions').delete().eq('id', sessionId);
   }
 
+  /// Deletes chat sessions (and their messages) created before [cutoff] for
+  /// [userId]. Returns the number of sessions removed.
+  static Future<int> pruneOldChats(String userId, DateTime cutoff) async {
+    try {
+      final expired = await _db
+          .from('chat_sessions')
+          .select('id')
+          .eq('user_id', userId)
+          .lt('created_at', cutoff.toIso8601String());
+      final ids = expired.map((e) => e['id'] as String).toList();
+      if (ids.isEmpty) return 0;
+
+      await _db.from('chat_messages').delete().inFilter('session_id', ids);
+      await _db.from('chat_sessions').delete().inFilter('id', ids);
+      return ids.length;
+    } catch (e) {
+      developer.log('Error pruning old chats: $e', name: 'DatabaseService');
+      return 0;
+    }
+  }
+
   // ─── Chat Messages ──────────────────────────────────────────────
 
   static Future<List<Map<String, dynamic>>> getMessages(

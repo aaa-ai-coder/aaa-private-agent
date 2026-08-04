@@ -212,6 +212,48 @@ class FirebaseService {
     return sessions;
   }
 
+  /// Deletes Firestore mirror sessions last modified before [cutoff].
+  /// Returns the number of sessions removed.
+  static Future<int> pruneOldChatSessions(
+    String userId,
+    DateTime cutoff,
+  ) async {
+    try {
+      final col = _firestore
+          .collection('user_chats')
+          .doc(userId)
+          .collection('sessions');
+      final snap = await col.get();
+      if (snap.docs.isEmpty) return 0;
+
+      final batch = _firestore.batch();
+      int pruned = 0;
+      for (final doc in snap.docs) {
+        final data = doc.data();
+        DateTime? ts;
+        final json = data['json'];
+        if (json is String) {
+          try {
+            final parsed = jsonDecode(json) as Map<String, dynamic>;
+            final raw = parsed['timestamp'];
+            if (raw is String) ts = DateTime.tryParse(raw);
+          } catch (_) {
+            // skip malformed session
+          }
+        }
+        if (ts == null) continue;
+        if (!ts.isBefore(cutoff)) continue;
+        batch.delete(doc.reference);
+        pruned++;
+      }
+      if (pruned > 0) await batch.commit();
+      return pruned;
+    } catch (e) {
+      developer.log('Firestore chat prune error: $e', name: 'FirebaseService');
+      return 0;
+    }
+  }
+
   // ─── Firebase Storage (Heavy Files) ──────────────────────────────
 
   /// Upload bytes directly to Firebase Storage.

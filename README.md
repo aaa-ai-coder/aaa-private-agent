@@ -14,6 +14,11 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
 - Multi-provider AI (Groq, NVIDIA, Ollama Cloud, DeepSeek, local)
 - Multi-turn conversation with streaming
 - Task history and analytics
+- Automated data retention: auto-deletes chat history older than the
+  configured window from the device, Supabase and the Firebase mirror
+- API keys saved permanently to Supabase (synced on every add/update/delete)
+- Automated backup cleanup: the Cloudflare Worker drops R2 DB snapshots
+  older than 30 days on its daily schedule
 - Dark/Light theme with Material 3
 
 ## Setup

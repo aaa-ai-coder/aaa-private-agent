@@ -48,6 +48,23 @@ class CloudflareService {
     }
   }
 
+  /// Ask the Worker to delete expired R2 DB snapshots (older than the
+  /// configured retention window). `dryRun` previews without deleting.
+  /// Returns the cleanup summary (e.g. `{deleted: 3, removed: [...]}`).
+  static Future<Map<String, dynamic>?> triggerCleanup({bool dryRun = false}) async {
+    try {
+      final res = await http
+          .get(Uri.parse('$_baseUrl/cleanup?dryRun=${dryRun ? '1' : '0'}'))
+          .timeout(const Duration(seconds: 60));
+      if (res.statusCode != 200) return null;
+      final json = jsonDecode(res.body) as Map<String, dynamic>;
+      return json['ok'] == true ? json : null;
+    } catch (e) {
+      developer.log('Trigger cleanup error: $e', name: 'CloudflareService');
+      return null;
+    }
+  }
+
   /// Ask the Worker for its latest status.
   static Future<Map<String, dynamic>?> status() async {
     try {

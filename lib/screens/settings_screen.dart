@@ -6,6 +6,8 @@ import '../config/feature_flags.dart';
 import '../services/auth_service.dart';
 import '../services/ai_service.dart';
 import '../services/backup_service.dart';
+import '../services/cloudflare_service.dart';
+import '../services/retention_service.dart';
 import '../services/chat_history_service.dart';
 import '../services/firebase_service.dart';
 import '../services/shizuku_service.dart';
@@ -45,7 +47,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _isSyncingKeys = false;
   bool _isBackingUp = false;
   bool _isRestoring = false;
+  bool _isCleaning = false;
   bool _autoBackup = true;
+  int _retentionDays = 30;
 
   @override
   void initState() {
@@ -65,6 +69,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _liveModels = widget.aiService.cachedModels;
         _floatingIconEnabled = prefs.getBool('floating_icon_enabled') ?? true;
         _autoBackup = prefs.getBool('auto_backup_enabled') ?? true;
+        _retentionDays = prefs.getInt(RetentionService.retentionDaysKey) ?? 30;
       });
     }
   }
@@ -618,6 +623,55 @@ class _SettingsScreenState extends State<SettingsScreen> {
               value: _autoBackup,
               onChanged: _toggleAutoBackup,
             ),
+            const SizedBox(height: 4),
+            Text(
+              'Automated cleanup: the Worker deletes R2 DB snapshots older '
+              'than 30 days on its daily schedule.',
+              style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54),
+            ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: _isCleaning ? null : _runCleanup,
+                icon: _isCleaning
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.cleaning_services_rounded, size: 18),
+                label: Text(_isCleaning ? 'Cleaning…' : 'Clean old backups'),
+              ),
+            ),
+            const Divider(height: 24),
+            Text(
+              'Auto-delete old chat history',
+              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Sessions older than the window are deleted from this device, '
+              'Supabase and the Firebase mirror automatically.',
+              style: TextStyle(fontSize: 11, color: isDark ? Colors.white60 : Colors.black54),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final option in const [
+                  (label: '7 days', days: 7),
+                  (label: '30 days', days: 30),
+                  (label: '90 days', days: 90),
+                  (label: 'Keep all', days: 0),
+                ])
+                  ChoiceChip(
+                    label: Text(option.label, style: const TextStyle(fontSize: 12)),
+                    selected: _retentionDays == option.days,
+                    onSelected: (_) => _setRetention(option.days),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
@@ -665,6 +719,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  Future<void> _runCleanup() async {
+    setState(() => _isCleaning = true);
+    final result = await CloudflareService.triggerCleanup();
+    if (!mounted) return;
+    setState(() => _isCleaning = false);
+
+    final deleted = result?['deleted'];
+    final msg = deleted is int
+        ? 'Cleanup done: $deleted expired snapshot(s) removed'
+        : 'Cleanup failed — check worker status';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg),
+        backgroundColor: deleted is int ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  Future<void> _setRetention(int days) async {
+    setState(() => _retentionDays = days);
+    await RetentionService.setRetentionDays(days);
   }
 
   Future<void> _toggleAutoBackup(bool value) async {

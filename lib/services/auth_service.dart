@@ -10,6 +10,7 @@ import 'package:supabase_flutter/supabase_flutter.dart' as sb;
 import '../config/supabase_config.dart';
 import 'firebase_service.dart';
 import 'ai_service.dart';
+import 'retention_service.dart';
 
 class AuthService extends ChangeNotifier {
   sb.User? _user;
@@ -41,7 +42,14 @@ class AuthService extends ChangeNotifier {
     ) {
       _user = data.session?.user;
       _session = data.session;
+      // API keys are permanently stored in Supabase; bind the user so every
+      // key mutation (add/update/delete/activate) is pushed to the cloud.
+      AiService.instance.setSyncUserId(_user?.id);
       _syncUserCloudKeys();
+      if (_user != null) {
+        // Apply the retention policy on every sign-in.
+        unawaited(RetentionService.runAutomatedCleanup());
+      }
       notifyListeners();
     });
   }
@@ -80,6 +88,7 @@ class AuthService extends ChangeNotifier {
   Future<void> _checkSession() async {
     _session = SupabaseConfig.client.auth.currentSession;
     _user = SupabaseConfig.client.auth.currentUser;
+    AiService.instance.setSyncUserId(_user?.id);
     _syncUserCloudKeys();
     notifyListeners();
   }

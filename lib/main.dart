@@ -13,6 +13,7 @@ import 'config/supabase_config.dart';
 import 'services/auth_service.dart';
 import 'services/cloudflare_service.dart';
 import 'services/firebase_service.dart';
+import 'services/retention_service.dart';
 import 'services/storage_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/onboarding_screen.dart';
@@ -87,6 +88,10 @@ void main() async {
   } catch (e) {
     log('Storage/keepalive initialization warning: $e');
   }
+
+  // Automated data lifecycle: prune chat history older than the retention
+  // window and ask the Worker to drop expired R2 snapshots (fire-and-forget).
+  unawaited(RetentionService.runAutomatedCleanup());
 
   if (FeatureFlags.floatingOverlayEnabled) {
     FlutterOverlayWindow.overlayListener.listen((event) {

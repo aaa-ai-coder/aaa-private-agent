@@ -10,11 +10,16 @@ Deployed at `https://aaa-supabase-keepalive.aaaai.workers.dev`.
 2. **Daily DB snapshot** — once per day exports every table through the REST
    API (service_role) and stores it in the `aaa-r2` bucket as
    `db-backup/YYYY-MM-DD.json` (a logical backup of all chat data).
+3. **Automated retention cleanup** — once per day deletes `db-backup/`
+   snapshots older than `BACKUP_RETENTION_DAYS` (default 30) so the bucket
+   never grows without bound.
 
 ## Routes
 
 - `GET /` — keepalive ping (the app calls this on startup).
 - `GET /backup` — on-demand full backup (`?force=1` to overwrite today's file).
+- `GET /cleanup` — delete expired snapshots. `?dryRun=1` previews without
+  deleting; `?days=N` overrides the retention window for this run.
 - `GET /health` — liveness probe.
 
 ## Deploy

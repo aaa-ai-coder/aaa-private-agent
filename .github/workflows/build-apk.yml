@@ -43,6 +43,7 @@ jobs:
             sed -i "s|your_cloudflare_account_id|${{ secrets.R2_ACCOUNT_ID }}|" lib/config/credentials.dart
             sed -i "s|your_cloudflare_email|${{ secrets.R2_AUTH_EMAIL }}|" lib/config/credentials.dart
             sed -i "s|your_cloudflare_api_key|${{ secrets.R2_GLOBAL_KEY }}|" lib/config/credentials.dart
+            sed -i "s|your_cloudflare_api_token|${{ secrets.R2_API_TOKEN }}|" lib/config/credentials.dart
             sed -i "s|aaa-r2|${{ secrets.R2_BUCKET_NAME }}|" lib/config/credentials.dart
           fi
 

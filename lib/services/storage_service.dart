@@ -18,6 +18,7 @@ class StorageService {
   static String _bucketName = AppCredentials.r2BucketName;
   static String _authEmail = AppCredentials.r2AuthEmail;
   static String _globalKey = AppCredentials.r2GlobalKey;
+  static String _apiToken = AppCredentials.r2ApiToken;
 
   static Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
@@ -25,6 +26,7 @@ class StorageService {
     _bucketName = prefs.getString('r2_bucket_name') ?? AppCredentials.r2BucketName;
     _authEmail = prefs.getString('r2_auth_email') ?? AppCredentials.r2AuthEmail;
     _globalKey = prefs.getString('r2_global_key') ?? AppCredentials.r2GlobalKey;
+    _apiToken = prefs.getString('r2_api_token') ?? AppCredentials.r2ApiToken;
   }
 
   static Future<void> saveConfig({
@@ -36,6 +38,7 @@ class StorageService {
     _accountId = accountId.trim();
     _bucketName = bucketName.trim();
     _globalKey = apiToken.trim();
+    _apiToken = apiToken.trim();
     if (authEmail.trim().isNotEmpty) _authEmail = authEmail.trim();
 
     final prefs = await SharedPreferences.getInstance();
@@ -43,22 +46,25 @@ class StorageService {
     await prefs.setString('r2_bucket_name', _bucketName);
     await prefs.setString('r2_auth_email', _authEmail);
     await prefs.setString('r2_global_key', _globalKey);
+    await prefs.setString('r2_api_token', _apiToken);
   }
 
   /// Whether Cloudflare R2 credentials have been provided by the user.
   static bool get isConfigured =>
       _accountId.isNotEmpty &&
       _bucketName.isNotEmpty &&
-      _authEmail.isNotEmpty &&
-      _globalKey.isNotEmpty;
+      (_apiToken.isNotEmpty ||
+          (_authEmail.isNotEmpty && _globalKey.isNotEmpty));
 
   static String get _baseEndpoint =>
       'https://api.cloudflare.com/client/v4/accounts/$_accountId/r2/buckets/$_bucketName/objects';
 
-  static Map<String, String> get _authHeaders => {
-        'X-Auth-Email': _authEmail,
-        'X-Auth-Key': _globalKey,
-      };
+  static Map<String, String> get _authHeaders => _apiToken.isNotEmpty
+      ? {'Authorization': 'Bearer $_apiToken'}
+      : {
+          'X-Auth-Email': _authEmail,
+          'X-Auth-Key': _globalKey,
+        };
 
   /// Upload a file simultaneously to Cloudflare R2, Supabase Storage, and Firebase Storage.
   /// Returns the primary public URL on success.

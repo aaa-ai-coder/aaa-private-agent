@@ -138,6 +138,27 @@ class ChatHistoryService {
     }
   }
 
+  /// Deletes every local session last modified before [cutoff].
+  /// Returns the number of sessions removed.
+  static Future<int> deleteSessionsOlderThan(DateTime cutoff) async {
+    try {
+      final file = await _localFile;
+      final sessions = await loadSessions();
+      if (sessions.isEmpty) return 0;
+
+      final before = sessions.length;
+      sessions.removeWhere((s) => s.timestamp.isBefore(cutoff));
+
+      if (sessions.length == before) return 0;
+      final jsonList = sessions.map((s) => s.toJson()).toList();
+      await file.writeAsString(jsonEncode(jsonList));
+      return before - sessions.length;
+    } catch (e) {
+      developer.log('Error pruning old chat sessions: $e', name: 'ChatHistory');
+      return 0;
+    }
+  }
+
   /// Clears all saved chat sessions.
   static Future<void> clearAll() async {
     try {
