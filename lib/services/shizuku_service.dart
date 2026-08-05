@@ -230,6 +230,57 @@ class ShizukuService {
     return runCommand('input keyevent KEYCODE_POWER');
   }
 
+  /// Wake the screen (does not unlock)
+  Future<String> wakeScreen() async {
+    return runCommand('input keyevent KEYCODE_WAKEUP');
+  }
+
+  /// Go to the launcher home screen
+  Future<String> goHome() async {
+    return runCommand('input keyevent KEYCODE_HOME');
+  }
+
+  /// Open the recent-apps overview
+  Future<String> openRecentApps() async {
+    return runCommand('input keyevent KEYCODE_APP_SWITCH');
+  }
+
+  /// Toggle airplane mode (needs WRITE_SECURE_SETTINGS / root)
+  Future<String> toggleAirplaneMode(bool enable) async {
+    final onOff = enable ? '1' : '0';
+    return runCommand(
+      'settings put global airplane_mode_on $onOff && '
+      'am broadcast -a android.intent.action.AIRPLANE_MODE --ez state $enable',
+    );
+  }
+
+  /// Best-effort toggle for the portable Wi-Fi hotspot.
+  Future<String> toggleHotspot(bool enable) async {
+    return runCommand(
+      'cmd wifi ${enable ? 'start' : 'stop'}-hotspot 2>/dev/null || '
+      'echo "Hotspot toggle not supported on this Android version."',
+    );
+  }
+
+  /// Toggle Do Not Disturb (zen mode). 1=off, 2=total silence.
+  Future<String> toggleDnd(bool enable) async {
+    return runCommand('settings put global zen_mode ${enable ? '2' : '0'}');
+  }
+
+  /// Enable/disable auto-rotate using the accelerometer.
+  Future<String> setAutoRotate(bool enable) async {
+    return runCommand(
+      'settings put system accelerometer_rotation ${enable ? '1' : '0'}',
+    );
+  }
+
+  /// Clear all active notifications.
+  Future<String> clearNotifications() async {
+    return runCommand('cmd notification cancel_all 2>/dev/null || '
+        'service call notification 1 i32 0 2>/dev/null || '
+        'echo "Could not clear notifications."');
+  }
+
   /// Take a screenshot (saves to /sdcard/)
   Future<String> takeScreenshot() async {
     final timestamp = DateTime.now().millisecondsSinceEpoch;

@@ -34,6 +34,13 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
   streaming adapter; add a Puter token in Settings for higher limits
 - Long-press any chat message: copy, speak aloud, regenerate the AI response or
   delete the message (history stays coherent after edits)
+- Phone Control Panel: one-tap grid for WiFi, Bluetooth, mobile data, airplane
+  mode, hotspot, DND, auto-rotate, volume/brightness, media, ringer, wake, lock,
+  screenshot, home, recent apps, clear notifications and WiFi scan - the same
+  action pipeline the AI agent uses
+- Expanded phone automation: wake screen, go home, recent apps, airplane mode,
+  hotspot, Do Not Disturb, auto-rotate, clear notifications, saved WiFi
+  password retrieval and arbitrary ADB shell commands (Shizuku/root)
 
 ## Setup
 

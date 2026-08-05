@@ -176,6 +176,52 @@ class ActionHandler {
           result = await _shizuku.lockScreen();
           break;
 
+        case 'wake_screen':
+          result = await _shizuku.wakeScreen();
+          break;
+
+        case 'go_home':
+          result = await _shizuku.goHome();
+          break;
+
+        case 'open_recent_apps':
+          result = await _shizuku.openRecentApps();
+          break;
+
+        case 'toggle_airplane_mode':
+          result = await _shizuku.toggleAirplaneMode(
+            action.params['enable'] as bool? ?? true,
+          );
+          break;
+
+        case 'toggle_hotspot':
+          result = await _shizuku.toggleHotspot(
+            action.params['enable'] as bool? ?? true,
+          );
+          break;
+
+        case 'toggle_dnd':
+          result = await _shizuku.toggleDnd(
+            action.params['enable'] as bool? ?? true,
+          );
+          break;
+
+        case 'set_auto_rotate':
+          result = await _shizuku.setAutoRotate(
+            action.params['enable'] as bool? ?? true,
+          );
+          break;
+
+        case 'clear_notifications':
+          result = await _shizuku.clearNotifications();
+          break;
+
+        case 'get_wifi_password':
+          result = await _shizuku.getWifiPassword(
+            action.params['ssid'] as String? ?? '',
+          );
+          break;
+
         case 'take_screenshot':
           result = await _shizuku.takeScreenshot();
           break;
@@ -340,6 +386,10 @@ class ActionHandler {
 
         case 'get_battery':
           result = await _deviceInfo.getBatteryLevel();
+          break;
+
+        case 'get_memory':
+          result = await _deviceInfo.getMemoryInfo();
           break;
 
         case 'get_storage':

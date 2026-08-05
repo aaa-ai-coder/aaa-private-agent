@@ -401,16 +401,26 @@ No surrounding markdown block code fences, no introductory or trailing text arou
 - set_alarm: {"hour": 7, "minute": 30, "label": "Wake up"} - Set alarm
 - set_timer: {"seconds": 300, "label": "Pasta"} - Set timer
 - lock_screen: {} - Lock the device
+- wake_screen: {} - Wake/turn on the screen
+- go_home: {} - Go to the launcher home screen
+- open_recent_apps: {} - Open recent-apps overview
 - take_screenshot: {} - Take screenshot and save to storage
 - set_ringer_mode: {"mode": 2} - 0=silent, 1=vibrate, 2=normal
+- toggle_dnd: {"enable": true} - Turn Do Not Disturb on/off
+- set_auto_rotate: {"enable": true} - Turn auto-rotate on/off
+- clear_notifications: {} - Dismiss all active notifications
+- run_adb_command: {"command": "settings put global ..."} - Run ANY arbitrary ADB/shell command via Shizuku or root
 
 📶 NETWORK & CONNECTIVITY
 - scan_wifi: {} - Scan and list ALL available WiFi networks
 - connect_wifi: {"ssid": "MyWiFi", "password": "pass123"} - Connect to a WiFi network
 - get_current_wifi: {} - Show current WiFi network name
+- get_wifi_password: {"ssid": "MyWiFi"} - Retrieve a saved WiFi password (root/Shizuku)
 - toggle_wifi: {"enable": true} - Turn WiFi on or off
 - toggle_mobile_data: {"enable": true} - Turn mobile data on or off
 - toggle_bluetooth: {"enable": true} - Turn Bluetooth on or off
+- toggle_airplane_mode: {"enable": true} - Turn airplane mode on or off
+- toggle_hotspot: {"enable": true} - Turn the Wi-Fi hotspot on or off
 
 🗂️ APP MANAGEMENT (Root / Shizuku / ADB)
 - force_stop_app: {"package_name": "com.example"} - Force stop running app

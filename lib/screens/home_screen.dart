@@ -29,6 +29,7 @@ import '../services/storage_service.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
 import 'accounts_screen.dart';
+import 'control_panel_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:share_plus/share_plus.dart';
 import '../main.dart';
@@ -766,6 +767,22 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             icon: const Icon(Icons.add_comment_outlined),
             tooltip: 'New chat',
             onPressed: _isLoading ? null : _startNewChat,
+          ),
+          IconButton(
+            icon: const Icon(Icons.tune_rounded),
+            tooltip: 'Phone Control Panel',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => ControlPanelScreen(
+                    actionHandler: _actionHandler,
+                  ),
+                ),
+              );
+              await _actionHandler.shizuku.checkAvailability();
+              if (mounted) setState(() {});
+            },
           ),
           // Settings Action
           IconButton(
