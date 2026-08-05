@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:local_auth/local_auth.dart';
 import '../services/app_lock_service.dart';
 import '../theme/app_theme.dart';
 
@@ -36,6 +37,35 @@ class _AppLockScreenState extends State<AppLockScreen>
       vsync: this,
       duration: const Duration(milliseconds: 420),
     );
+    if (!widget.setupMode) {
+      _tryBiometricUnlock();
+    }
+  }
+
+  /// If the user enabled fingerprint/face unlock, offer it immediately.
+  Future<void> _tryBiometricUnlock() async {
+    try {
+      if (!await AppLockService.isBiometricsEnabled()) return;
+      final auth = LocalAuthentication();
+      final canCheck = await auth.canCheckBiometrics;
+      final isDeviceSupported = await auth.isDeviceSupported();
+      if (!canCheck || !isDeviceSupported || !mounted) return;
+      final success = await auth.authenticate(
+        localizedReason: 'Unlock AAA Private Agent',
+        options: const AuthenticationOptions(
+          stickyAuth: true,
+          biometricOnly: true,
+        ),
+      );
+      if (success && mounted) {
+        AppLockService.unlock();
+        HapticFeedback.mediumImpact();
+        Navigator.of(context).pop(true);
+        widget.onUnlocked?.call();
+      }
+    } catch (_) {
+      // Fall through to the PIN pad.
+    }
   }
 
   @override

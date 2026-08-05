@@ -56,6 +56,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _autoBackup = true;
   int _retentionDays = 30;
   bool _appLockEnabled = false;
+  bool _biometricsEnabled = false;
 
   @override
   void initState() {
@@ -68,6 +69,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _loadVoiceSettings() async {
     final prefs = await SharedPreferences.getInstance();
     final appLockEnabled = await AppLockService.isEnabled();
+    final biometricsEnabled = await AppLockService.isBiometricsEnabled();
     if (mounted) {
       setState(() {
         _autoReadTts = prefs.getBool('auto_read_tts') ?? true;
@@ -78,6 +80,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _autoBackup = prefs.getBool('auto_backup_enabled') ?? true;
         _retentionDays = prefs.getInt(RetentionService.retentionDaysKey) ?? 30;
         _appLockEnabled = appLockEnabled;
+        _biometricsEnabled = biometricsEnabled;
       });
     }
   }
@@ -361,6 +364,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: _toggleAppLock,
             ),
             if (_appLockEnabled) ...[
+              const SizedBox(height: 4),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Unlock with fingerprint'),
+                subtitle: const Text('Faster unlock using biometrics'),
+                value: _biometricsEnabled,
+                onChanged: (val) async {
+                  setState(() => _biometricsEnabled = val);
+                  await AppLockService.setBiometricsEnabled(val);
+                },
+              ),
               const SizedBox(height: 4),
               ListTile(
                 contentPadding: EdgeInsets.zero,
@@ -1072,7 +1086,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             Center(
               child: Text(
-                'AAA Private Agent v2.0 • Nebula Edition',
+                'AAA Private Agent v2.1 • Nebula Edition',
                 style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.black38),
               ),
             ),

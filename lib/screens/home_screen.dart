@@ -17,6 +17,7 @@ import '../widgets/quick_actions.dart';
 import '../widgets/home_drawer.dart';
 import '../widgets/home_background_glows.dart';
 import '../widgets/home_mode_selector.dart';
+import '../widgets/agent_status_bar.dart';
 import '../widgets/home_empty_state.dart';
 import '../widgets/home_input_bar.dart';
 import '../widgets/model_picker_sheet.dart';
@@ -24,8 +25,10 @@ import '../widgets/api_warning_banner.dart';
 import '../services/telegram_service.dart';
 import '../services/chat_history_service.dart';
 import '../services/notification_service.dart';
+import '../services/storage_service.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
+import 'accounts_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:share_plus/share_plus.dart';
 import '../main.dart';
@@ -766,6 +769,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   setState(() => _mode = mode);
                 },
                 isDark: isDark,
+              ),
+
+              // Agent dashboard status strip
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: AgentStatusBar(
+                  providerName: _aiService.activeKey?.name ?? 'Free Keyless AI',
+                  model: _aiService.model,
+                  r2Configured: StorageService.isConfigured,
+                  cloudSynced: authService.isLoggedIn,
+                  isDark: isDark,
+                  onOpenHealth: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => AccountsScreen(
+                          aiService: _aiService,
+                          telegramService: _telegramService,
+                        ),
+                      ),
+                    );
+                    if (mounted) setState(() {});
+                  },
+                ),
               ),
 
               // API key warning banner

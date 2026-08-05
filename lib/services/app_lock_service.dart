@@ -15,6 +15,7 @@ class AppLockService {
   static const String _enabledKey = 'app_lock_enabled';
   static const String _pinHashKey = 'app_lock_pin_hash';
   static const String _pinSaltKey = 'app_lock_pin_salt';
+  static const String _biometricsKey = 'app_lock_biometrics';
 
   /// Reflects the current in-memory lock state. When `true`, the UI shows the
   /// unlock screen instead of the main app.
@@ -55,6 +56,17 @@ class AppLockService {
     if (hash == null || salt == null || pin.isEmpty) return false;
     final candidate = await _hashPin(pin, salt);
     return candidate == hash;
+  }
+
+  /// Whether the user opted into fingerprint/face unlock as a shortcut.
+  static Future<bool> isBiometricsEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_biometricsKey) ?? false;
+  }
+
+  static Future<void> setBiometricsEnabled(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_biometricsKey, value);
   }
 
   /// Disable the lock and remove all PIN material.
