@@ -414,6 +414,8 @@ No surrounding markdown block code fences, no introductory or trailing text arou
 📶 NETWORK & CONNECTIVITY
 - scan_wifi: {} - Scan and list ALL available WiFi networks
 - connect_wifi: {"ssid": "MyWiFi", "password": "pass123"} - Connect to a WiFi network
+- connect_saved_wifi: {"ssid": "MyWiFi"} - Connect to a SAVED WiFi network using its stored password (user does not need to provide one)
+- connect_best_wifi: {} - Fully autonomous: connect to the best saved network currently in range (no password needed from the user)
 - get_current_wifi: {} - Show current WiFi network name
 - get_wifi_password: {"ssid": "MyWiFi"} - Retrieve a saved WiFi password (root/Shizuku)
 - toggle_wifi: {"enable": true} - Turn WiFi on or off

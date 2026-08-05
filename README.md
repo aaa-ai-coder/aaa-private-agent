@@ -41,6 +41,10 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
 - Expanded phone automation: wake screen, go home, recent apps, airplane mode,
   hotspot, Do Not Disturb, auto-rotate, clear notifications, saved WiFi
   password retrieval and arbitrary ADB shell commands (Shizuku/root)
+- Autonomous WiFi: `connect_best_wifi` scans in-range networks, matches them
+  against the phone's saved networks and connects to the best one — no password
+  needed from the user; `connect_saved_wifi` connects a specific saved network
+  by SSID via its stored config
 
 ## Setup
 

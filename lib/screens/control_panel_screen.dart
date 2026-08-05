@@ -300,6 +300,13 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                   AppColors.info,
                   () => _run(_a('scan_wifi', {})),
                 ),
+                _actionTile(
+                  isDark,
+                  Icons.wifi_find_rounded,
+                  'Auto Connect',
+                  AppColors.info,
+                  () => _run(_a('connect_best_wifi', {})),
+                ),
               ],
             ),
             const SizedBox(height: 16),

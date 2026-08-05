@@ -142,6 +142,16 @@ class ActionHandler {
           );
           break;
 
+        case 'connect_saved_wifi':
+          result = await _shizuku.connectToSavedNetwork(
+            action.params['ssid'] as String? ?? '',
+          );
+          break;
+
+        case 'connect_best_wifi':
+          result = await _shizuku.connectBestSavedNetwork();
+          break;
+
         case 'toggle_wifi':
           result = await _shizuku.toggleWifi(
             action.params['enable'] as bool? ?? true,

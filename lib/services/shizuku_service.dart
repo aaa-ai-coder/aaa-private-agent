@@ -201,6 +201,135 @@ class ShizukuService {
     return result;
   }
 
+  /// Connect to an already-saved network by SSID — no password needed, the
+  /// device already stored it. Tries a direct connect, then resolves the saved
+  /// network id and connects by id as a fallback.
+  Future<String> connectToSavedNetwork(String ssid) async {
+    final name = ssid.trim().replaceAll('"', '');
+    if (name.isEmpty) return 'No SSID provided.';
+    if (!_isAvailable && !_rootAvailable) {
+      return 'Shizuku/root not available. Cannot read saved networks.';
+    }
+    await runCommand('svc wifi enable');
+    final direct = await runCommand('cmd wifi connect-network "$name"');
+    if (!_looksLikeFailure(direct)) return direct;
+    final id = await _findSavedNetworkId(name);
+    if (id == null) {
+      return 'Network "$name" is not saved on this device, or saved networks '
+          'cannot be read without root/Shizuku.';
+    }
+    final byId = await runCommand('cmd wifi connect-network $id');
+    if (!_looksLikeFailure(byId)) return byId;
+    final wpa = await runCommand(
+      'wpa_cli -i wlan0 enable_network $id 2>/dev/null && '
+      'wpa_cli -i wlan0 select_network $id 2>/dev/null || echo ""',
+    );
+    return wpa.trim().isEmpty
+        ? 'Connected attempt via network id $id ($byId)'
+        : wpa;
+  }
+
+  /// List all saved (known) WiFi network names.
+  Future<List<String>> listSavedNetworks() async {
+    final list = await runCommand('cmd wifi list-networks 2>/dev/null');
+    final networks = <String>[];
+    for (final line in list.split('\n')) {
+      final parts = line.trim().split(RegExp(r'\s+'));
+      if (parts.length < 2) continue;
+      if (int.tryParse(parts[0]) != null) {
+        final name = parts[1].replaceAll('"', '');
+        if (name.isNotEmpty && name != 'SSID') networks.add(name);
+      }
+    }
+    return networks;
+  }
+
+  /// Scan for in-range network names.
+  Future<List<String>> scanInRangeNetworks() async {
+    await runCommand('cmd wifi start-scan');
+    await Future<void>.delayed(const Duration(seconds: 2));
+    final out = await runCommand(
+      'cmd wifi list-scan-results 2>/dev/null || '
+      'dumpsys wifi | grep "SSID:" 2>/dev/null || echo "NO_SCAN"',
+    );
+    if (out.contains('NO_SCAN') || out.contains('Error')) return [];
+    final names = <String>{};
+    for (final line in out.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      final mac = RegExp(r'([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}')
+          .firstMatch(trimmed);
+      if (mac != null) {
+        final name = trimmed
+            .substring(0, mac.start)
+            .replaceAll('"', '')
+            .trim();
+        if (name.isNotEmpty && name.toLowerCase() != 'ssid') {
+          names.add(name);
+        }
+      } else if (trimmed.contains('SSID:"')) {
+        final quoted = RegExp(r'SSID:"([^"]+)"').firstMatch(trimmed);
+        if (quoted != null) names.add(quoted.group(1)!);
+      }
+    }
+    return names.toList();
+  }
+
+  /// Fully autonomous: connect to the best saved network currently in range.
+  /// No password is required from the user — the device already knows it.
+  Future<String> connectBestSavedNetwork() async {
+    if (!_isAvailable && !_rootAvailable) {
+      return 'Shizuku/root not available. Cannot auto-connect WiFi.';
+    }
+    await runCommand('svc wifi enable');
+    final saved = await listSavedNetworks();
+    if (saved.isEmpty) {
+      return 'No saved WiFi networks found (or saved networks cannot be read '
+          'without root/Shizuku).';
+    }
+    final inRange = await scanInRangeNetworks();
+    if (inRange.isEmpty) {
+      return 'WiFi is on, but no in-range scan results were returned. '
+          'Saved networks: ${saved.join(', ')}';
+    }
+    String? target;
+    for (final s in saved) {
+      if (inRange.contains(s)) {
+        target = s;
+        break;
+      }
+    }
+    if (target == null) {
+      return 'No saved network is currently in range.\nIn range: '
+          '${inRange.join(', ')}\nSaved: ${saved.join(', ')}';
+    }
+    final connectResult = await connectToSavedNetwork(target);
+    final status = await runCommand('cmd wifi get-connection-state 2>/dev/null');
+    return 'Auto-connected to saved network "$target".\n$connectResult\n'
+        'Connection state: $status';
+  }
+
+  bool _looksLikeFailure(String result) {
+    final lower = result.toLowerCase();
+    return lower.contains('error') ||
+        lower.contains('failed') ||
+        lower.contains('exception') ||
+        lower.contains('not supported');
+  }
+
+  /// Resolve the network id of a saved network from `cmd wifi list-networks`.
+  Future<int?> _findSavedNetworkId(String ssid) async {
+    final list = await runCommand('cmd wifi list-networks 2>/dev/null');
+    for (final line in list.split('\n')) {
+      final parts = line.trim().split(RegExp(r'\s+'));
+      if (parts.length < 2) continue;
+      final id = int.tryParse(parts[0]);
+      final name = parts[1].replaceAll('"', '');
+      if (id != null && name == ssid) return id;
+    }
+    return null;
+  }
+
   /// Enable/disable mobile data
   Future<String> setMobileData(bool enable) async {
     return runCommand('svc data ${enable ? 'enable' : 'disable'}');
