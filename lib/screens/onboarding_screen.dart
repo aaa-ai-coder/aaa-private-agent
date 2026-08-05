@@ -177,6 +177,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       } else if (provider == 'deepseek') {
         _baseUrlController.text = 'https://api.deepseek.com';
         _modelController.text = 'deepseek-chat';
+      } else if (provider == 'puter') {
+        _baseUrlController.text = AiService.puterBaseUrl;
+        _modelController.text = AiService.puterDefaultModel;
       } else if (provider == 'local') {
         _baseUrlController.text = 'http://10.0.2.2:1234/v1';
         _modelController.text = 'qwen2.5-7b-instruct';
@@ -208,6 +211,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     if (_selectedProvider != 'ollama' &&
         _selectedProvider != 'ollama_cloud' &&
         _selectedProvider != 'local' &&
+        _selectedProvider != 'puter' &&
         apiKey.isEmpty) {
       setState(() {
         _validationError = 'API Key is required for this provider.';
@@ -1135,6 +1139,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 _buildProviderCard('ollama_cloud', 'Ollama Cloud', Icons.cloud_circle_rounded, isDark),
                 const SizedBox(width: 10),
                 _buildProviderCard('deepseek', 'DeepSeek', Icons.analytics_rounded, isDark),
+                const SizedBox(width: 10),
+                _buildProviderCard('puter', 'Puter AI', Icons.terminal_rounded, isDark),
                 const SizedBox(width: 10),
                 _buildProviderCard('local', 'Local Server', Icons.dns_rounded, isDark),
               ],

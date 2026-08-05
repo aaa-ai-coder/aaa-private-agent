@@ -18,10 +18,18 @@ class QuickActions extends StatelessWidget {
     _QuickAction(icon: Icons.play_circle_fill_rounded, label: 'YouTube', command: 'Open YouTube'),
     _QuickAction(icon: Icons.phone_in_talk_rounded, label: 'Call', command: 'Make a phone call'),
     _QuickAction(icon: Icons.alarm_rounded, label: 'Alarm', command: 'Set an alarm for 7 AM'),
+    _QuickAction(icon: Icons.timer_rounded, label: 'Timer', command: 'Set a 10 minute timer'),
+    _QuickAction(icon: Icons.chat_rounded, label: 'WhatsApp', command: 'Open WhatsApp and send a message'),
+    _QuickAction(icon: Icons.notifications_active_rounded, label: 'Read Notifs', command: 'Read my latest notifications'),
+    _QuickAction(icon: Icons.bluetooth_rounded, label: 'Bluetooth', command: 'Turn on Bluetooth'),
+    _QuickAction(icon: Icons.volume_off_rounded, label: 'Mute', command: 'Mute the ringer'),
     _QuickAction(icon: Icons.screenshot_monitor_rounded, label: 'Screenshot', command: 'Take a screenshot'),
     _QuickAction(icon: Icons.battery_charging_full_rounded, label: 'Battery', command: 'Show battery and device info'),
     _QuickAction(icon: Icons.flash_on_rounded, label: 'Flashlight', command: 'Turn on flashlight'),
     _QuickAction(icon: Icons.play_arrow_rounded, label: 'Media Play', command: 'Play media'),
+    _QuickAction(icon: Icons.translate_rounded, label: 'Translate', command: 'Translate this sentence into Spanish: hello world'),
+    _QuickAction(icon: Icons.content_copy_rounded, label: 'Clipboard', command: 'Read my clipboard'),
+    _QuickAction(icon: Icons.calculate_rounded, label: 'Calculator', command: 'What is 384 times 27?'),
     _QuickAction(icon: Icons.share_rounded, label: 'Export Chat', command: 'Export this chat session'),
   ];
 

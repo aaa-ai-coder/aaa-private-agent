@@ -25,6 +25,25 @@ class AiService {
   static const String keylessBaseUrl = 'https://text.pollinations.ai/openai';
   static const String keylessDefaultModel = 'openai-fast';
 
+  /// Puter.js free AI gateway (https://puter.com). Uses its own REST format
+  /// (`/v2/chat`), not the OpenAI shape — handled by dedicated adapters.
+  static const String puterBaseUrl = 'https://api.puter.com/v2/chat';
+  static const String puterDefaultModel = 'gpt-4o-mini';
+  static const List<String> puterModels = [
+    'gpt-5-mini',
+    'gpt-5',
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4.1',
+    'gpt-4.1-mini',
+    'claude-sonnet-4',
+    'claude-haiku-4',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash',
+    'llama-3.3-70b',
+    'deepseek-v3',
+  ];
+
   static const String _defaultBaseUrl = keylessBaseUrl;
   static const String _defaultModel = keylessDefaultModel;
   static const String nvidiaBaseUrl = 'https://integrate.api.nvidia.com/v1';
@@ -559,6 +578,11 @@ No surrounding markdown block code fences, no introductory or trailing text arou
 
     if (urlToUse.isEmpty) return [];
 
+    // Puter has no public /models endpoint; serve the curated catalog.
+    if (urlToUse.contains('api.puter.com')) {
+      return List.of(puterModels);
+    }
+
     final modelsEndpoint = '$urlToUse/models';
     try {
       final response = await http.get(
@@ -603,7 +627,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
     return [];
   }
 
-  bool get isConfigured => _isKeyless || (_apiKey != null && _apiKey!.isNotEmpty);
+  bool get isConfigured => _isKeyless || _isPuter || (_apiKey != null && _apiKey!.isNotEmpty);
   String get baseUrl => _baseUrl;
   String get model => _model;
   String get apiKey => _apiKey ?? '';
@@ -647,8 +671,89 @@ No surrounding markdown block code fences, no introductory or trailing text arou
     return '$url/chat/completions';
   }
 
+  bool get _isPuter => _baseUrl.trim().contains('api.puter.com');
+
+  /// Puter.js gateway: non-streaming `/v2/chat` request.
+  /// Works anonymously (guest) without a token, or with `Bearer <token>`
+  /// from https://puter.com dashboard for higher limits.
+  Future<String> _sendPuter(List<Map<String, String>> messages) async {
+    final token = (_apiKey ?? '').trim();
+    final response = await http
+        .post(
+          Uri.parse(puterBaseUrl),
+          headers: {
+            'Content-Type': 'application/json',
+            if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+          },
+          body: jsonEncode({
+            'model': _model,
+            'messages': messages,
+          }),
+        )
+        .timeout(const Duration(minutes: 5));
+    if (response.statusCode != 200) {
+      throw Exception('Puter error (${response.statusCode}): ${response.body}');
+    }
+    final decoded = jsonDecode(response.body);
+    if (decoded is Map<String, dynamic>) {
+      final msg = decoded['message'];
+      if (msg is Map<String, dynamic> && msg['content'] is String) {
+        return msg['content'] as String;
+      }
+    }
+    throw Exception('Unexpected Puter response: $decoded');
+  }
+
+  /// Puter.js gateway: streaming `/v2/chat` SSE adapter.
+  /// Puter sends `data: {"message":{"role":"assistant","content":"..."}}`
+  /// chunks and marks the last one with `status.finished`.
+  Stream<String> _streamPuter(List<Map<String, String>> messages) async* {
+    final token = (_apiKey ?? '').trim();
+    final client = http.Client();
+    try {
+      final request = http.Request('POST', Uri.parse(puterBaseUrl))
+        ..headers.addAll({
+          'Content-Type': 'application/json',
+          if (token.isNotEmpty) 'Authorization': 'Bearer $token',
+        })
+        ..body = jsonEncode({
+          'model': _model,
+          'messages': messages,
+          'stream': true,
+        });
+      final response = await client.send(request).timeout(const Duration(minutes: 5));
+      if (response.statusCode != 200) {
+        final body = await response.stream.bytesToString();
+        throw Exception('Puter error (${response.statusCode}): $body');
+      }
+      await for (final line in response.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())) {
+        final trimmed = line.trim();
+        if (trimmed.isEmpty || trimmed.startsWith(':')) continue;
+        if (!trimmed.startsWith('data:')) continue;
+        final payload = trimmed.substring(5).trim();
+        if (payload == '[DONE]') break;
+        try {
+          final data = jsonDecode(payload) as Map<String, dynamic>;
+          final msg = data['message'];
+          if (msg is Map<String, dynamic>) {
+            final content = msg['content'];
+            if (content is String && content.isNotEmpty) yield content;
+            final status = msg['status'];
+            if (status is Map && status['finished'] == true) break;
+          }
+        } catch (_) {
+          // Skip malformed SSE events.
+        }
+      }
+    } finally {
+      client.close();
+    }
+  }
+
   Future<String> sendMessage(String message, {bool isAgentMode = true}) async {
-    if ((_apiKey == null || _apiKey!.isEmpty) && !_isKeyless) {
+    if ((_apiKey == null || _apiKey!.isEmpty) && !_isKeyless && !_isPuter) {
       throw Exception('API Key is not configured. Please go to Settings.');
     }
 
@@ -667,6 +772,24 @@ No surrounding markdown block code fences, no introductory or trailing text arou
         if (_useSystemPrompt) {'role': 'system', 'content': systemPrompt},
         ..._telegramHistory,
       ];
+
+      // Puter uses its own /v2/chat REST format, not OpenAI shape.
+      if (_isPuter) {
+        final raw = await _sendPuter(messages);
+        final assistantMessage = raw
+            .replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '')
+            .trim();
+        if (assistantMessage.isEmpty) {
+          throw Exception(
+            'API returned an empty response. This may be due to rate limits or API instability.',
+          );
+        }
+        _telegramHistory.add({
+          'role': 'assistant',
+          'content': assistantMessage,
+        });
+        return assistantMessage;
+      }
 
       final requestUrl = _buildChatUrl(_baseUrl);
 
@@ -781,12 +904,14 @@ No surrounding markdown block code fences, no introductory or trailing text arou
           .toList();
 
       String fullResponse = '';
-      final stream = AriAiEngine.instance.executeStreamWithFailover(
-        messages: castMessages,
-        temperature: _temperature,
-        maxTokens: _effectiveMaxTokens,
-        activeCustomKey: activeKey,
-      );
+      final stream = _isPuter
+          ? _streamPuter(castMessages)
+          : AriAiEngine.instance.executeStreamWithFailover(
+              messages: castMessages,
+              temperature: _temperature,
+              maxTokens: _effectiveMaxTokens,
+              activeCustomKey: activeKey,
+            );
 
       await for (final chunk in stream) {
         fullResponse += chunk;

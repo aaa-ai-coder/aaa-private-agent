@@ -60,6 +60,18 @@ class ModelPickerSheet {
               ),
               _buildOption(
                 ctx, aiService, onChanged,
+                icon: Icons.terminal_rounded,
+                iconColor: Colors.cyan,
+                title: 'Puter.js AI (guest, no key needed)',
+                subtitle: 'Free gateway to GPT/Claude/Gemini/Llama models',
+                baseUrl: AiService.puterBaseUrl,
+                model: AiService.puterDefaultModel,
+                switchMessage: 'Switched to Puter.js AI',
+                clearKey: true,
+                name: 'Puter.js AI',
+              ),
+              _buildOption(
+                ctx, aiService, onChanged,
                 icon: Icons.bolt_rounded,
                 iconColor: Colors.orange,
                 title: 'Groq (Llama 3.3 70B)',
@@ -126,6 +138,8 @@ class ModelPickerSheet {
     required String baseUrl,
     required String model,
     required String switchMessage,
+    bool clearKey = false,
+    String? name,
   }) {
     return ListTile(
       leading: Container(
@@ -140,9 +154,10 @@ class ModelPickerSheet {
       subtitle: Text(subtitle, style: const TextStyle(fontSize: 12)),
       onTap: () async {
         await aiService.saveSettings(
-          apiKey: aiService.apiKey,
+          apiKey: clearKey ? '' : aiService.apiKey,
           baseUrl: baseUrl,
           model: model,
+          name: name,
         );
         if (!context.mounted) return;
         Navigator.pop(context);

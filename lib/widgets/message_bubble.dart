@@ -7,12 +7,16 @@ class MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final VoidCallback? onSpeakTap;
   final VoidCallback? onCopyTap;
+  final VoidCallback? onDeleteTap;
+  final VoidCallback? onRegenerateTap;
 
   const MessageBubble({
     super.key,
     required this.message,
     this.onSpeakTap,
     this.onCopyTap,
+    this.onDeleteTap,
+    this.onRegenerateTap,
   });
 
   @override
@@ -21,7 +25,9 @@ class MessageBubble extends StatelessWidget {
 
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
+      child: GestureDetector(
+        onLongPress: () => _showActions(context),
+        child: Container(
         constraints: BoxConstraints(
           maxWidth: MediaQuery.of(context).size.width * 0.82,
         ),
@@ -201,7 +207,133 @@ class MessageBubble extends StatelessWidget {
             ),
           ],
         ),
+        ),
       ),
+    );
+  }
+
+  /// Long-press action sheet: copy/speak/regenerate/delete per message role.
+  void _showActions(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isUser = message.isUser;
+    final bg = isDark ? const Color(0xFF1E1B4B) : Colors.white;
+    final sub = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          margin: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: bg,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark ? const Color(0xFF8B5CF6).withValues(alpha: 0.25) : const Color(0xFFE2E8F0),
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: sub.withValues(alpha: 0.4),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Text(
+                    isUser ? 'Message actions' : 'Assistant response',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: sub,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                _actionTile(
+                  ctx,
+                  icon: Icons.copy_rounded,
+                  label: 'Copy text',
+                  onTap: () {
+                    Clipboard.setData(ClipboardData(text: message.content));
+                    Navigator.pop(ctx);
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('Message copied to clipboard'),
+                        duration: Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                ),
+                if (!isUser && onSpeakTap != null)
+                  _actionTile(
+                    ctx,
+                    icon: Icons.volume_up_rounded,
+                    label: 'Speak aloud',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      onSpeakTap!();
+                    },
+                  ),
+                if (!isUser && onRegenerateTap != null)
+                  _actionTile(
+                    ctx,
+                    icon: Icons.refresh_rounded,
+                    label: 'Regenerate response',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      onRegenerateTap!();
+                    },
+                  ),
+                _actionTile(
+                  ctx,
+                  icon: Icons.delete_outline_rounded,
+                  label: 'Delete message',
+                  destructive: true,
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    onDeleteTap?.call();
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _actionTile(
+    BuildContext context, {
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    bool destructive = false,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fg = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
+    final color = destructive ? const Color(0xFFEF4444) : fg;
+    return ListTile(
+      dense: true,
+      leading: Icon(icon, size: 20, color: color),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: color,
+        ),
+      ),
+      onTap: onTap,
     );
   }
 

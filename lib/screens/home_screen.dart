@@ -65,6 +65,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   AppLifecycleState _appLifecycleState = AppLifecycleState.resumed;
   Timer? _overlayHistoryTimer;
 
+  /// Human-friendly label for the active AI backend, falling back to the
+  /// endpoint host so switching providers (e.g. Puter) shows correctly even
+  /// before any custom key is saved.
+  String get _providerLabel {
+    final url = _aiService.baseUrl;
+    if (url.contains('api.puter.com')) return 'Puter.js AI';
+    if (url.contains('pollinations.ai')) return 'Free Keyless AI';
+    if (url.isNotEmpty) {
+      final host = Uri.tryParse(url)?.host ?? '';
+      if (host.isNotEmpty) return host;
+    }
+    return 'AI Provider';
+  }
+
   @override
   void initState() {
     super.initState();
@@ -168,6 +182,61 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _scrollToBottom();
     await _safeSaveSession();
 
+    await _streamAssistantResponse(text.trim(), isAgent: _mode == 'agent');
+  }
+
+  /// Deletes a message and rebuilds the in-memory AI history so subsequent
+  /// turns don't reference removed content.
+  Future<void> _deleteMessage(int index) async {
+    if (_isLoading) return;
+    if (index < 0 || index >= _messages.length) return;
+    setState(() {
+      _messages.removeAt(index);
+    });
+    _rebuildAiHistory();
+    _sendOverlayHistorySnapshot();
+    await _safeSaveSession();
+  }
+
+  /// Regenerates the assistant answer for the given bubble by trimming the
+  /// conversation back to its preceding user message and re-streaming a new
+  /// response. Progress + action-result bubbles in between are discarded.
+  Future<void> _regenerateResponse(int index) async {
+    if (_isLoading) return;
+    if (index < 0 || index >= _messages.length) return;
+    if (_messages[index].isUser) return;
+
+    int ui = index - 1;
+    while (ui >= 0 && _messages[ui].isUser) {
+      ui--;
+    }
+    if (ui < 0) return;
+    final userContent = _messages[ui].content;
+
+    setState(() {
+      _messages.removeRange(ui + 1, _messages.length);
+      _isLoading = true;
+    });
+    _rebuildAiHistory();
+    _sendOverlayHistorySnapshot();
+    await _safeSaveSession();
+    await _streamAssistantResponse(userContent, isAgent: _mode == 'agent');
+  }
+
+  /// Replays the current visible conversation into the AI service history so
+  /// the next request stays coherent after edits.
+  void _rebuildAiHistory() {
+    _aiService.clearHistory();
+    for (final m in _messages) {
+      _aiService.addHistoryMessage(m.role, m.content);
+    }
+  }
+
+  /// Streams an assistant response for [text] and appends it to the chat,
+  /// handling action parsing, voice output and error reporting.
+  Future<void> _streamAssistantResponse(String text, {required bool isAgent}) async {
+    if (!mounted) return;
+
     // Add empty placeholder assistant message for streaming
     final assistantMessage = ChatMessage(role: 'assistant', content: '');
     setState(() {
@@ -176,11 +245,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final assistantIndex = _messages.length - 1;
 
     try {
-      // In Chat mode the model receives a plain chat prompt; in Agent mode it
-      // gets the full device-automation action catalog.
-      final isAgent = _mode == 'agent';
       final stream = _aiService
-          .sendMessageStream(text.trim(), isAgentMode: isAgent)
+          .sendMessageStream(text, isAgentMode: isAgent)
           .timeout(
             const Duration(seconds: 90),
             onTimeout: (sink) {
@@ -775,7 +841,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: AgentStatusBar(
-                  providerName: _aiService.activeKey?.name ?? 'Free Keyless AI',
+                  providerName: _aiService.activeKey?.name ?? _providerLabel,
                   model: _aiService.model,
                   r2Configured: StorageService.isConfigured,
                   cloudSynced: authService.isLoggedIn,
@@ -838,6 +904,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                 _voiceService.speak(_messages[index].content);
                               }
                             },
+                            onDeleteTap: () => _deleteMessage(index),
+                            onRegenerateTap: _messages[index].isUser
+                                ? null
+                                : () => _regenerateResponse(index),
                           );
                         },
                       ),

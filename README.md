@@ -11,7 +11,7 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
 - Firebase Auth + Crashlytics + Analytics
 - Supabase backend for user data collection
 - Cloudflare R2 for heavy data storage (screenshots, files)
-- Multi-provider AI (Groq, NVIDIA, Ollama Cloud, DeepSeek, local)
+- Multi-provider AI (Groq, NVIDIA, Ollama Cloud, DeepSeek, Puter.js, local)
 - Multi-turn conversation with streaming
 - Task history and analytics
 - Automated data retention: auto-deletes chat history older than the
@@ -29,6 +29,11 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
   keep-alive Worker, R2 and Telegram with one-tap R2/Telegram configuration
 - Keyless free AI by default (Pollinations) with anonymous `X-User-ID` to beat
   rate limits, plus ARI failover to your own keys when configured
+- Puter.js AI gateway (guest mode works with no key): free access to GPT-4o,
+  Claude, Gemini and Llama models via `api.puter.com` with a dedicated
+  streaming adapter; add a Puter token in Settings for higher limits
+- Long-press any chat message: copy, speak aloud, regenerate the AI response or
+  delete the message (history stays coherent after edits)
 
 ## Setup
 
