@@ -305,7 +305,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                   Icons.wifi_find_rounded,
                   'Auto Connect',
                   AppColors.info,
-                  () => _run(_a('connect_best_wifi', {})),
+                  () => _run(_a('connect_available_wifi', {})),
                 ),
               ],
             ),

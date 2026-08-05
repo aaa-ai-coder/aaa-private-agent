@@ -45,6 +45,10 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
   against the phone's saved networks and connects to the best one — no password
   needed from the user; `connect_saved_wifi` connects a specific saved network
   by SSID via its stored config
+- Brand-new networks: `connect_available_wifi` goes fully hands-free — it
+  prefers a saved network in range, otherwise connects to the best OPEN
+  (password-less) network automatically; secured brand-new networks require
+  their password (password cracking is not supported)
 
 ## Setup
 

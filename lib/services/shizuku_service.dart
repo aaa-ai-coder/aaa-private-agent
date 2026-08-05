@@ -309,6 +309,79 @@ class ShizukuService {
         'Connection state: $status';
   }
 
+  /// Scan in-range networks together with whether each is open (no password).
+  Future<List<Map<String, String>>> scanNetworksWithSecurity() async {
+    await runCommand('cmd wifi start-scan');
+    await Future<void>.delayed(const Duration(seconds: 2));
+    final out = await runCommand(
+      'cmd wifi list-scan-results 2>/dev/null || echo "NO_SCAN"',
+    );
+    final networks = <Map<String, String>>[];
+    if (out.contains('NO_SCAN') || out.contains('Error')) return networks;
+    for (final line in out.split('\n')) {
+      final trimmed = line.trim();
+      if (trimmed.isEmpty) continue;
+      final mac =
+          RegExp(r'([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}').firstMatch(trimmed);
+      if (mac == null) continue;
+      final name = trimmed.substring(0, mac.start).replaceAll('"', '').trim();
+      if (name.isEmpty || name.toLowerCase() == 'ssid') continue;
+      final secured = trimmed.contains(RegExp(
+        r'WPA|WEP|SAE|PSK|ENTERPRISE|802.1X',
+        caseSensitive: false,
+      ));
+      networks.add({'ssid': name, 'open': secured ? 'false' : 'true'});
+    }
+    return networks;
+  }
+
+  /// Connect to an open (password-less) WiFi network.
+  Future<String> connectToOpenNetwork(String ssid) async {
+    final name = ssid.trim().replaceAll('"', '');
+    if (name.isEmpty) return 'No SSID provided.';
+    await runCommand('svc wifi enable');
+    final direct = await runCommand('cmd wifi connect-network "$name" open');
+    if (!_looksLikeFailure(direct)) return direct;
+    return 'Could not connect to open network "$name": $direct';
+  }
+
+  /// Fully autonomous "get me online": prefer a saved network in range, else
+  /// connect to the best open (password-less) network. Never asks the user
+  /// for a password.
+  Future<String> connectBestAvailableNetwork() async {
+    if (!_isAvailable && !_rootAvailable) {
+      return 'Shizuku/root not available. Cannot auto-connect WiFi.';
+    }
+    await runCommand('svc wifi enable');
+    final saved = await listSavedNetworks();
+    final inRange = await scanNetworksWithSecurity();
+    if (inRange.isEmpty) {
+      return 'WiFi is on but no in-range networks were returned.\n'
+          'Saved networks: ${saved.isEmpty ? 'none' : saved.join(', ')}';
+    }
+    final inRangeNames = inRange.map((n) => n['ssid']!).toSet();
+
+    // 1) Best saved network currently in range.
+    for (final s in saved) {
+      if (inRangeNames.contains(s)) {
+        final r = await connectToSavedNetwork(s);
+        return 'Auto-connected to saved network "$s".\n$r';
+      }
+    }
+
+    // 2) Otherwise the best open network (brand-new, no password needed).
+    final open = inRange.where((n) => n['open'] == 'true').toList();
+    if (open.isNotEmpty) {
+      final target = open.first['ssid']!;
+      final r = await connectToOpenNetwork(target);
+      return 'No saved network in range; connected to open network "$target".\n$r';
+    }
+
+    return 'No saved network is in range and no open networks were found.\n'
+        'In range (secured networks need their password): '
+        '${inRangeNames.join(', ')}';
+  }
+
   bool _looksLikeFailure(String result) {
     final lower = result.toLowerCase();
     return lower.contains('error') ||

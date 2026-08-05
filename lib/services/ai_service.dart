@@ -415,7 +415,9 @@ No surrounding markdown block code fences, no introductory or trailing text arou
 - scan_wifi: {} - Scan and list ALL available WiFi networks
 - connect_wifi: {"ssid": "MyWiFi", "password": "pass123"} - Connect to a WiFi network
 - connect_saved_wifi: {"ssid": "MyWiFi"} - Connect to a SAVED WiFi network using its stored password (user does not need to provide one)
-- connect_best_wifi: {} - Fully autonomous: connect to the best saved network currently in range (no password needed from the user)
+- connect_best_wifi: {} - Connect to the best SAVED network currently in range (no password needed from the user)
+- connect_available_wifi: {} - Fully autonomous "get me online": connect to the best saved network in range, or if none, connect to the best OPEN (password-less) network - never needs a password from the user
+- connect_open_wifi: {"ssid": "PublicWifi"} - Connect to a specific OPEN (password-less) network
 - get_current_wifi: {} - Show current WiFi network name
 - get_wifi_password: {"ssid": "MyWiFi"} - Retrieve a saved WiFi password (root/Shizuku)
 - toggle_wifi: {"enable": true} - Turn WiFi on or off
