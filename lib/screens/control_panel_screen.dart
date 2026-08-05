@@ -246,7 +246,7 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                 ),
                 _actionTile(
                   isDark,
-                  Icons.silence_rounded,
+                  Icons.volume_mute_rounded,
                   'Ringer: Silent',
                   AppColors.info,
                   () => _run(_a('set_ringer_mode', {'mode': 0})),
