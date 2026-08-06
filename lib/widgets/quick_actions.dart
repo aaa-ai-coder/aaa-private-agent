@@ -31,6 +31,9 @@ class QuickActions extends StatelessWidget {
     _QuickAction(icon: Icons.content_copy_rounded, label: 'Clipboard', command: 'Read my clipboard'),
     _QuickAction(icon: Icons.calculate_rounded, label: 'Calculator', command: 'What is 384 times 27?'),
     _QuickAction(icon: Icons.share_rounded, label: 'Export Chat', command: 'Export this chat session'),
+    _QuickAction(icon: Icons.summarize_rounded, label: 'Summarize', command: 'Summarize our conversation so far'),
+    _QuickAction(icon: Icons.phone_android_rounded, label: 'Device Info', command: 'Show device info'),
+    _QuickAction(icon: Icons.password_rounded, label: 'WiFi Pass', command: 'Reveal my saved WiFi passwords'),
   ];
 
   @override

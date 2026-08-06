@@ -12,6 +12,7 @@ class HomeDrawer extends StatefulWidget {
   final Function(String sessionId, String title) onLoadSession;
   final VoidCallback onTaskHistory;
   final VoidCallback onSettings;
+  final VoidCallback onSummarize;
 
   const HomeDrawer({
     super.key,
@@ -21,6 +22,7 @@ class HomeDrawer extends StatefulWidget {
     required this.onLoadSession,
     required this.onTaskHistory,
     required this.onSettings,
+    required this.onSummarize,
   });
 
   @override
@@ -373,6 +375,19 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   onTap: () {
                     Navigator.pop(context);
                     widget.onTaskHistory();
+                  },
+                ),
+                ListTile(
+                  horizontalTitleGap: 8,
+                  leading: Icon(
+                    Icons.summarize_rounded,
+                    color: widget.isDark ? Colors.grey[400] : Colors.grey[600],
+                    size: 20,
+                  ),
+                  title: Text('Summarize Conversation', style: textStyle),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onSummarize();
                   },
                 ),
                 ListTile(

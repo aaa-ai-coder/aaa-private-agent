@@ -68,8 +68,16 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
           end: Alignment.bottomCenter,
           colors: [
             Colors.transparent,
-            widget.isDark ? const Color(0xFF0F172A).withValues(alpha: 0.95) : Colors.white.withValues(alpha: 0.95),
+            widget.isDark
+                ? const Color(0xFF0C0A15).withValues(alpha: 0.96)
+                : Colors.white.withValues(alpha: 0.96),
           ],
+        ),
+        border: Border(
+          top: BorderSide(
+            color: primaryColor.withValues(alpha: widget.isDark ? 0.25 : 0.15),
+            width: 0.8,
+          ),
         ),
       ),
       child: Column(
@@ -132,14 +140,22 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
                     child: Container(
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: widget.isListening
-                            ? Colors.redAccent
-                            : (widget.isDark ? const Color(0xFF1E1B4B) : const Color(0xFFF1F5F9)),
+                        gradient: widget.isListening
+                            ? null
+                            : const LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  Color(0xFF1E1B4B),
+                                  Color(0xFF312E81),
+                                ],
+                              ),
+                        color: widget.isListening ? Colors.redAccent : null,
                         border: Border.all(
                           color: widget.isListening
                               ? Colors.redAccent
-                              : primaryColor.withValues(alpha: 0.3),
-                          width: 1.2,
+                              : primaryColor.withValues(alpha: 0.45),
+                          width: 1.4,
                         ),
                         boxShadow: [
                           if (widget.isListening)
@@ -178,19 +194,26 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
               Expanded(
                 child: Container(
                   decoration: BoxDecoration(
-                    color: widget.isDark ? const Color(0xFF1E293B) : Colors.white,
+                    color: widget.isDark
+                        ? const Color(0xFF151430)
+                        : Colors.white,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
                       color: widget.isDark
-                          ? const Color(0xFF334155)
+                          ? const Color(0xFF8B5CF6).withValues(alpha: 0.3)
                           : const Color(0xFFE2E8F0),
                       width: 1.2,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: widget.isDark ? 0.3 : 0.05),
-                        blurRadius: 10,
+                        color: const Color(0xFF7C3AED).withValues(alpha: widget.isDark ? 0.12 : 0.08),
+                        blurRadius: 14,
                         offset: const Offset(0, 4),
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: widget.isDark ? 0.3 : 0.04),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
@@ -204,16 +227,23 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
                             color: widget.isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
                           decoration: InputDecoration(
-                            hintText: widget.isListening ? 'Listening...' : 'Type anything or ask AI to execute...',
+                            hintText: widget.isListening
+                                ? 'Listening...'
+                                : 'Type anything or ask AI to execute...',
                             hintStyle: TextStyle(
                               fontSize: 13,
-                              color: widget.isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                              color: widget.isDark
+                                  ? const Color(0xFF64748B)
+                                  : const Color(0xFF94A3B8),
                             ),
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 18, vertical: 12),
                             border: InputBorder.none,
                           ),
                           textInputAction: TextInputAction.send,
-                          onSubmitted: widget.isLoading ? null : (text) => widget.onSend(text),
+                          onSubmitted: widget.isLoading
+                              ? null
+                              : (text) => widget.onSend(text),
                         ),
                       ),
 
@@ -224,20 +254,23 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
                           shape: BoxShape.circle,
                           gradient: const LinearGradient(
                             colors: [
-                              Color(0xFF7C3AED),
+                              Color(0xFF6366F1),
                               Color(0xFF8B5CF6),
+                              Color(0xFFA855F7),
                             ],
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF7C3AED).withValues(alpha: 0.4),
-                              blurRadius: 8,
+                              color: const Color(0xFF8B5CF6).withValues(alpha: 0.45),
+                              blurRadius: 10,
+                              spreadRadius: 1,
                               offset: const Offset(0, 2),
                             ),
                           ],
                         ),
                         child: IconButton(
-                          icon: const Icon(Icons.send_rounded, size: 16, color: Colors.white),
+                          icon: const Icon(Icons.arrow_upward_rounded,
+                              size: 17, color: Colors.white),
                           onPressed: widget.isLoading
                               ? null
                               : () {

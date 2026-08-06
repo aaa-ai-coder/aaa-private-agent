@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../models/agent_action.dart';
 import '../services/action_handler.dart';
+import '../services/scheduler_service.dart';
 import '../theme/app_theme.dart';
 
 /// One-tap Phone Control Panel: every toggle calls the same action pipeline the
@@ -111,6 +112,188 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     );
     if (value == null || value.isEmpty) return;
     await _run(buildAction(value));
+  }
+
+  /// Show a scheduling dialog: pick an action, a time and an optional repeat
+  /// interval, then register it with the SchedulerService.
+  Future<void> _scheduleAction() async {
+    const presets = <_SchedulePreset>[
+      _SchedulePreset(Icons.volume_up_rounded, 'Set Volume', 'set_volume', {'level': 50}),
+      _SchedulePreset(Icons.alarm_rounded, 'Set Alarm', 'set_alarm', {'hour': 7, 'minute': 30, 'label': 'Wake up'}),
+      _SchedulePreset(Icons.wifi_rounded, 'Toggle WiFi', 'toggle_wifi', {'enable': true}),
+      _SchedulePreset(Icons.music_note_rounded, 'Play Music', 'control_media', {'command': 'play'}),
+      _SchedulePreset(Icons.lock_rounded, 'Lock Screen', 'lock_screen', {}),
+      _SchedulePreset(Icons.home_rounded, 'Go Home', 'go_home', {}),
+      _SchedulePreset(Icons.apps_rounded, 'Open App', 'open_app', {'app_name': 'YouTube'}),
+      _SchedulePreset(Icons.phone_in_talk_rounded, 'Make Call', 'make_call', {'contact_name': 'Mom'}),
+      _SchedulePreset(Icons.sms_rounded, 'Send SMS', 'send_sms', {'contact_name': 'John', 'message': 'Hello'}),
+      _SchedulePreset(Icons.do_not_disturb_rounded, 'Do Not Disturb', 'toggle_dnd', {'enable': true}),
+    ];
+
+    String actionType = 'set_alarm';
+    Map<String, dynamic> params = {'hour': 7, 'minute': 30, 'label': 'Wake up'};
+    final labelCtrl = TextEditingController(text: 'Wake up');
+    TimeOfDay time = TimeOfDay.now().add(const Duration(hours: 1));
+    int repeatMinutes = 0;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return AlertDialog(
+              backgroundColor: isDark ? AppColors.darkSurfaceHigh : Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+              title: const Text('Schedule Action'),
+              content: SizedBox(
+                width: 340,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('ACTION', style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      )),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: presets.map((p) {
+                          final selected = actionType == p.action;
+                          return ChoiceChip(
+                            avatar: Icon(p.icon, size: 16),
+                            label: Text(p.label),
+                            selected: selected,
+                            onSelected: (_) {
+                              setState(() {
+                                actionType = p.action;
+                                params = Map.of(p.params);
+                                labelCtrl.text = p.label;
+                              });
+                            },
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      Text('TIME', style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 1.2,
+                        color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      )),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.schedule_rounded, size: 18),
+                              label: Text(
+                                '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+                                style: const TextStyle(fontSize: 14),
+                              ),
+                              onPressed: () async {
+                                final picked = await showTimePicker(
+                                  context: ctx,
+                                  initialTime: time,
+                                );
+                                if (picked != null) {
+                                  setState(() => time = picked);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDark
+                                      ? AppColors.darkBorder
+                                      : AppColors.lightBorder,
+                                ),
+                              ),
+                              child: DropdownButton<int>(
+                                value: repeatMinutes,
+                                isExpanded: true,
+                                underline: const SizedBox.shrink(),
+                                items: const [
+                                  DropdownMenuItem(value: 0, child: Text('Once')),
+                                  DropdownMenuItem(value: 30, child: Text('Every 30 min')),
+                                  DropdownMenuItem(value: 60, child: Text('Every hour')),
+                                  DropdownMenuItem(value: 360, child: Text('Every 6 hours')),
+                                  DropdownMenuItem(value: 1440, child: Text('Daily')),
+                                ],
+                                onChanged: (v) =>
+                                    setState(() => repeatMinutes = v ?? 0),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        controller: labelCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Label',
+                          hintText: 'e.g. Wake up',
+                          isDense: true,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton.icon(
+                  icon: const Icon(Icons.add_alarm_rounded, size: 18),
+                  label: const Text('Schedule'),
+                  onPressed: () => Navigator.pop(ctx, true),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    final now = DateTime.now();
+    var when = DateTime(
+      now.year, now.month, now.day, time.hour, time.minute,
+    );
+    if (!when.isAfter(now)) {
+      when = when.add(const Duration(days: 1));
+    }
+
+    await SchedulerService.instance.addTask(
+      label: labelCtrl.text.trim().isEmpty ? actionType : labelCtrl.text.trim(),
+      actionType: actionType,
+      params: params,
+      scheduledAt: when,
+      repeatMinutes: repeatMinutes,
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Text('Scheduled for ${when.toString().split('.').first}'),
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: AppColors.success,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ));
   }
 
   @override
@@ -406,6 +589,13 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                       );
                   },
                 ),
+                _actionTile(
+                  isDark,
+                  Icons.add_alarm_rounded,
+                  'Schedule Action',
+                  AppColors.cyan,
+                  _scheduleAction,
+                ),
               ],
             ),
             const SizedBox(height: 16),
@@ -585,4 +775,14 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
       ),
     );
   }
+}
+
+/// A canned schedule preset shown in the "Schedule Action" dialog.
+class _SchedulePreset {
+  final IconData icon;
+  final String label;
+  final String action;
+  final Map<String, dynamic> params;
+
+  const _SchedulePreset(this.icon, this.label, this.action, this.params);
 }

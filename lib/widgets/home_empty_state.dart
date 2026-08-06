@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'agent_orb.dart';
 
-/// Animated empty-state greeting with suggestion chips.
+/// Redesigned empty-state: glowing agent orb, gradient greeting, and
+/// suggestion chips with gradient icons.
 class HomeEmptyState extends StatelessWidget {
   final String mode;
   final bool isDark;
@@ -15,6 +17,7 @@ class HomeEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final time = DateTime.now();
     String greeting;
     if (time.hour >= 5 && time.hour < 12) {
@@ -44,48 +47,49 @@ class HomeEmptyState extends StatelessWidget {
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
         child: Column(
           children: [
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    greeting,
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w300,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                      letterSpacing: -1.5,
-                      height: 1.1,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'How can I help you?',
-                    style: TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.primary,
-                      letterSpacing: -1.5,
-                      height: 1.2,
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 14),
+            const AgentOrb(size: 76),
+            const SizedBox(height: 22),
+            Text(
+              greeting,
+              style: TextStyle(
+                fontSize: 30,
+                fontWeight: FontWeight.w300,
+                color: scheme.onSurface.withValues(alpha: 0.55),
+                letterSpacing: -1.5,
+                height: 1.1,
               ),
             ),
-            const SizedBox(height: 48),
+            const SizedBox(height: 4),
+            ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF22D3EE), Color(0xFF8B5CF6)],
+              ).createShader(bounds),
+              child: Text(
+                'How can I help you?',
+                style: TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -1.5,
+                  height: 1.2,
+                ),
+              ),
+            ),
+            const SizedBox(height: 36),
             Align(
               alignment: Alignment.centerLeft,
               child: Row(
                 children: [
                   Icon(
-                    Icons.lightbulb_outline_rounded,
-                    size: 12,
-                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                    Icons.auto_awesome_rounded,
+                    size: 13,
+                    color: scheme.primary,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -93,7 +97,7 @@ class HomeEmptyState extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w800,
-                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                      color: scheme.onSurface.withValues(alpha: 0.6),
                       letterSpacing: 1.5,
                     ),
                   ),
@@ -116,32 +120,49 @@ class HomeEmptyState extends StatelessWidget {
                       borderRadius: BorderRadius.circular(16),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 12),
                         decoration: BoxDecoration(
-                          color: isDark ? const Color(0xFF151D30) : Colors.white,
+                          color: isDark
+                              ? const Color(0xFF151430)
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: isDark
-                                ? const Color(0xFF243049).withValues(alpha: 0.4)
+                                ? const Color(0xFF8B5CF6).withValues(alpha: 0.3)
                                 : const Color(0xFFE2E8F0),
                             width: 1.2,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: isDark ? 0.1 : 0.02),
+                              color: Colors.black.withValues(
+                                  alpha: isDark ? 0.15 : 0.03),
                               blurRadius: 8,
                               offset: const Offset(0, 3),
                             ),
                           ],
                         ),
                         child: Center(
-                          child: Text(
-                            suggestion,
-                            style: TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w600,
-                              color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.bolt_rounded,
+                                size: 14,
+                                color: const Color(0xFF8B5CF6),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                suggestion,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? const Color(0xFFF8FAFC)
+                                      : const Color(0xFF1E293B),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),

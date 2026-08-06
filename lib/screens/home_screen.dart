@@ -26,6 +26,10 @@ import '../services/telegram_service.dart';
 import '../services/chat_history_service.dart';
 import '../services/notification_service.dart';
 import '../services/storage_service.dart';
+import '../services/scheduler_service.dart';
+import '../widgets/home_header.dart';
+import '../widgets/typing_indicator.dart';
+import '../widgets/agent_orb.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
 import 'accounts_screen.dart';
@@ -98,6 +102,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _voiceService.init();
     await _telegramService.init();
     await _actionHandler.shizuku.checkAvailability();
+    await SchedulerService.instance.initialize();
 
     // Seed default preferences that may not have been set yet
     final prefs = await SharedPreferences.getInstance();
@@ -485,6 +490,58 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
+  /// Asks the AI to condense the current conversation into a short summary
+  /// bubble (added as a normal turn so it stays in the transcript).
+  Future<void> _summarizeChat() async {
+    if (_messages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No conversation to summarize yet.')),
+      );
+      return;
+    }
+    await _sendMessage(
+      'Summarize our conversation so far in a few concise bullet points '
+      '(under 120 words). Highlight the main decisions and any actions taken.',
+    );
+  }
+
+  String _dayLabel(DateTime dt) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final thatDay = DateTime(dt.year, dt.month, dt.day);
+    final diff = today.difference(thatDay).inDays;
+    if (diff == 0) return 'Today';
+    if (diff == 1) return 'Yesterday';
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[dt.month - 1]} ${dt.day}';
+  }
+
+  /// Flat list used by the chat ListView: greeting header, day-separator
+  /// labels (String), or the index of a message in [_messages] (int).
+  List<Object> get _messageEntries {
+    final entries = <Object>[
+      HomeHeader(
+        providerLabel: _aiService.activeKey?.name ?? _providerLabel,
+        model: _aiService.model,
+        isDark: Theme.of(context).brightness == Brightness.dark,
+        isOnline: true,
+      ),
+    ];
+    String? lastDay;
+    for (var i = 0; i < _messages.length; i++) {
+      final day = _dayLabel(_messages[i].timestamp);
+      if (day != lastDay) {
+        lastDay = day;
+        entries.add(day);
+      }
+      entries.add(i);
+    }
+    return entries;
+  }
+
   Future<void> _exportChatSession() async {
     if (_messages.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -680,38 +737,47 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF0C0A15) : const Color(0xFFFFFFFF),
       appBar: AppBar(
-        title: RichText(
-          text: TextSpan(
-            style: TextStyle(
-              fontSize: 20,
-              color: isDark ? Colors.white : const Color(0xFF1E293B),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const AgentOrb(size: 26, glow: false),
+            const SizedBox(width: 8),
+            Flexible(
+              child: RichText(
+                text: TextSpan(
+                  style: TextStyle(
+                    fontSize: 20,
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                  ),
+                  children: [
+                    TextSpan(
+                      text: 'AAA ',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w300,
+                        color: Theme.of(context).colorScheme.primary,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'Private',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w900,
+                        color: Theme.of(context).colorScheme.primary,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    TextSpan(
+                      text: 'Agent',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w400,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            children: [
-              TextSpan(
-                text: 'AAA ',
-                style: TextStyle(
-                  fontWeight: FontWeight.w300,
-                  color: Theme.of(context).colorScheme.primary,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              TextSpan(
-                text: 'Private',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  color: Theme.of(context).colorScheme.primary,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              TextSpan(
-                text: 'Agent',
-                style: TextStyle(
-                  fontWeight: FontWeight.w400,
-                  letterSpacing: -0.5,
-                ),
-              ),
-            ],
-          ),
+          ],
         ),
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
@@ -818,6 +884,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         currentSessionId: _sessionId,
         onNewChat: _startNewChat,
         onLoadSession: _loadSessionMessages,
+        onSummarize: _summarizeChat,
         onTaskHistory: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
@@ -917,22 +984,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     : ListView.builder(
                         controller: _scrollController,
                         physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                        itemCount: _messages.length,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 8),
+                        itemCount: _messageEntries.length,
                         itemBuilder: (context, index) {
+                          final entry = _messageEntries[index];
+                          if (entry is String) {
+                            return _DayChip(
+                              label: entry,
+                              isDark: isDark,
+                            );
+                          }
+                          final i = entry as int;
                           return MessageBubble(
-                            message: _messages[index],
+                            message: _messages[i],
+                            modelLabel: _messages[i].isUser
+                                ? null
+                                : _aiService.model,
                             onSpeakTap: () {
                               if (_voiceService.isSpeaking) {
                                 _voiceService.stopSpeaking();
                               } else {
-                                _voiceService.speak(_messages[index].content);
+                                _voiceService.speak(_messages[i].content);
                               }
                             },
-                            onDeleteTap: () => _deleteMessage(index),
-                            onRegenerateTap: _messages[index].isUser
+                            onDeleteTap: () => _deleteMessage(i),
+                            onRegenerateTap: _messages[i].isUser
                                 ? null
-                                : () => _regenerateResponse(index),
+                                : () => _regenerateResponse(i),
                           );
                         },
                       ),
@@ -945,15 +1024,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
-                      SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Theme.of(context).colorScheme.secondary,
-                          ),
-                        ),
+                      TypingIndicator(
+                        color: Theme.of(context).colorScheme.secondary,
+                        dotSize: 5,
                       ),
                       const SizedBox(width: 10),
                       ShaderMask(
@@ -1025,6 +1098,48 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Centered day separator chip shown between messages from different days.
+class _DayChip extends StatelessWidget {
+  final String label;
+  final bool isDark;
+
+  const _DayChip({required this.label, required this.isDark});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+          decoration: BoxDecoration(
+            color: isDark
+                ? const Color(0xFF151430)
+                : const Color(0xFFF1F5F9),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: isDark
+                  ? const Color(0xFF8B5CF6).withValues(alpha: 0.25)
+                  : const Color(0xFFE2E8F0),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.6,
+              color: isDark
+                  ? const Color(0xFFC4B5FD)
+                  : const Color(0xFF6D28D9),
+            ),
+          ),
+        ),
       ),
     );
   }

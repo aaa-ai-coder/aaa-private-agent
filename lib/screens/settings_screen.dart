@@ -16,6 +16,7 @@ import '../services/shizuku_service.dart';
 import '../services/screen_automation_service.dart';
 import '../services/telegram_service.dart';
 import '../services/storage_service.dart';
+import '../services/scheduler_service.dart';
 import '../models/api_key_config.dart';
 import 'task_history_screen.dart';
 import 'accounts_screen.dart';
@@ -189,6 +190,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               // 6. DEVICE AUTOMATION & AUTHORITY
               _buildDeviceAuthorityCard(isDark),
+              const SizedBox(height: 16),
+
+              // 6b. SCHEDULED TASKS
+              const _ScheduledTasksCard(),
               const SizedBox(height: 16),
 
               // 7. APP PREFERENCES & THEMING
@@ -1207,6 +1212,177 @@ class _SettingsScreenState extends State<SettingsScreen> {
           modelCtrl.text = model;
           nameCtrl.text = label;
         },
+      ),
+    );
+  }
+}
+
+/// Card listing active scheduled tasks with per-task cancel controls.
+class _ScheduledTasksCard extends StatefulWidget {
+  const _ScheduledTasksCard();
+
+  @override
+  State<_ScheduledTasksCard> createState() => _ScheduledTasksCardState();
+}
+
+class _ScheduledTasksCardState extends State<_ScheduledTasksCard> {
+  Future<void> _refresh() async {
+    await SchedulerService.instance.initialize();
+    if (mounted) setState(() {});
+  }
+
+  String _fmtTime(DateTime dt) {
+    final local = dt.toLocal();
+    final h = local.hour.toString().padLeft(2, '0');
+    final m = local.minute.toString().padLeft(2, '0');
+    return '$h:$m';
+  }
+
+  String _fmtRepeat(int minutes) {
+    if (minutes <= 0) return 'Once';
+    if (minutes == 30) return 'Every 30 min';
+    if (minutes == 60) return 'Every hour';
+    if (minutes == 360) return 'Every 6 hours';
+    if (minutes == 1440) return 'Daily';
+    return 'Every $minutes min';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final tasks = SchedulerService.instance.tasks;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.add_alarm_rounded,
+                  size: 18,
+                  color: isDark
+                      ? const Color(0xFFA78BFA)
+                      : const Color(0xFF7C3AED),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Scheduled Tasks',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  tooltip: 'Refresh',
+                  onPressed: _refresh,
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'The agent runs these actions automatically, even while you use other apps.',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? const Color(0xFF94A3B8)
+                    : const Color(0xFF64748B),
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (tasks.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.event_available_rounded,
+                      size: 18,
+                      color: isDark
+                          ? const Color(0xFF475569)
+                          : const Color(0xFF94A3B8),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'No scheduled tasks yet.',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else
+              ...tasks.map((t) {
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF131225)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF2A2847)
+                          : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.schedule_rounded,
+                        size: 18,
+                        color: const Color(0xFF22D3EE),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              t.label,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Text(
+                              '${_fmtTime(t.scheduledAt)} · ${_fmtRepeat(t.repeatMinutes)}',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        icon: Icon(
+                          Icons.delete_outline_rounded,
+                          size: 18,
+                          color: Colors.redAccent.withValues(alpha: 0.8),
+                        ),
+                        tooltip: 'Cancel task',
+                        onPressed: () async {
+                          await SchedulerService.instance.cancel(t.id);
+                          if (mounted) setState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }),
+          ],
+        ),
       ),
     );
   }

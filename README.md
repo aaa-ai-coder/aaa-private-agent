@@ -14,6 +14,14 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
 - Multi-provider AI (Groq, NVIDIA, Ollama Cloud, DeepSeek, Puter.js, local)
 - Multi-turn conversation with streaming
 - Task history and analytics
+- Scheduled Tasks: run any device action automatically at a chosen time (once
+  or repeating every 30 min / hour / 6 hours / daily); persisted and re-armed
+  after restarts, with active-schedule management in Settings
+- One-tap "Summarize Conversation" in the drawer and quick commands
+- Redesigned Nebula chat: agent orb avatar, animated typing indicator, day
+  separators, per-message model labels, gradient user bubbles
+- Smarter AI replies: rewritten system prompts (cleaner action parsing, concise
+  chat style, same-language replies) and fenced-JSON (` ```json `) action parsing
 - Automated data retention: auto-deletes chat history older than the
   configured window from the device, Supabase and the Firebase mirror
 - API keys saved permanently to Supabase (synced on every add/update/delete)
