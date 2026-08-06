@@ -49,6 +49,13 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
   prefers a saved network in range, otherwise connects to the best OPEN
   (password-less) network automatically; secured brand-new networks require
   their password (password cracking is not supported)
+- WiFi password recovery from your own device: `reveal_wifi_password` tries the
+  saved config, `cmd wifi get-saved-network`, then Android's own Share-QR screen
+  (pure-Dart QR decode) and caches the result so the AI can auto-connect later
+- Self-setting Shizuku on rooted devices: `setup_shizuku` starts the Shizuku
+  server and grants this app permission via root automatically
+- New Nebula app icon (adaptive + monochrome themed icon) and Android 12 splash
+- Stop button halts streaming AI responses and running tasks immediately
 
 ## Setup
 

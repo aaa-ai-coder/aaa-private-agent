@@ -14,6 +14,7 @@ import 'clipboard_service.dart';
 import 'device_info_service.dart';
 import 'firebase_service.dart';
 import 'storage_service.dart';
+import 'qr_decoder.dart';
 
 class ActionHandler {
   final AppLauncherService _appLauncher = AppLauncherService();
@@ -160,6 +161,19 @@ class ActionHandler {
           result = await _shizuku.connectToOpenNetwork(
             action.params['ssid'] as String? ?? '',
           );
+          break;
+
+        // Recover the password of a network saved on this device, via the
+        // saved config, `cmd wifi` detail, or Android's own Share-QR screen.
+        case 'reveal_wifi_password':
+          result = await _revealWifiPassword(
+            action.params['ssid'] as String? ?? '',
+          );
+          break;
+
+        // On a rooted device: start Shizuku and grant permission automatically.
+        case 'setup_shizuku':
+          result = await _shizuku.setupShizukuViaRoot();
           break;
 
         case 'toggle_wifi':
@@ -515,5 +529,77 @@ class ActionHandler {
   /// Cancel the currently running task
   void cancelTask() {
     _currentExecutor?.cancel();
+  }
+
+  /// Recover a saved WiFi network's password from the user's own device.
+  /// Tries (1) the WifiConfigStore XML, (2) `cmd wifi get-saved-network`,
+  /// then (3) Android's own Share-QR screen via UI automation. Recovered
+  /// passwords are cached so the agent can reuse them to connect.
+  Future<String> _revealWifiPassword(String ssid) async {
+    final name = ssid.trim().replaceAll('"', '');
+    if (name.isEmpty) return 'No SSID provided.';
+    if (!_shizuku.isAvailable && !_shizuku.isRootAvailable) {
+      return 'Root/Shizuku required to read saved WiFi configs.';
+    }
+
+    // 1) Config-file route.
+    final config = await _shizuku.getWifiPassword(name);
+    final configMatch =
+        RegExp(r'PreSharedKey[^>]*>\s*([^<\s]+)').firstMatch(config);
+    final configPass = configMatch?.group(1);
+    if (configPass != null &&
+        configPass.isNotEmpty &&
+        configPass != '...' &&
+        !configPass.contains('Cannot') &&
+        !configPass.contains('requires')) {
+      await _shizuku.storeRecoveredPassword(name, configPass);
+      return 'Recovered from device config. Password for "$name": $configPass';
+    }
+
+    // 2) cmd wifi saved-network detail.
+    final detail = await _shizuku.getSavedNetworkDetail(name);
+    final detailMatch =
+        RegExp(r'(?:preSharedKey|PreSharedKey)[^"]*"?\s*([^"<]+)')
+            .firstMatch(detail);
+    final detailPass = detailMatch?.group(1)?.trim();
+    if (detailPass != null &&
+        detailPass.isNotEmpty &&
+        !detailPass.contains(' ') &&
+        !detailPass.contains('unavailable')) {
+      await _shizuku.storeRecoveredPassword(name, detailPass);
+      return 'Recovered from saved network config. Password for "$name": $detailPass';
+    }
+
+    // 3) Android Share-QR route (best effort, device-specific).
+    await _systemControl.openSystemSetting('wifi');
+    await Future<void>.delayed(const Duration(milliseconds: 1200));
+    var opened = await _screenAutomation.clickByText(name);
+    if (opened) {
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      var tapped = await _screenAutomation.clickByText('Share');
+      if (!tapped) {
+        tapped = await _screenAutomation.clickByText('QR');
+      }
+      if (tapped) {
+        await Future<void>.delayed(const Duration(milliseconds: 800));
+        final path = await _shizuku.screenshotToFile();
+        if (path != null) {
+          final payload = QrDecoder.decodePngFile(path);
+          if (payload != null) {
+            final info = QrDecoder.parseWifiQr(payload);
+            if (info != null && info.password != null && info.password!.isNotEmpty) {
+              await _shizuku.storeRecoveredPassword(info.ssid, info.password!);
+              return 'Recovered from Share QR. Password for "${info.ssid}": '
+                  '${info.password}';
+            }
+            return 'QR decoded but it has no recoverable password: $payload';
+          }
+          return 'Reached the Share-QR screen but decoding failed. '
+              'Screenshot saved at: $path';
+        }
+      }
+    }
+    return 'Could not recover the password automatically. Open '
+        'Settings > WiFi > "$name" > Share and decode the QR with Google Lens.';
   }
 }

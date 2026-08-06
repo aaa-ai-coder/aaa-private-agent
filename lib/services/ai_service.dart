@@ -410,6 +410,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
 - set_auto_rotate: {"enable": true} - Turn auto-rotate on/off
 - clear_notifications: {} - Dismiss all active notifications
 - run_adb_command: {"command": "settings put global ..."} - Run ANY arbitrary ADB/shell command via Shizuku or root
+- setup_shizuku: {} - On a ROOTED device, start the Shizuku server and grant this app permission automatically (no manual setup)
 
 📶 NETWORK & CONNECTIVITY
 - scan_wifi: {} - Scan and list ALL available WiFi networks
@@ -420,6 +421,7 @@ No surrounding markdown block code fences, no introductory or trailing text arou
 - connect_open_wifi: {"ssid": "PublicWifi"} - Connect to a specific OPEN (password-less) network
 - get_current_wifi: {} - Show current WiFi network name
 - get_wifi_password: {"ssid": "MyWiFi"} - Retrieve a saved WiFi password (root/Shizuku)
+- reveal_wifi_password: {"ssid": "MyWiFi"} - Recover a saved network's password from the device config, cmd detail or Android's own Share-QR screen, then cache it for later auto-connect
 - toggle_wifi: {"enable": true} - Turn WiFi on or off
 - toggle_mobile_data: {"enable": true} - Turn mobile data on or off
 - toggle_bluetooth: {"enable": true} - Turn Bluetooth on or off

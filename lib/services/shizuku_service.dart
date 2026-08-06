@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:shizuku_api/shizuku_api.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ShizukuService {
   final ShizukuApi _shizuku = ShizukuApi();
@@ -377,6 +379,20 @@ class ShizukuService {
       return 'No saved network in range; connected to open network "$target".\n$r';
     }
 
+    // 3) Secured brand-new networks the AI has already recovered a password
+    //    for (via the Share-QR or saved-config route).
+    final recovered = await allRecoveredPasswords();
+    if (recovered.isNotEmpty) {
+      for (final n in inRange) {
+        final pass = recovered[n['ssid']];
+        if (pass != null && pass.isNotEmpty) {
+          final r = await connectToWifi(n['ssid']!, pass);
+          return 'Connected to secured network "${n['ssid']}" using a '
+              'previously recovered password.\n$r';
+        }
+      }
+    }
+
     return 'No saved network is in range and no open networks were found.\n'
         'In range (secured networks need their password): '
         '${inRangeNames.join(', ')}';
@@ -489,6 +505,117 @@ class ShizukuService {
     return runCommand(
       'screencap -p /sdcard/screenshot_$timestamp.png',
     );
+  }
+
+  /// Take a screenshot and return the saved file path (or null on failure).
+  Future<String?> screenshotToFile() async {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final path = '/sdcard/screenshot_$timestamp.png';
+    final result = await runCommand('screencap -p $path');
+    if (_looksLikeFailure(result)) return null;
+    return path;
+  }
+
+  /// Best-effort: dump a saved network's full config (some Android builds
+  /// include the preSharedKey here even when the XML store is encrypted).
+  Future<String> getSavedNetworkDetail(String ssid) async {
+    final id = await _findSavedNetworkId(ssid);
+    if (id == null) return 'Network "$ssid" is not saved on this device.';
+    return runCommand(
+      'cmd wifi get-saved-network $id 2>/dev/null || '
+      'echo "Saved network details unavailable on this build."',
+    );
+  }
+
+  // ─── Recovered password store ───────────────────────────────────
+  // Passwords the AI recovers from the user's own saved configs or the
+  // Android Share QR screen are cached locally so the agent can reuse them to
+  // connect without ever asking the user.
+
+  Future<Map<String, String>> allRecoveredPasswords() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('wifi_recovered') ?? '{}';
+    try {
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      return decoded.map((k, v) => MapEntry(k, v.toString()));
+    } catch (_) {
+      return {};
+    }
+  }
+
+  Future<String?> getRecoveredPassword(String ssid) async {
+    final all = await allRecoveredPasswords();
+    return all[ssid];
+  }
+
+  Future<void> storeRecoveredPassword(String ssid, String password) async {
+    final prefs = await SharedPreferences.getInstance();
+    final all = await allRecoveredPasswords();
+    all[ssid] = password;
+    await prefs.setString('wifi_recovered', jsonEncode(all));
+  }
+
+  Future<void> removeRecoveredPassword(String ssid) async {
+    final prefs = await SharedPreferences.getInstance();
+    final all = await allRecoveredPasswords();
+    all.remove(ssid);
+    await prefs.setString('wifi_recovered', jsonEncode(all));
+  }
+
+  // ─── Self setup via root ────────────────────────────────────────
+
+  /// On a rooted device, start the Shizuku server and grant this app
+  /// permission automatically so no manual Shizuku setup is required.
+  Future<String> setupShizukuViaRoot() async {
+    if (!_rootAvailable) {
+      await checkAvailability();
+    }
+    if (!_rootAvailable) {
+      return 'Root is not available. To use Shizuku without root, enable it '
+          'once over ADB (see Settings > Shizuku), or grant root access.';
+    }
+    final steps = <String>[];
+    // 1) Start the Shizuku server from its data dir (rooted path).
+    final start = await _runAsRoot(
+      'sh /sdcard/Android/data/moe.shizuku.privileged.api/start.sh 2>/dev/null || '
+      'sh /data/local/tmp/shizuku/start.sh 2>/dev/null || '
+      'echo "START_SCRIPT_MISSING"',
+    );
+    if (start.contains('START_SCRIPT_MISSING')) {
+      steps.add('Shizuku app not installed - install it first, then retry.');
+    } else {
+      steps.add('Shizuku server started: ${start.trim().replaceAll('\n', ' ')}');
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 800));
+
+    // 2) Grant this app the Shizuku binder permission via appops (root).
+    final grant = await _runAsRoot(
+      'cmd appops set com.aaa.privateagent SHIZUKU_USER allow 2>/dev/null || '
+      'appops set com.aaa.privateagent SHIZUKU_USER allow 2>/dev/null || '
+      'echo "GRANT_FAILED"',
+    );
+    if (grant.contains('GRANT_FAILED')) {
+      steps.add('Could not auto-grant permission (no root appops access).');
+    } else {
+      steps.add('Permission granted to com.aaa.privateagent.');
+    }
+
+    // 3) Refresh binder state.
+    await checkAvailability();
+    steps.add(_isAvailable
+        ? 'Shizuku is now available (permission: $_hasPermission).'
+        : 'Shizuku still not reachable - try launching the Shizuku app once.');
+    return steps.join('\n');
+  }
+
+  /// Root fallback for the SHIZUKU_USER appops grant, used by the app itself.
+  Future<bool> selfGrantShizukuPermission() async {
+    final result = await _runAsRoot(
+      'cmd appops set com.aaa.privateagent SHIZUKU_USER allow 2>/dev/null || '
+      'appops set com.aaa.privateagent SHIZUKU_USER allow',
+    );
+    await checkAvailability();
+    return _hasPermission || !_looksLikeFailure(result);
   }
 
   /// Install an APK from a file path

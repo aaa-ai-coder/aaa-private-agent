@@ -53,6 +53,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   final List<ChatMessage> _messages = [];
   bool _isLoading = false;
+  bool _stopRequested = false;
   bool _isListening = false;
   bool _continuousVoiceMode = false;
 
@@ -177,6 +178,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() {
       _messages.add(userMessage);
       _isLoading = true;
+      _stopRequested = false;
     });
     _updateOverlayState();
     _textController.clear();
@@ -217,6 +219,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     setState(() {
       _messages.removeRange(ui + 1, _messages.length);
       _isLoading = true;
+      _stopRequested = false;
     });
     _rebuildAiHistory();
     _sendOverlayHistorySnapshot();
@@ -262,6 +265,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       String accumulated = '';
 
       await for (final chunk in stream) {
+        if (_stopRequested) break;
         accumulated += chunk;
         if (mounted) {
           setState(() {
@@ -274,6 +278,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
       }
       await _safeSaveSession();
+
+      // User pressed Stop: keep whatever partial text arrived and do not
+      // attempt action execution or voice output.
+      if (_stopRequested) return;
 
       // Check if it's an action
       final action = _aiService.parseAction(accumulated);
@@ -974,6 +982,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           onPressed: () {
                             _actionHandler.cancelTask();
                             setState(() {
+                              _stopRequested = true;
                               _isLoading = false;
                             });
                           },

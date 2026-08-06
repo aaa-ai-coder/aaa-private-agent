@@ -70,6 +70,49 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
       );
   }
 
+  /// Ask for a single text value, then run the generated action.
+  Future<void> _promptAndRun(
+    String label,
+    String hint,
+    AgentAction Function(String value) buildAction,
+  ) async {
+    final controller = TextEditingController(text: hint);
+    final value = await showDialog<String>(
+      context: context,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return AlertDialog(
+          backgroundColor: isDark ? AppColors.darkSurfaceHigh : Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text('Enter value'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: label,
+              hintText: hint,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: const Text('Run'),
+            ),
+          ],
+        );
+      },
+    );
+    if (value == null || value.isEmpty) return;
+    await _run(buildAction(value));
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -302,10 +345,66 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
                 ),
                 _actionTile(
                   isDark,
+                  Icons.phone_android_rounded,
+                  'Device Info',
+                  AppColors.indigo,
+                  () => _run(_a('get_device_info', {})),
+                ),
+                _actionTile(
+                  isDark,
+                  Icons.battery_full_rounded,
+                  'Battery',
+                  AppColors.success,
+                  () => _run(_a('get_battery', {})),
+                ),
+                _actionTile(
+                  isDark,
+                  Icons.apps_rounded,
+                  'Open App',
+                  AppColors.violet,
+                  () => _promptAndRun('App name to open:', 'WhatsApp',
+                      (v) => _a('open_app', {'app_name': v})),
+                ),
+                _actionTile(
+                  isDark,
                   Icons.wifi_find_rounded,
                   'Auto Connect',
                   AppColors.info,
                   () => _run(_a('connect_available_wifi', {})),
+                ),
+                _actionTile(
+                  isDark,
+                  Icons.key_rounded,
+                  'Recover WiFi Pass',
+                  AppColors.warning,
+                  () => _promptAndRun('Network SSID to recover:', 'HomeNet',
+                      (v) => _a('reveal_wifi_password', {'ssid': v})),
+                ),
+                _actionTile(
+                  isDark,
+                  Icons.admin_panel_settings_rounded,
+                  'Setup Shizuku',
+                  AppColors.violet,
+                  () async {
+                    HapticFeedback.mediumImpact();
+                    setState(() => _busy = true);
+                    final result =
+                        await widget.actionHandler.shizuku.setupShizukuViaRoot();
+                    if (!mounted) return;
+                    setState(() => _busy = false);
+                    _status = result.split('\n').join(' ');
+                    ScaffoldMessenger.of(context)
+                      ..hideCurrentSnackBar()
+                      ..showSnackBar(
+                        SnackBar(
+                          content: Text(result),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      );
+                  },
                 ),
               ],
             ),
