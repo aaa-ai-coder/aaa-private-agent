@@ -13,6 +13,7 @@ class HomeDrawer extends StatefulWidget {
   final VoidCallback onTaskHistory;
   final VoidCallback onSettings;
   final VoidCallback onSummarize;
+  final VoidCallback onClearChat;
 
   const HomeDrawer({
     super.key,
@@ -23,6 +24,7 @@ class HomeDrawer extends StatefulWidget {
     required this.onTaskHistory,
     required this.onSettings,
     required this.onSummarize,
+    required this.onClearChat,
   });
 
   @override
@@ -388,6 +390,19 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   onTap: () {
                     Navigator.pop(context);
                     widget.onSummarize();
+                  },
+                ),
+                ListTile(
+                  horizontalTitleGap: 8,
+                  leading: Icon(
+                    Icons.delete_sweep_rounded,
+                    color: widget.isDark ? Colors.grey[400] : Colors.grey[600],
+                    size: 20,
+                  ),
+                  title: Text('Clear Conversation', style: textStyle),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onClearChat();
                   },
                 ),
                 ListTile(

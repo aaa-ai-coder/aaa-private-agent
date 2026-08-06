@@ -21,7 +21,11 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
 - Redesigned Nebula chat: agent orb avatar, animated typing indicator, day
   separators, per-message model labels, gradient user bubbles
 - Smarter AI replies: rewritten system prompts (cleaner action parsing, concise
-  chat style, same-language replies) and fenced-JSON (` ```json `) action parsing
+  chat style, same-language replies) and fenced-JSON (```json) action parsing
+- Long-press any message: Rewrite with AI (polish the text) or Translate with
+  AI (pick from 11 languages) — results stream in as a new assistant reply
+- Conversation search: find any message and jump to it with a highlight
+- Export conversations as Markdown or structured JSON (re-importable)
 - Automated data retention: auto-deletes chat history older than the
   configured window from the device, Supabase and the Firebase mirror
 - API keys saved permanently to Supabase (synced on every add/update/delete)

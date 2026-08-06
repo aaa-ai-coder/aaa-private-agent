@@ -56,6 +56,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   late final TelegramService _telegramService;
 
   final List<ChatMessage> _messages = [];
+  final Map<int, GlobalKey> _messageKeys = {};
+  int? _searchHighlightIndex;
   bool _isLoading = false;
   bool _stopRequested = false;
   bool _isListening = false;
@@ -487,7 +489,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _sessionTitle = '';
       _messages.clear();
       _aiService.clearHistory();
+      _messageKeys.clear();
+      _searchHighlightIndex = null;
     });
+  }
+
+  /// Clears the current view without opening a new session.
+  Future<void> _clearConversation() async {
+    setState(() {
+      _messages.clear();
+      _aiService.clearHistory();
+      _messageKeys.clear();
+      _searchHighlightIndex = null;
+    });
+    _sendOverlayHistorySnapshot();
+    await _safeSaveSession();
   }
 
   /// Asks the AI to condense the current conversation into a short summary
@@ -503,6 +519,257 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       'Summarize our conversation so far in a few concise bullet points '
       '(under 120 words). Highlight the main decisions and any actions taken.',
     );
+  }
+
+  /// Streams an AI helper turn (rewrite/translate) WITHOUT adding a user
+  /// bubble — the result appears directly as a new assistant message.
+  Future<void> _aiAssistMessage(String prompt) async {
+    if (_isLoading) return;
+    final assistantMessage = ChatMessage(role: 'assistant', content: '');
+    setState(() {
+      _messages.add(assistantMessage);
+      _isLoading = true;
+      _stopRequested = false;
+    });
+    final assistantIndex = _messages.length - 1;
+    try {
+      final stream = _aiService
+          .sendMessageStream(prompt, isAgentMode: false)
+          .timeout(
+            const Duration(seconds: 90),
+            onTimeout: (sink) {
+              sink.addError(
+                TimeoutException(
+                  'The model did not return visible text within 90 seconds.',
+                ),
+              );
+              sink.close();
+            },
+          );
+      String accumulated = '';
+      await for (final chunk in stream) {
+        if (_stopRequested) break;
+        accumulated += chunk;
+        if (mounted) {
+          setState(() {
+            _messages[assistantIndex] = ChatMessage(
+              role: 'assistant',
+              content: accumulated,
+            );
+          });
+          _scrollToBottom();
+        }
+      }
+      await _safeSaveSession();
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          if (_messages.length > assistantIndex) {
+            _messages.removeAt(assistantIndex);
+          }
+          _messages.add(
+            ChatMessage(
+              role: 'assistant',
+              content:
+                  'Error: ${e.toString().replaceFirst('Exception: ', '')}',
+            ),
+          );
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      }
+    }
+  }
+
+  Future<void> _rewriteMessage(int index) async {
+    if (index < 0 || index >= _messages.length) return;
+    final content = _messages[index].content;
+    await _aiAssistMessage(
+      'Rewrite the following text to be clearer, more polished and more '
+      'professional. Keep the meaning and the same language. Only output the '
+      'rewritten text.\n\n$content',
+    );
+  }
+
+  Future<void> _translateMessage(int index) async {
+    if (index < 0 || index >= _messages.length) return;
+    const languages = [
+      'English', 'Bangla', 'Hindi', 'Spanish', 'French', 'Arabic',
+      'German', 'Japanese', 'Chinese', 'Russian', 'Portuguese',
+    ];
+    final target = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          margin: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Text(
+                    'Translate to',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                ...languages.map(
+                  (lang) => ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.translate_rounded, size: 20),
+                    title: Text(lang),
+                    onTap: () => Navigator.pop(ctx, lang),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (target == null) return;
+    final content = _messages[index].content;
+    await _aiAssistMessage(
+      'Translate the following text into $target. Only output the '
+      'translation, nothing else.\n\n$content',
+    );
+  }
+
+  /// Search the current conversation; tapping a result jumps to and
+  /// highlights the matching message.
+  Future<void> _openSearch() async {
+    if (_messages.isEmpty) return;
+    final controller = TextEditingController();
+    String query = '';
+    final target = await showDialog<int>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            final matches = query.isEmpty
+                ? <int>[]
+                : [
+                    for (var i = 0; i < _messages.length; i++)
+                      if (_messages[i].content
+                          .toLowerCase()
+                          .contains(query.toLowerCase()))
+                        i,
+                  ];
+            return AlertDialog(
+              title: const Text('Search conversation'),
+              content: SizedBox(
+                width: 340,
+                height: 360,
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: controller,
+                      autofocus: true,
+                      onChanged: (v) => setState(() => query = v),
+                      decoration: const InputDecoration(
+                        hintText: 'Search messages...',
+                        prefixIcon: Icon(Icons.search_rounded),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Expanded(
+                      child: matches.isEmpty
+                          ? Center(
+                              child: Text(
+                                query.isEmpty
+                                    ? 'Type to search'
+                                    : 'No matches found',
+                                style: TextStyle(
+                                  color: Theme.of(ctx)
+                                      .colorScheme
+                                      .onSurface
+                                      .withValues(alpha: 0.5),
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              itemCount: matches.length,
+                              itemBuilder: (context, i) {
+                                final mi = matches[i];
+                                final msg = _messages[mi];
+                                final preview = msg.content.replaceAll(
+                                  RegExp(r'\s+'),
+                                  ' ',
+                                );
+                                return ListTile(
+                                  dense: true,
+                                  leading: Icon(
+                                    msg.isUser
+                                        ? Icons.person_rounded
+                                        : Icons.smart_toy_rounded,
+                                    size: 18,
+                                  ),
+                                  title: Text(
+                                    preview.length > 60
+                                        ? '${preview.substring(0, 60)}...'
+                                        : preview,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  subtitle: Text(
+                                    msg.isUser ? 'You' : 'Agent',
+                                    style: const TextStyle(fontSize: 11),
+                                  ),
+                                  onTap: () => Navigator.pop(ctx, mi),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Close'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (target == null) return;
+
+    setState(() => _searchHighlightIndex = target);
+    final entryIndex = _messageEntries.indexWhere(
+      (e) => e is int && e == target,
+    );
+    if (entryIndex >= 0 && _scrollController.hasClients) {
+      _scrollController.animateTo(
+        (entryIndex * 64.0).clamp(
+          0.0,
+          _scrollController.position.maxScrollExtent,
+        ),
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeOut,
+      );
+    }
+    // Clear the highlight after a short moment.
+    Future<void>.delayed(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _searchHighlightIndex = null);
+    });
   }
 
   String _dayLabel(DateTime dt) {
@@ -563,6 +830,90 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final exportedText = buffer.toString();
     await SharePlus.instance.share(
       ShareParams(text: exportedText, subject: 'AAA Private Agent Chat Export'),
+    );
+  }
+
+  /// Share sheet: export the conversation as Markdown or structured JSON.
+  Future<void> _showExportSheet() async {
+    if (_messages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No chat history to export.')),
+      );
+      return;
+    }
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return Container(
+          margin: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                  child: Text(
+                    'Export conversation',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.description_rounded, size: 20),
+                  title: const Text('Markdown (.md)'),
+                  subtitle: Text(
+                    'Readable transcript for docs or sharing',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(ctx, 'md'),
+                ),
+                ListTile(
+                  dense: true,
+                  leading: const Icon(Icons.data_object_rounded, size: 20),
+                  title: const Text('JSON'),
+                  subtitle: Text(
+                    'Full structured data, re-importable',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
+                    ),
+                  ),
+                  onTap: () => Navigator.pop(ctx, 'json'),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (choice == 'md') return _exportChatSession();
+    if (choice != 'json') return;
+
+    final payload = jsonEncode({
+      'app': 'AAA Private Agent',
+      'exported_at': DateTime.now().toIso8601String(),
+      'messages': _messages.map((m) => m.toJson()).toList(),
+    });
+    await SharePlus.instance.share(
+      ShareParams(text: payload, subject: 'AAA Private Agent Chat Export (JSON)'),
     );
   }
 
@@ -826,9 +1177,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             },
           ),
           IconButton(
+            icon: const Icon(Icons.search_rounded),
+            tooltip: 'Search conversation',
+            onPressed: _messages.isEmpty ? null : _openSearch,
+          ),
+          IconButton(
             icon: const Icon(Icons.share_rounded),
             tooltip: 'Export & Share Chat',
-            onPressed: _messages.isEmpty ? null : _exportChatSession,
+            onPressed: _messages.isEmpty ? null : _showExportSheet,
           ),
           IconButton(
             icon: const Icon(Icons.psychology_rounded),
@@ -885,6 +1241,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         onNewChat: _startNewChat,
         onLoadSession: _loadSessionMessages,
         onSummarize: _summarizeChat,
+        onClearChat: _clearConversation,
         onTaskHistory: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
@@ -996,22 +1353,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             );
                           }
                           final i = entry as int;
-                          return MessageBubble(
-                            message: _messages[i],
-                            modelLabel: _messages[i].isUser
-                                ? null
-                                : _aiService.model,
-                            onSpeakTap: () {
-                              if (_voiceService.isSpeaking) {
-                                _voiceService.stopSpeaking();
-                              } else {
-                                _voiceService.speak(_messages[i].content);
-                              }
-                            },
-                            onDeleteTap: () => _deleteMessage(i),
-                            onRegenerateTap: _messages[i].isUser
-                                ? null
-                                : () => _regenerateResponse(i),
+                          final key =
+                              _messageKeys.putIfAbsent(i, () => GlobalKey());
+                          return KeyedSubtree(
+                            key: key,
+                            child: MessageBubble(
+                              message: _messages[i],
+                              modelLabel: _messages[i].isUser
+                                  ? null
+                                  : _aiService.model,
+                              highlight: _searchHighlightIndex == i,
+                              onSpeakTap: () {
+                                if (_voiceService.isSpeaking) {
+                                  _voiceService.stopSpeaking();
+                                } else {
+                                  _voiceService.speak(_messages[i].content);
+                                }
+                              },
+                              onDeleteTap: () => _deleteMessage(i),
+                              onRegenerateTap: _messages[i].isUser
+                                  ? null
+                                  : () => _regenerateResponse(i),
+                              onRewriteTap: () => _rewriteMessage(i),
+                              onTranslateTap: () => _translateMessage(i),
+                            ),
                           );
                         },
                       ),

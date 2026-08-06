@@ -7,19 +7,25 @@ import 'agent_orb.dart';
 class MessageBubble extends StatelessWidget {
   final ChatMessage message;
   final String? modelLabel;
+  final bool highlight;
   final VoidCallback? onSpeakTap;
   final VoidCallback? onCopyTap;
   final VoidCallback? onDeleteTap;
   final VoidCallback? onRegenerateTap;
+  final VoidCallback? onRewriteTap;
+  final VoidCallback? onTranslateTap;
 
   const MessageBubble({
     super.key,
     required this.message,
     this.modelLabel,
+    this.highlight = false,
     this.onSpeakTap,
     this.onCopyTap,
     this.onDeleteTap,
     this.onRegenerateTap,
+    this.onRewriteTap,
+    this.onTranslateTap,
   });
 
   @override
@@ -49,12 +55,16 @@ class MessageBubble extends StatelessWidget {
           bottomRight: Radius.circular(isUser ? 4 : 20),
         ),
         border: isUser
-            ? null
+            ? (highlight
+                ? Border.all(color: const Color(0xFF22D3EE), width: 2)
+                : null)
             : Border.all(
-                color: isDark
-                    ? const Color(0xFF8B5CF6).withValues(alpha: 0.25)
-                    : const Color(0xFFE2E8F0),
-                width: 1.2,
+                color: highlight
+                    ? const Color(0xFF22D3EE)
+                    : isDark
+                        ? const Color(0xFF8B5CF6).withValues(alpha: 0.25)
+                        : const Color(0xFFE2E8F0),
+                width: highlight ? 2 : 1.2,
               ),
         boxShadow: [
           BoxShadow(
@@ -342,6 +352,26 @@ class MessageBubble extends StatelessWidget {
                     onTap: () {
                       Navigator.pop(ctx);
                       onRegenerateTap!();
+                    },
+                  ),
+                if (onRewriteTap != null)
+                  _actionTile(
+                    ctx,
+                    icon: Icons.auto_fix_high_rounded,
+                    label: 'Rewrite with AI',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      onRewriteTap!();
+                    },
+                  ),
+                if (onTranslateTap != null)
+                  _actionTile(
+                    ctx,
+                    icon: Icons.translate_rounded,
+                    label: 'Translate with AI',
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      onTranslateTap!();
                     },
                   ),
                 _actionTile(

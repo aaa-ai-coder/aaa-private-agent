@@ -404,7 +404,31 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
               ],
             ),
             const SizedBox(height: 20),
-            _sectionLabel('Quick Actions', isDark),
+            _sectionLabel('Command Deck', isDark),
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 12,
+                    color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'One-tap actions using the exact same pipeline the AI agent uses',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color:
+                            isDark ? AppColors.darkMuted : AppColors.lightMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
             const SizedBox(height: 10),
             GridView.count(
               crossAxisCount: 2,
