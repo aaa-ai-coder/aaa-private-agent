@@ -1,5 +1,35 @@
 import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// Curated const icon set for custom quick commands. Kept as const
+/// [IconData] so Flutter's icon tree-shaking (--tree-shake-icons) can
+/// include only the glyphs that are actually referenced.
+const List<IconData> kCommandIcons = [
+  Icons.star_rounded,
+  Icons.favorite_rounded,
+  Icons.home_rounded,
+  Icons.email_rounded,
+  Icons.work_rounded,
+  Icons.restaurant_rounded,
+  Icons.directions_car_rounded,
+  Icons.school_rounded,
+  Icons.shopping_bag_rounded,
+  Icons.fitness_center_rounded,
+  Icons.lightbulb_rounded,
+  Icons.bolt_rounded,
+  Icons.music_note_rounded,
+  Icons.flashlight_on_rounded,
+];
+
+/// Resolves a stored icon codepoint back to a const [IconData] from
+/// [kCommandIcons]. Falls back to a safe default for unknown codes.
+IconData commandIcon(int code) {
+  for (final icon in kCommandIcons) {
+    if (icon.codePoint == code) return icon;
+  }
+  return Icons.star_rounded;
+}
 
 /// A user-defined quick command chip shown alongside the built-in ones.
 class CustomCommand {

@@ -520,18 +520,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return StatefulBuilder(
           builder: (ctx, setSheetState) {
-            final icons = <IconData>[
-              Icons.star_rounded,
-              Icons.favorite_rounded,
-              Icons.home_rounded,
-              Icons.email_rounded,
-              Icons.work_rounded,
-              Icons.restaurant_rounded,
-              Icons.directions_car_rounded,
-              Icons.school_rounded,
-              Icons.shopping_bag_rounded,
-              Icons.fitness_center_rounded,
-            ];
+            final icons = kCommandIcons;
             return Padding(
               padding: EdgeInsets.only(
                 left: 16,
@@ -594,8 +583,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             dense: true,
                             contentPadding: EdgeInsets.zero,
                             leading: Icon(
-                              IconData(c.iconCode,
-                                  fontFamily: 'MaterialIcons'),
+                              commandIcon(c.iconCode),
                               size: 20,
                               color: const Color(0xFFFF8A5C),
                             ),

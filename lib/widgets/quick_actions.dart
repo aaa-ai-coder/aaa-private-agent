@@ -87,7 +87,7 @@ class QuickActions extends StatelessWidget {
                 if (index < customCommands.length) {
                   final custom = customCommands[index];
                   return _ActionChip(
-                    icon: IconData(custom.iconCode, fontFamily: 'MaterialIcons'),
+                    icon: commandIcon(custom.iconCode),
                     label: custom.label,
                     isDark: isDark,
                     custom: true,
