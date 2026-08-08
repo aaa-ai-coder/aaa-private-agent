@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/chat_message.dart';
+import '../models/agent_action.dart';
 import '../models/language_config.dart';
 import '../services/ai_service.dart';
 import '../services/action_handler.dart';
@@ -99,11 +100,33 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _telegramService = TelegramService(_actionHandler, _aiService);
-    _initServices();
+    unawaited(_initServicesSafe());
     _startOverlayHistorySync();
-    _loadCustomCommands();
+    unawaited(_loadCustomCommandsSafe());
     // Register as the handler for overlay bubble tasks
     onOverlayTask = _onOverlayTask;
+  }
+
+  /// Initializes services without ever crashing or blocking first render.
+  Future<void> _initServicesSafe() async {
+    try {
+      await _initServices();
+    } catch (e) {
+      developer.log('Service init failed: $e', name: 'PrivateAgent');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadCustomCommandsSafe() async {
+    try {
+      await _loadCustomCommands();
+    } catch (e) {
+      developer.log('Custom commands load failed: $e', name: 'PrivateAgent');
+    }
   }
 
   Future<void> _initServices() async {
@@ -229,57 +252,101 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _streamAssistantResponse(trimmed, isAgent: _mode == 'agent');
   }
 
-  /// Runs the fully offline assistant: executes device-control actions it
-  /// recognizes or replies with plain text (spoken when auto-read is on).
+  /// Offline AI mode: prefers a real on-device LLM (Ollama at localhost), and
+  /// falls back to the instant intent-based assistant when no model is running.
   Future<void> _handleOfflineMessage(String text) async {
     if (!mounted) return;
-    final result = OfflineAssistantService.handle(text);
 
+    final prefs = await SharedPreferences.getInstance();
+    final localBase = prefs.getString('offline_llm_base_url') ??
+        'http://127.0.0.1:11434/v1';
+    final localModel =
+        prefs.getString('offline_llm_model') ?? 'llama3.2';
+
+    String? localReply;
+    try {
+      localReply = await _aiService.sendToLocalEndpoint(
+        text,
+        baseUrl: localBase,
+        model: localModel,
+      );
+    } catch (e) {
+      developer.log('Local model unavailable: $e', name: 'PrivateAgent');
+    }
+
+    if (localReply != null && localReply.trim().isNotEmpty) {
+      final localAction = _aiService.parseAction(localReply);
+      if (localAction != null) {
+        await _executeOfflineAction(localAction, text);
+      } else {
+        if (!mounted) return;
+        setState(() {
+          _messages.add(
+            ChatMessage(role: 'assistant', content: localReply),
+          );
+        });
+        _scrollToBottom();
+        await _safeSaveSession();
+        await _speakIfEnabled(localReply);
+      }
+      _updateOverlayState();
+      return;
+    }
+
+    final result = OfflineAssistantService.handle(text);
     if (result.action != null) {
-      await _showTaskProgressOverlay('Starting: $text');
-      final actionResult = await _actionHandler.execute(
-        result.action!,
-        aiService: _aiService,
-        onProgress: (msg) {
-          if (mounted) {
-            setState(() {
-              _messages.add(ChatMessage(role: 'assistant', content: '⏳ $msg'));
-            });
-            _scrollToBottom();
-          }
-        },
-      );
-      if (!mounted) return;
-      setState(() {
-        _messages.add(
-          ChatMessage(
-            role: 'assistant',
-            content: actionResult.success
-                ? (result.action!.response.isNotEmpty
-                    ? result.action!.response
-                    : (actionResult.details ?? 'Done.'))
-                : '⚠️ ${actionResult.details ?? 'Action could not be completed.'}',
-            actionResult: actionResult,
-          ),
-        );
-      });
-      _scrollToBottom();
-      _sendOverlayEvent(
-        'OVERLAY_TASK_FINISHED',
-        actionResult.success
-            ? (actionResult.details ?? 'Task complete.')
-            : 'Task failed: ${actionResult.details ?? 'Unknown error'}',
-      );
+      await _executeOfflineAction(result.action!, text);
     } else {
       if (!mounted) return;
       setState(() {
         _messages.add(ChatMessage(role: 'assistant', content: result.reply));
       });
       _scrollToBottom();
+      await _safeSaveSession();
       await _speakIfEnabled(result.reply);
     }
-    await _safeSaveSession();
     _updateOverlayState();
+  }
+
+  Future<void> _executeOfflineAction(
+    AgentAction action,
+    String text,
+  ) async {
+    await _showTaskProgressOverlay('Starting: $text');
+    final actionResult = await _actionHandler.execute(
+      action,
+      aiService: _aiService,
+      onProgress: (msg) {
+        if (mounted) {
+          setState(() {
+            _messages.add(ChatMessage(role: 'assistant', content: '⏳ $msg'));
+          });
+          _scrollToBottom();
+        }
+      },
+    );
+    if (!mounted) return;
+    setState(() {
+      _messages.add(
+        ChatMessage(
+          role: 'assistant',
+          content: actionResult.success
+              ? (action.response.isNotEmpty
+                  ? action.response
+                  : (actionResult.details ?? 'Done.'))
+              : '⚠️ ${actionResult.details ?? 'Action could not be completed.'}',
+          actionResult: actionResult,
+        ),
+      );
+    });
+    _scrollToBottom();
+    _sendOverlayEvent(
+      'OVERLAY_TASK_FINISHED',
+      actionResult.success
+          ? (actionResult.details ?? 'Task complete.')
+          : 'Task failed: ${actionResult.details ?? 'Unknown error'}',
+    );
+    await _safeSaveSession();
   }
 
   /// Speaks [text] when auto-read TTS is enabled (or voice mode is active).

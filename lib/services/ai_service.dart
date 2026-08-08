@@ -528,7 +528,54 @@ RULES:
     _memory = await MemoryService.memoryBlock();
   }
 
-  Future<void> saveSettings({    required String apiKey,
+  /// Sends a single turn to a real on-device/local LLM (e.g. Ollama running
+  /// on the phone at http://127.0.0.1:11434/v1) over the OpenAI-compatible
+  /// chat endpoint. Fully offline, no API key. Used by Offline AI mode.
+  Future<String> sendToLocalEndpoint(
+    String message, {
+    required String baseUrl,
+    required String model,
+  }) async {
+    final systemPrompt = _chatSystemPrompt + _memory;
+    final messages = [
+      if (_useSystemPrompt) {'role': 'system', 'content': systemPrompt},
+      ..._conversationHistory,
+      {'role': 'user', 'content': message},
+    ];
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/chat/completions'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'model': model,
+            'messages': messages,
+            'temperature': _temperature,
+            'max_tokens': _effectiveMaxTokens,
+          }),
+        )
+        .timeout(const Duration(minutes: 2));
+    if (response.statusCode != 200) {
+      throw Exception('Local model error (${response.statusCode})');
+    }
+    final data = jsonDecode(response.body);
+    if (data is! Map<String, dynamic> ||
+        !data.containsKey('choices') ||
+        data['choices'].isEmpty) {
+      throw Exception('Unexpected local model response');
+    }
+    String content = data['choices'][0]['message']['content'] as String;
+    content = content
+        .replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '')
+        .trim();
+    if (content.isEmpty) {
+      throw Exception('Local model returned an empty response');
+    }
+    _conversationHistory.add({'role': 'assistant', 'content': content});
+    return content;
+  }
+
+  Future<void> saveSettings({
+    required String apiKey,
     String? baseUrl,
     String? model,
     String? name,

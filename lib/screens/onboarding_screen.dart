@@ -182,6 +182,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       } else if (provider == 'deepseek') {
         _baseUrlController.text = 'https://api.deepseek.com';
         _modelController.text = 'deepseek-chat';
+      } else if (provider == 'ollama') {
+        _baseUrlController.text = 'http://127.0.0.1:11434/v1';
+        _modelController.text = 'llama3.2';
+        _apiKeyController.clear();
       } else if (provider == 'puter') {
         _baseUrlController.text = AiService.puterBaseUrl;
         _modelController.text = AiService.puterDefaultModel;
@@ -1139,6 +1143,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               physics: const BouncingScrollPhysics(),
               children: [
                 _buildProviderCard('free', 'Free AI', Icons.auto_awesome_rounded, isDark, highlight: true),
+                const SizedBox(width: 10),
+                _buildProviderCard('ollama', 'Ollama On-device', Icons.memory_rounded, isDark),
                 const SizedBox(width: 10),
                 _buildProviderCard('groq', 'Groq Free', Icons.bolt_rounded, isDark),
                 const SizedBox(width: 10),

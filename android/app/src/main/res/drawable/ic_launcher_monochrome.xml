@@ -5,12 +5,9 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Monochrome silhouette for Android 13 themed icons -->
-    <path android:fillColor="#FFFFFF" android:pathData="M54,22A32,32,0,1,0,54,86A32,32,0,1,0,54,22z"/>
+    <!-- Monochrome "A" silhouette for Android 13 themed icons -->
     <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="3"
-        android:pathData="M54,40 C80,40 80,68 54,68 C28,68 28,40 54,40 Z"/>
-    <path android:fillColor="#FFFFFF" android:pathData="M80,54A3.4,3.4,0,1,0,80,60.8A3.4,3.4,0,1,0,80,54z"/>
+        android:fillColor="#FFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M21.6,79.9 L86.4,79.9 L54,32.4 Z M33.5,68 L74.5,68 L54,58.6 Z M28.7,42.6 L79.3,42.6 L79.3,52.4 L28.7,52.4 Z"/>
 </vector>

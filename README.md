@@ -33,12 +33,16 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
   drawer and Settings
 - Custom Quick Commands: pin your own frequent requests as home-screen chips
   (icon, label and AI command) right from the quick-command bar
-- Offline AI Assistant (v4.3): a fully on-device intent-based assistant that
-  controls the phone (WiFi, Bluetooth, hotspot, mobile data, DND, brightness,
-  volume, ringer, media, alarms, timers, screenshots, open apps, lock/wake,
-  home, system settings, battery & device info) and chats — no API key, no
-  internet. Emits the same actions as the cloud agent and speaks via TTS.
-  Enable it in Settings > Offline AI & Memory.
+- Offline AI Assistant (v4.3/v4.4): two layers — a **real on-device LLM** via
+  Ollama (localhost OpenAI-compatible endpoint, fully offline, no key; test the
+  connection in Settings) and an instant intent-based fallback that controls the
+  phone (WiFi, Bluetooth, hotspot, mobile data, DND, brightness, volume, ringer,
+  media, alarms, timers, screenshots, open apps, lock/wake, home, system
+  settings, battery & device info) and chats. Both emit the same actions as the
+  cloud agent and speak via TTS. Enable in Settings > Offline AI & Memory.
+- New Aurora app logo: coral/peach/rose gradient with a white "A" monogram and
+  amber spark — adaptive (Android 8+), monochrome (Android 13 themed) and legacy
+  launcher icons regenerated
 - AI Memory (v4.3): the assistant remembers facts about you across
   conversations ("my name is Alex", "remember that I like short answers").
   Facts are stored on-device, injected into the AI system prompt, and

@@ -1148,10 +1148,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               builder: (context, snapshot) {
                 return SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Offline Assistant'),
+                  title: const Text('Offline AI'),
                   subtitle: const Text(
-                    'Use the built-in on-device AI for phone control and chat — '
-                    'no API key or internet needed.',
+                    'Use a real on-device LLM (Ollama) for phone control and '
+                    'chat — no internet or API key. Falls back to the instant '
+                    'assistant when no local model is running.',
                   ),
                   value: snapshot.data ?? false,
                   onChanged: (val) async {
@@ -1162,6 +1163,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
+            const _LocalOllamaConfig(),
             ListTile(
               contentPadding: EdgeInsets.zero,
               leading: Container(
@@ -1311,6 +1313,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _presetChip('NVIDIA NIM', 'https://integrate.api.nvidia.com/v1', 'z-ai/glm-5.2', urlCtrl, modelCtrl, nameCtrl),
                     _presetChip('DeepSeek', 'https://api.deepseek.com', 'deepseek-chat', urlCtrl, modelCtrl, nameCtrl),
                     _presetChip('Puter', 'https://api.puter.com/v2/chat', 'gpt-4o-mini', urlCtrl, modelCtrl, nameCtrl),
+                    _presetChip('Ollama (on-device)', 'http://127.0.0.1:11434/v1', 'llama3.2', urlCtrl, modelCtrl, nameCtrl),
                   ],
                 ),
               ),
@@ -1555,6 +1558,170 @@ class _ScheduledTasksCardState extends State<_ScheduledTasksCard> {
               }),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Configures a real on-device/local LLM (Ollama) used by Offline AI mode.
+/// Stores the base URL + model locally and can verify the connection.
+class _LocalOllamaConfig extends StatefulWidget {
+  const _LocalOllamaConfig();
+
+  @override
+  State<_LocalOllamaConfig> createState() => _LocalOllamaConfigState();
+}
+
+class _LocalOllamaConfigState extends State<_LocalOllamaConfig> {
+  final TextEditingController _urlController = TextEditingController(
+    text: 'http://127.0.0.1:11434/v1',
+  );
+  final TextEditingController _modelController = TextEditingController(
+    text: 'llama3.2',
+  );
+  bool _testing = false;
+  String? _testResult;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    _urlController.text = prefs.getString('offline_llm_base_url') ??
+        'http://127.0.0.1:11434/v1';
+    _modelController.text =
+        prefs.getString('offline_llm_model') ?? 'llama3.2';
+  }
+
+  Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('offline_llm_base_url', _urlController.text.trim());
+    await prefs.setString('offline_llm_model', _modelController.text.trim());
+  }
+
+  Future<void> _test() async {
+    setState(() {
+      _testing = true;
+      _testResult = null;
+    });
+    await _save();
+    try {
+      final reply = await AiService.instance.sendToLocalEndpoint(
+        'Say "Local model OK" in one short line.',
+        baseUrl: _urlController.text.trim(),
+        model: _modelController.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() {
+        _testing = false;
+        _testResult = 'Connected. Model replied: ${reply.length > 40 ? '${reply.substring(0, 40)}…' : reply}';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _testing = false;
+        _testResult =
+            'Not reachable. Start Ollama on this phone (localhost:11434) and pull '
+            'the model, then try again. (${e.toString().replaceFirst('Exception: ', '')})';
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    _modelController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final fieldColor = isDark
+        ? const Color(0xFF241B21)
+        : const Color(0xFFF7F0E9);
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'On-device model (Ollama)',
+            style: TextStyle(
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+              color: isDark ? const Color(0xFFEDE0D8) : const Color(0xFF5A4638),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _urlController,
+            decoration: InputDecoration(
+              labelText: 'Base URL',
+              hintText: 'http://127.0.0.1:11434/v1',
+              filled: true,
+              fillColor: fieldColor,
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (_) => _save(),
+          ),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _modelController,
+            decoration: InputDecoration(
+              labelText: 'Model',
+              hintText: 'llama3.2',
+              filled: true,
+              fillColor: fieldColor,
+              isDense: true,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide.none,
+              ),
+            ),
+            onChanged: (_) => _save(),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              if (_testing)
+                const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              else
+                OutlinedButton.icon(
+                  onPressed: _test,
+                  icon: const Icon(Icons.network_check_rounded, size: 16),
+                  label: const Text('Test connection'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                ),
+            ],
+          ),
+          if (_testResult != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _testResult!,
+              style: TextStyle(
+                fontSize: 11.5,
+                height: 1.4,
+                color: _testResult!.startsWith('Connected')
+                    ? const Color(0xFF2FBF8F)
+                    : const Color(0xFFFF6B4A),
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

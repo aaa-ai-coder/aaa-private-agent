@@ -5,20 +5,26 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Deep space base -->
+    <!-- Aurora warm base -->
     <path
-        android:fillColor="#0B0A1A"
+        android:fillColor="#FF6B4A"
         android:pathData="M0,0h108v108h-108z"/>
 
-    <!-- Soft indigo nebula glow -->
+    <!-- Rose glow (bottom) -->
     <path
-        android:fillColor="#1E1B4B"
-        android:alpha="0.55"
-        android:pathData="M54,10A44,44,0,1,0,54,98A44,44,0,1,0,54,10z"/>
+        android:fillColor="#F65E8B"
+        android:alpha="0.45"
+        android:pathData="M54,38A34,34,0,1,0,54,106A34,34,0,1,0,54,38z"/>
 
-    <!-- Cyan halo hint -->
+    <!-- Amber glow (top-right) -->
     <path
-        android:fillColor="#0E7490"
-        android:alpha="0.30"
-        android:pathData="M54,26A28,28,0,1,0,54,82A28,28,0,1,0,54,26z"/>
+        android:fillColor="#FFB86B"
+        android:alpha="0.35"
+        android:pathData="M66,6A28,28,0,1,0,66,62A28,28,0,1,0,66,6z"/>
+
+    <!-- Peach light (top-left) -->
+    <path
+        android:fillColor="#FF8A5C"
+        android:alpha="0.5"
+        android:pathData="M8,8A30,30,0,1,0,8,68A30,30,0,1,0,8,8z"/>
 </vector>

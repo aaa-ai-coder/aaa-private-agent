@@ -93,6 +93,36 @@ class AboutScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
+          _section('What\u2019s new in v4.4', isDark),
+          const SizedBox(height: 8),
+          _card(
+            isDark,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                _WhatNewItem(
+                  icon: Icons.smart_toy_rounded,
+                  color: AppColors.orange,
+                  text: 'Real offline LLM — connect a local Ollama model on your '
+                      'phone (no internet, no key). Offline AI falls back to the '
+                      'instant assistant when no model is running.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.bug_report_rounded,
+                  color: AppColors.success,
+                  text: 'Crash-proof startup: every service initializes inside a '
+                      'safety net so the app never gets stuck or crashes.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.apps_rounded,
+                  color: AppColors.indigo,
+                  text: 'New Aurora logo — warm coral/peach/rose gradient with a '
+                      'white "A" monogram and amber spark, adaptive + monochrome.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           _section('What\u2019s new in v4.3', isDark),
           const SizedBox(height: 8),
           _card(

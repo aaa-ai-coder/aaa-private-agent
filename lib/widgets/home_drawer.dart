@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/database_service.dart';
 import '../services/chat_history_service.dart';
+import '../utils/app_info.dart';
 import '../main.dart';
 
 /// Modern navigation drawer with search, cloud backend badges, and session history.
