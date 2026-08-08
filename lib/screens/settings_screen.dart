@@ -21,6 +21,7 @@ import '../models/api_key_config.dart';
 import 'task_history_screen.dart';
 import 'accounts_screen.dart';
 import 'app_lock_screen.dart';
+import 'about_screen.dart';
 import 'permissions_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
@@ -201,9 +202,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const _ScheduledTasksCard(),
               const SizedBox(height: 16),
 
-              // 7. APP PREFERENCES & THEMING
-              _buildPreferencesCard(isDark),
-              const SizedBox(height: 24),
+               // 6c. ABOUT & WHAT'S NEW
+               _buildAboutCard(isDark),
+               const SizedBox(height: 16),
+
+               // 7. APP PREFERENCES & THEMING
+               _buildPreferencesCard(isDark),
+               const SizedBox(height: 24),
             ],
           ),
         ),
@@ -1109,6 +1114,50 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
                 );
               },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAboutCard(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.info_outline_rounded, color: Color(0xFFFF8A5C), size: 20),
+                SizedBox(width: 8),
+                Text('About & What\u2019s New', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const Divider(height: 20),
+            Text(
+              'Version 4.0.0 (Aurora) — warm redesign, Discover hub, permission '
+              'dashboard, custom commands and more. See the full changelog.',
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.45,
+                color: isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonalIcon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const AboutScreen()),
+                  );
+                },
+                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: const Text('Open changelog'),
+              ),
             ),
           ],
         ),

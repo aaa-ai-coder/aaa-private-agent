@@ -219,6 +219,68 @@ class DiscoverScreen extends StatelessWidget {
         ),
       ],
     ),
+    _CapabilityGroup(
+      title: 'Quick Settings',
+      icon: Icons.toggle_on_rounded,
+      color: AppColors.teal,
+      items: [
+        _Capability(
+          icon: Icons.battery_saver_rounded,
+          label: 'Battery saver',
+          subtitle: 'Conserve battery life',
+          command: 'Turn on battery saver',
+        ),
+        _Capability(
+          icon: Icons.location_on_rounded,
+          label: 'Location',
+          subtitle: 'Toggle GPS service',
+          command: 'Turn on location',
+        ),
+        _Capability(
+          icon: Icons.brightness_medium_rounded,
+          label: 'Brightness',
+          subtitle: 'Set screen level',
+          command: 'Set brightness to 70%',
+        ),
+        _Capability(
+          icon: Icons.volume_down_rounded,
+          label: 'Silence phone',
+          subtitle: 'Mute the ringer',
+          command: 'Mute the ringer',
+        ),
+      ],
+    ),
+    _CapabilityGroup(
+      title: 'Web & AI',
+      icon: Icons.language_rounded,
+      color: AppColors.info,
+      items: [
+        _Capability(
+          icon: Icons.quiz_rounded,
+          label: 'Quick Q&A',
+          subtitle: 'Ask anything',
+          command: 'Explain black holes in simple terms',
+        ),
+        _Capability(
+          icon: Icons.translate_rounded,
+          label: 'Daily briefing',
+          subtitle: 'Summarize your day',
+          command: 'Give me a short summary of my day so far',
+        ),
+        _Capability(
+          icon: Icons.menu_book_rounded,
+          label: 'Learn a topic',
+          subtitle: 'Deep dive on anything',
+          command: 'Teach me the basics of photography',
+        ),
+        _Capability(
+          icon: Icons.list_alt_rounded,
+          label: 'Make a plan',
+          subtitle: 'Turn goals into steps',
+          command: 'Create a weekly workout plan',
+        ),
+      ],
+    ),
   ];
 
   @override

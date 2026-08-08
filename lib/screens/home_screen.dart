@@ -35,6 +35,7 @@ import 'settings_screen.dart';
 import 'task_history_screen.dart';
 import 'accounts_screen.dart';
 import 'control_panel_screen.dart';
+import 'about_screen.dart';
 import 'discover_screen.dart';
 import 'permissions_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
@@ -1498,6 +1499,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           if (mounted) setState(() {});
         },
         onDiscover: () => _openDiscover(),
+        onAbout: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AboutScreen()),
+        ),
         onExportChat: _showExportSheet,
         onPermissions: () => Navigator.push(
           context,

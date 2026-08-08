@@ -18,6 +18,7 @@ class HomeDrawer extends StatefulWidget {
   final VoidCallback onDiscover;
   final VoidCallback onExportChat;
   final VoidCallback onPermissions;
+  final VoidCallback onAbout;
 
   const HomeDrawer({
     super.key,
@@ -33,6 +34,7 @@ class HomeDrawer extends StatefulWidget {
     required this.onDiscover,
     required this.onExportChat,
     required this.onPermissions,
+    required this.onAbout,
   });
 
   @override
@@ -505,6 +507,19 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   onTap: () {
                     Navigator.pop(context);
                     widget.onSettings();
+                  },
+                ),
+                ListTile(
+                  horizontalTitleGap: 8,
+                  leading: Icon(
+                    Icons.info_outline_rounded,
+                    color: widget.isDark ? Colors.grey[400] : Colors.grey[600],
+                    size: 20,
+                  ),
+                  title: Text('About & What\u2019s New', style: textStyle),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onAbout();
                   },
                 ),
                 const SizedBox(height: 12),
