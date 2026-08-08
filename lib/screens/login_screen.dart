@@ -187,7 +187,7 @@ class _LoginScreenState extends State<LoginScreen>
     final auth = widget.authService;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF090710) : const Color(0xFFF8FAFC),
+      backgroundColor: isDark ? const Color(0xFF171015) : const Color(0xFFFFFBF4),
       body: Stack(
         children: [
           Positioned(
@@ -199,7 +199,7 @@ class _LoginScreenState extends State<LoginScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(colors: [
-                  isDark ? const Color(0xFF6366F1).withValues(alpha: 0.25) : const Color(0xFF4F46E5).withValues(alpha: 0.12),
+                  isDark ? const Color(0xFFFF6B4A).withValues(alpha: 0.25) : const Color(0xFFFF6B4A).withValues(alpha: 0.12),
                   Colors.transparent,
                 ]),
               ),
@@ -214,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(colors: [
-                  isDark ? const Color(0xFF38BDF8).withValues(alpha: 0.2) : const Color(0xFF0EA5E9).withValues(alpha: 0.1),
+                  isDark ? const Color(0xFFFFB86B).withValues(alpha: 0.2) : const Color(0xFFFF8A5C).withValues(alpha: 0.1),
                   Colors.transparent,
                 ]),
               ),
@@ -271,7 +271,7 @@ class _LoginScreenState extends State<LoginScreen>
                           style: TextStyle(
                             fontSize: 28,
                             fontWeight: FontWeight.w900,
-                            color: isDark ? Colors.white : const Color(0xFF1E293B),
+                            color: isDark ? Colors.white : const Color(0xFF2E1F1A),
                             letterSpacing: -0.5,
                           ),
                         ),
@@ -280,7 +280,7 @@ class _LoginScreenState extends State<LoginScreen>
                           _isRegistering ? 'Create your secure account' : 'Sign in to your account',
                           style: TextStyle(
                             fontSize: 14,
-                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            color: isDark ? const Color(0xFFA8938C) : const Color(0xFF8C7A6E),
                           ),
                         ),
                         const SizedBox(height: 32),
@@ -322,7 +322,7 @@ class _LoginScreenState extends State<LoginScreen>
                             style: OutlinedButton.styleFrom(
                               foregroundColor: isDark ? Colors.white : Colors.black87,
                               side: BorderSide(
-                                color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+                                color: isDark ? const Color(0xFF3B2C33) : const Color(0xFFE3D2BF),
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(16),
@@ -360,17 +360,17 @@ class _LoginScreenState extends State<LoginScreen>
                             hintText: 'you@example.com',
                             prefixIcon: const Icon(Icons.email_outlined, size: 18),
                             filled: true,
-                            fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                            fillColor: isDark ? const Color(0xFF171015) : Colors.white,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide(
-                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                                color: isDark ? const Color(0xFF3B2C33) : const Color(0xFFF0E3D3),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide(
-                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                                color: isDark ? const Color(0xFF3B2C33) : const Color(0xFFF0E3D3),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(
@@ -400,17 +400,17 @@ class _LoginScreenState extends State<LoginScreen>
                               onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                             ),
                             filled: true,
-                            fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                            fillColor: isDark ? const Color(0xFF171015) : Colors.white,
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide(
-                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                                color: isDark ? const Color(0xFF3B2C33) : const Color(0xFFF0E3D3),
                               ),
                             ),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(14),
                               borderSide: BorderSide(
-                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                                color: isDark ? const Color(0xFF3B2C33) : const Color(0xFFF0E3D3),
                               ),
                             ),
                             focusedBorder: OutlineInputBorder(

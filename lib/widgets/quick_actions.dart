@@ -49,13 +49,13 @@ class QuickActions extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                  color: const Color(0xFFFF6B4A).withValues(alpha: 0.15),
                   shape: BoxShape.circle,
                 ),
                 child: const Icon(
                   Icons.auto_awesome_rounded,
                   size: 11,
-                  color: Color(0xFFA78BFA),
+                  color: Color(0xFFFF9A6B),
                 ),
               ),
               const SizedBox(width: 6),
@@ -65,7 +65,7 @@ class QuickActions extends StatelessWidget {
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.2,
-                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  color: isDark ? const Color(0xFFA8938C) : const Color(0xFF8C7A6E),
                 ),
               ),
             ],
@@ -124,13 +124,13 @@ class _ActionChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED);
+    final primary = isDark ? const Color(0xFFFF9A6B) : const Color(0xFFFF6B4A);
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E1B4B).withValues(alpha: 0.4) : const Color(0xFFF1F5F9),
+        color: isDark ? const Color(0xFF241B21).withValues(alpha: 0.4) : const Color(0xFFF7EDE0),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? const Color(0xFF8B5CF6).withValues(alpha: 0.2) : const Color(0xFFCBD5E1),
+          color: isDark ? const Color(0xFFFF6B4A).withValues(alpha: 0.2) : const Color(0xFFE3D2BF),
           width: 1.0,
         ),
       ),
@@ -152,7 +152,7 @@ class _ActionChip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B),
+                    color: isDark ? const Color(0xFFF9F1EA) : const Color(0xFF2E1F1A),
                   ),
                 ),
               ],

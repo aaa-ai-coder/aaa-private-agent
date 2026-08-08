@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:image/image.dart' as img;
 import 'package:zxing2/qrcode.dart';
 
@@ -19,7 +20,7 @@ class QrDecoder {
   /// Decode the first QR code found in PNG bytes.
   static String? decodePngBytes(List<int> bytes) {
     try {
-      final image = img.decodeImage(bytes);
+      final image = img.decodeImage(Uint8List.fromList(bytes));
       if (image == null) return null;
       final source = RGBLuminanceSource(
         image.width,

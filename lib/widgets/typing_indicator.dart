@@ -7,7 +7,7 @@ class TypingIndicator extends StatefulWidget {
 
   const TypingIndicator({
     super.key,
-    this.color = const Color(0xFF8B5CF6),
+    this.color = const Color(0xFFF65E8B),
     this.dotSize = 6,
   });
 

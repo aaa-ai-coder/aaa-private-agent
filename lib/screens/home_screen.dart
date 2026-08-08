@@ -34,6 +34,7 @@ import 'settings_screen.dart';
 import 'task_history_screen.dart';
 import 'accounts_screen.dart';
 import 'control_panel_screen.dart';
+import 'discover_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:share_plus/share_plus.dart';
 import '../main.dart';
@@ -610,7 +611,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return Container(
           margin: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
+            color: isDark ? const Color(0xFF241B21) : Colors.white,
             borderRadius: BorderRadius.circular(20),
           ),
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -653,6 +654,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   /// Search the current conversation; tapping a result jumps to and
   /// highlights the matching message.
+  /// Pushes the Discover capabilities hub; tapping a card sends its command.
+  Future<void> _openDiscover() async {
+    final command = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(builder: (_) => const DiscoverScreen()),
+    );
+    if (command != null && command.trim().isNotEmpty && mounted) {
+      _sendMessage(command.trim());
+    }
+  }
+
   Future<void> _openSearch() async {
     if (_messages.isEmpty) return;
     final controller = TextEditingController();
@@ -849,7 +861,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         return Container(
           margin: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF1E1B4B) : Colors.white,
+            color: isDark ? const Color(0xFF241B21) : Colors.white,
             borderRadius: BorderRadius.circular(20),
           ),
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -877,8 +889,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF64748B),
+                        ? const Color(0xFFA8938C)
+                          : const Color(0xFF8C7A6E),
                     ),
                   ),
                   onTap: () => Navigator.pop(ctx, 'md'),
@@ -892,8 +904,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     style: TextStyle(
                       fontSize: 12,
                       color: isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF64748B),
+                        ? const Color(0xFFA8938C)
+                          : const Color(0xFF8C7A6E),
                     ),
                   ),
                   onTap: () => Navigator.pop(ctx, 'json'),
@@ -1086,7 +1098,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      backgroundColor: isDark ? const Color(0xFF0C0A15) : const Color(0xFFFFFFFF),
+      backgroundColor: isDark ? const Color(0xFF171015) : const Color(0xFFFFFFFF),
       appBar: AppBar(
         title: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1098,7 +1110,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 text: TextSpan(
                   style: TextStyle(
                     fontSize: 20,
-                    color: isDark ? Colors.white : const Color(0xFF1E293B),
+                    color: isDark ? Colors.white : const Color(0xFF2E1F1A),
                   ),
                   children: [
                     TextSpan(
@@ -1145,7 +1157,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               _continuousVoiceMode
                   ? Icons.record_voice_over_rounded
                   : Icons.voice_over_off_rounded,
-              color: _continuousVoiceMode ? Colors.tealAccent : null,
+              color: _continuousVoiceMode ? const Color(0xFFFFB86B) : null,
             ),
             tooltip: _continuousVoiceMode
                 ? 'Hands-Free Voice Mode Active'
@@ -1159,7 +1171,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Hands-Free Voice Mode ON: AI will speak and listen continuously!'),
-                    backgroundColor: Colors.teal,
+                    backgroundColor: const Color(0xFF2FBF8F),
                   ),
                 );
                 if (!_isListening && !_voiceService.isSpeaking) {
@@ -1182,37 +1194,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             onPressed: _messages.isEmpty ? null : _openSearch,
           ),
           IconButton(
-            icon: const Icon(Icons.share_rounded),
-            tooltip: 'Export & Share Chat',
-            onPressed: _messages.isEmpty ? null : _showExportSheet,
-          ),
-          IconButton(
             icon: const Icon(Icons.psychology_rounded),
             tooltip: 'Quick AI Model Switcher',
             onPressed: () => ModelPickerSheet.show(context, _aiService, () {
               setState(() {});
             }),
-          ),
-          IconButton(
-            icon: const Icon(Icons.add_comment_outlined),
-            tooltip: 'New chat',
-            onPressed: _isLoading ? null : _startNewChat,
-          ),
-          IconButton(
-            icon: const Icon(Icons.tune_rounded),
-            tooltip: 'Phone Control Panel',
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => ControlPanelScreen(
-                    actionHandler: _actionHandler,
-                  ),
-                ),
-              );
-              await _actionHandler.shizuku.checkAvailability();
-              if (mounted) setState(() {});
-            },
           ),
           // Settings Action
           IconButton(
@@ -1242,6 +1228,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         onLoadSession: _loadSessionMessages,
         onSummarize: _summarizeChat,
         onClearChat: _clearConversation,
+        onControlPanel: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => ControlPanelScreen(
+                actionHandler: _actionHandler,
+              ),
+            ),
+          );
+          await _actionHandler.shizuku.checkAvailability();
+          if (mounted) setState(() {});
+        },
+        onDiscover: () => _openDiscover(),
+        onExportChat: _showExportSheet,
         onTaskHistory: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
@@ -1337,6 +1337,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                         mode: _mode,
                         isDark: isDark,
                         onSend: _sendMessage,
+                        onExplore: _openDiscover,
                       )
                     : ListView.builder(
                         controller: _scrollController,
@@ -1484,13 +1485,13 @@ class _DayChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
           decoration: BoxDecoration(
             color: isDark
-                ? const Color(0xFF151430)
-                : const Color(0xFFF1F5F9),
+                ? const Color(0xFF241B21)
+                : const Color(0xFFF7EDE0),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isDark
-                  ? const Color(0xFF8B5CF6).withValues(alpha: 0.25)
-                  : const Color(0xFFE2E8F0),
+                  ? const Color(0xFFFF6B4A).withValues(alpha: 0.25)
+                  : const Color(0xFFF0E3D3),
             ),
           ),
           child: Text(
@@ -1500,8 +1501,8 @@ class _DayChip extends StatelessWidget {
               fontWeight: FontWeight.w800,
               letterSpacing: 0.6,
               color: isDark
-                  ? const Color(0xFFC4B5FD)
-                  : const Color(0xFF6D28D9),
+                  ? const Color(0xFFFFC9A8)
+                  : const Color(0xFFC2503A),
             ),
           ),
         ),

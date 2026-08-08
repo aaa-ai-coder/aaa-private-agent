@@ -58,7 +58,7 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    final primaryColor = widget.isDark ? const Color(0xFFA78BFA) : const Color(0xFF7C3AED);
+    final primaryColor = widget.isDark ? const Color(0xFFFF8A5C) : const Color(0xFFFF6B4A);
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
@@ -69,7 +69,7 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
           colors: [
             Colors.transparent,
             widget.isDark
-                ? const Color(0xFF0C0A15).withValues(alpha: 0.96)
+                ? const Color(0xFF171015).withValues(alpha: 0.96)
                 : Colors.white.withValues(alpha: 0.96),
           ],
         ),
@@ -121,7 +121,7 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
                       fontWeight: FontWeight.w700,
                       color: widget.isListening
                           ? Colors.redAccent
-                          : (widget.isDark ? const Color(0xFFC084FC) : const Color(0xFF6D28D9)),
+                          : (widget.isDark ? const Color(0xFFFF9A6B) : const Color(0xFFC2503A)),
                     ),
                   ),
                 ],
@@ -146,8 +146,8 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
                                 begin: Alignment.topLeft,
                                 end: Alignment.bottomRight,
                                 colors: [
-                                  Color(0xFF1E1B4B),
-                                  Color(0xFF312E81),
+                                  Color(0xFFFF8A5C),
+                                  Color(0xFFF65E8B),
                                 ],
                               ),
                         color: widget.isListening ? Colors.redAccent : null,
@@ -195,18 +195,18 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
                 child: Container(
                   decoration: BoxDecoration(
                     color: widget.isDark
-                        ? const Color(0xFF151430)
+                        ? const Color(0xFF241B21)
                         : Colors.white,
                     borderRadius: BorderRadius.circular(24),
                     border: Border.all(
                       color: widget.isDark
-                          ? const Color(0xFF8B5CF6).withValues(alpha: 0.3)
-                          : const Color(0xFFE2E8F0),
+                          ? const Color(0xFFFF8A5C).withValues(alpha: 0.3)
+                          : const Color(0xFFF0E3D3),
                       width: 1.2,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF7C3AED).withValues(alpha: widget.isDark ? 0.12 : 0.08),
+                        color: const Color(0xFFFF6B4A).withValues(alpha: widget.isDark ? 0.12 : 0.08),
                         blurRadius: 14,
                         offset: const Offset(0, 4),
                       ),
@@ -224,7 +224,7 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
                           controller: widget.controller,
                           style: TextStyle(
                             fontSize: 14,
-                            color: widget.isDark ? Colors.white : const Color(0xFF0F172A),
+                            color: widget.isDark ? Colors.white : const Color(0xFF2E1F1A),
                           ),
                           decoration: InputDecoration(
                             hintText: widget.isListening
@@ -233,8 +233,8 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
                             hintStyle: TextStyle(
                               fontSize: 13,
                               color: widget.isDark
-                                  ? const Color(0xFF64748B)
-                                  : const Color(0xFF94A3B8),
+                                  ? const Color(0xFFA8938C)
+                                  : const Color(0xFF8C7A6E),
                             ),
                             contentPadding: const EdgeInsets.symmetric(
                                 horizontal: 18, vertical: 12),
@@ -254,14 +254,14 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
                           shape: BoxShape.circle,
                           gradient: const LinearGradient(
                             colors: [
-                              Color(0xFF6366F1),
-                              Color(0xFF8B5CF6),
-                              Color(0xFFA855F7),
+                              Color(0xFFFF6B4A),
+                              Color(0xFFF65E8B),
+                              Color(0xFFFF8A5C),
                             ],
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF8B5CF6).withValues(alpha: 0.45),
+                              color: const Color(0xFFF65E8B).withValues(alpha: 0.45),
                               blurRadius: 10,
                               spreadRadius: 1,
                               offset: const Offset(0, 2),

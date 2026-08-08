@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/agent_action.dart';
+import '../models/chat_message.dart';
 import 'action_handler.dart';
 import 'ai_service.dart';
 import 'notification_service.dart';

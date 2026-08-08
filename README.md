@@ -18,8 +18,18 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
   or repeating every 30 min / hour / 6 hours / daily); persisted and re-armed
   after restarts, with active-schedule management in Settings
 - One-tap "Summarize Conversation" in the drawer and quick commands
-- Redesigned Nebula chat: agent orb avatar, animated typing indicator, day
+- Redesigned Aurora chat: agent orb avatar, animated typing indicator, day
   separators, per-message model labels, gradient user bubbles
+- Aurora design language v4.0: warm sunrise palette (coral, peach, rose, amber)
+  with creamy light surfaces and espresso dark surfaces, applied consistently
+  across every screen — chat, drawer, control panel, settings, onboarding and
+  login — with light/dark themes rebuilt from one central theme
+- Discover Capabilities hub: browse every feature in one place (voice, Wi-Fi,
+  calls & SMS, media, device controls, productivity, privacy recovery) and tap
+  any card to send it to the AI agent
+- Decluttered chat AppBar (7 -> 4 actions) with a reorganised drawer that groups
+  tools into a dedicated section (Control Panel, Discover, Task History, Export,
+  Summarize, Clear, Settings)
 - Smarter AI replies: rewritten system prompts (cleaner action parsing, concise
   chat style, same-language replies) and fenced-JSON (```json) action parsing
 - Long-press any message: Rewrite with AI (polish the text) or Translate with
@@ -32,7 +42,7 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
 - Automated backup cleanup: the Cloudflare Worker drops R2 DB snapshots
   older than 30 days on its daily schedule
 - Dark/Light theme with Material 3
-- Nebula design language: unified light/dark theme across the whole app
+- Aurora design language: unified light/dark theme across the whole app
 - PIN App Lock: salted SHA-256 PIN, auto-locks when the app is backgrounded
 - Fingerprint / face unlock shortcut (Android BiometricPrompt) for the app lock
 - Home dashboard status bar: live AI provider + R2 + cloud-sync indicators with
@@ -66,7 +76,7 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
   (pure-Dart QR decode) and caches the result so the AI can auto-connect later
 - Self-setting Shizuku on rooted devices: `setup_shizuku` starts the Shizuku
   server and grants this app permission via root automatically
-- New Nebula app icon (adaptive + monochrome themed icon) and Android 12 splash
+- New Aurora app icon (adaptive + monochrome themed icon) and Android 12 splash
 - Stop button halts streaming AI responses and running tasks immediately
 
 ## Setup

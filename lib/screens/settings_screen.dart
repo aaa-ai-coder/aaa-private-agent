@@ -111,7 +111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('✓ API Keys auto-synced with Supabase cloud'),
-          backgroundColor: Color(0xFF10B981),
+          backgroundColor: Color(0xFF2FBF8F),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -139,7 +139,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             end: Alignment.bottomCenter,
           )
         : const LinearGradient(
-            colors: [Color(0xFFF8FAFC), Color(0xFFE2E8F0)],
+            colors: [Color(0xFFFFFBF4), Color(0xFFF0E3D3)],
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
           );
@@ -221,7 +221,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: const LinearGradient(
-                      colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)],
+                      colors: [Color(0xFFFF8A5C), Color(0xFFF65E8B)],
                     ),
                   ),
                   child: const Icon(Icons.person_rounded, color: Colors.white, size: 26),
@@ -241,19 +241,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                          color: const Color(0xFF2FBF8F).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.3)),
+                          border: Border.all(color: const Color(0xFF2FBF8F).withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: const [
-                            Icon(Icons.cloud_done_rounded, color: Color(0xFF10B981), size: 12),
+                            Icon(Icons.cloud_done_rounded, color: Color(0xFF2FBF8F), size: 12),
                             SizedBox(width: 4),
                             Text(
                               'Auto-Synced with Supabase',
                               style: TextStyle(
-                                color: Color(0xFF10B981),
+                                color: Color(0xFF2FBF8F),
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -310,7 +310,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Row(
               children: const [
-                Icon(Icons.troubleshoot_rounded, color: Color(0xFF22D3EE), size: 20),
+                Icon(Icons.troubleshoot_rounded, color: Color(0xFFFFB86B), size: 20),
                 SizedBox(width: 8),
                 Text(
                   'Accounts & Cloud Health',
@@ -460,7 +460,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 Row(
                   children: const [
-                    Icon(Icons.smart_toy_rounded, color: Color(0xFF818CF8), size: 20),
+                    Icon(Icons.smart_toy_rounded, color: Color(0xFFFF9A6B), size: 20),
                     SizedBox(width: 8),
                     Text(
                       'AI Provider & API Keys',
@@ -469,7 +469,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ],
                 ),
                 IconButton(
-                  icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFF818CF8)),
+                  icon: const Icon(Icons.add_circle_outline_rounded, color: Color(0xFFFF9A6B)),
                   onPressed: _showAddKeyModal,
                   tooltip: 'Add API Key',
                 ),
@@ -482,13 +482,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1).withValues(alpha: 0.1),
+                  color: const Color(0xFFFF6B4A).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFF6366F1).withValues(alpha: 0.3)),
+                  border: Border.all(color: const Color(0xFFFF6B4A).withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.key_rounded, color: Color(0xFF818CF8), size: 20),
+                    const Icon(Icons.key_rounded, color: Color(0xFFFF9A6B), size: 20),
                     const SizedBox(width: 10),
                     Expanded(
                       child: Column(
@@ -560,17 +560,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 margin: const EdgeInsets.only(bottom: 8),
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: isActive ? const Color(0xFF10B981).withValues(alpha: 0.08) : Colors.transparent,
+                  color: isActive ? const Color(0xFF2FBF8F).withValues(alpha: 0.08) : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(
-                    color: isActive ? const Color(0xFF10B981).withValues(alpha: 0.4) : (isDark ? Colors.white12 : Colors.black12),
+                    color: isActive ? const Color(0xFF2FBF8F).withValues(alpha: 0.4) : (isDark ? Colors.white12 : Colors.black12),
                   ),
                 ),
                 child: Row(
                   children: [
                     Icon(
                       isActive ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                      color: isActive ? const Color(0xFF10B981) : Colors.grey,
+                      color: isActive ? const Color(0xFF2FBF8F) : Colors.grey,
                       size: 20,
                     ),
                     const SizedBox(width: 10),
@@ -620,7 +620,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Row(
               children: const [
-                Icon(Icons.record_voice_over_rounded, color: Color(0xFF10B981), size: 20),
+                Icon(Icons.record_voice_over_rounded, color: Color(0xFF2FBF8F), size: 20),
                 SizedBox(width: 8),
                 Text('Voice & Multilingual Speech', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ],
@@ -645,7 +645,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               min: 0.2,
               max: 1.5,
               divisions: 13,
-              activeColor: const Color(0xFF10B981),
+              activeColor: const Color(0xFF2FBF8F),
               onChanged: (val) {
                 setState(() => _ttsSpeechRate = val);
                 _saveVoiceSettings();
@@ -658,7 +658,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               min: 0.5,
               max: 1.5,
               divisions: 10,
-              activeColor: const Color(0xFF10B981),
+              activeColor: const Color(0xFF2FBF8F),
               onChanged: (val) {
                 setState(() => _ttsPitch = val);
                 _saveVoiceSettings();
@@ -669,7 +669,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.08),
+                color: const Color(0xFF2FBF8F).withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Row(
@@ -722,7 +722,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildCloudStatusItem(
               'Supabase Storage',
               'aaa-backups bucket',
-              const Color(0xFF10B981),
+              const Color(0xFF2FBF8F),
               status: _authService.isLoggedIn ? 'Synced' : 'Signed out',
             ),
             const SizedBox(height: 8),
@@ -747,7 +747,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Row(
               children: const [
-                Icon(Icons.backup_rounded, color: Color(0xFF6366F1), size: 20),
+                Icon(Icons.backup_rounded, color: Color(0xFFFF6B4A), size: 20),
                 SizedBox(width: 8),
                 Text('Backup & Keep-Alive', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ],
@@ -878,7 +878,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: fileOk ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+        backgroundColor: fileOk ? const Color(0xFF2FBF8F) : const Color(0xFFFF4D5E),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -898,7 +898,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: restored >= 0 ? const Color(0xFF10B981) : const Color(0xFFF59E0B),
+        backgroundColor: restored >= 0 ? const Color(0xFF2FBF8F) : const Color(0xFFF59E0B),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -917,7 +917,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(msg),
-        backgroundColor: deleted is int ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+        backgroundColor: deleted is int ? const Color(0xFF2FBF8F) : const Color(0xFFFF4D5E),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -1004,7 +1004,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               contentPadding: EdgeInsets.zero,
               leading: Icon(
                 authorityActive ? Icons.verified_user_rounded : Icons.gavel_rounded,
-                color: authorityActive ? const Color(0xFF10B981) : Colors.orangeAccent,
+                color: authorityActive ? const Color(0xFF2FBF8F) : Colors.orangeAccent,
               ),
               title: const Text('Shizuku System Authority'),
               subtitle: Text(
@@ -1045,7 +1045,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             // Task History Link
             ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.history_rounded, color: Color(0xFF818CF8)),
+              leading: const Icon(Icons.history_rounded, color: Color(0xFFFF9A6B)),
               title: const Text('Task History Logs'),
               subtitle: const Text('View executed automation steps and logs'),
               trailing: const Icon(Icons.chevron_right_rounded),
@@ -1070,7 +1070,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           children: [
             Row(
               children: const [
-                Icon(Icons.palette_rounded, color: Color(0xFFA78BFA), size: 20),
+                Icon(Icons.palette_rounded, color: Color(0xFFFF9A6B), size: 20),
                 SizedBox(width: 8),
                 Text('App Preferences', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               ],
@@ -1264,8 +1264,8 @@ class _ScheduledTasksCardState extends State<_ScheduledTasksCard> {
                   Icons.add_alarm_rounded,
                   size: 18,
                   color: isDark
-                      ? const Color(0xFFA78BFA)
-                      : const Color(0xFF7C3AED),
+                      ? const Color(0xFFFF9A6B)
+                      : const Color(0xFFFF8A5C),
                 ),
                 const SizedBox(width: 8),
                 const Text(
@@ -1286,8 +1286,8 @@ class _ScheduledTasksCardState extends State<_ScheduledTasksCard> {
               style: TextStyle(
                 fontSize: 12,
                 color: isDark
-                    ? const Color(0xFF94A3B8)
-                    : const Color(0xFF64748B),
+                    ? const Color(0xFFA8938C)
+                    : const Color(0xFF8C7A6E),
               ),
             ),
             const SizedBox(height: 12),
@@ -1300,8 +1300,8 @@ class _ScheduledTasksCardState extends State<_ScheduledTasksCard> {
                       Icons.event_available_rounded,
                       size: 18,
                       color: isDark
-                          ? const Color(0xFF475569)
-                          : const Color(0xFF94A3B8),
+                          ? const Color(0xFF6B5A52)
+                          : const Color(0xFFA8938C),
                     ),
                     const SizedBox(width: 8),
                     Text(
@@ -1309,8 +1309,8 @@ class _ScheduledTasksCardState extends State<_ScheduledTasksCard> {
                       style: TextStyle(
                         fontSize: 13,
                         color: isDark
-                            ? const Color(0xFF94A3B8)
-                            : const Color(0xFF64748B),
+                            ? const Color(0xFFA8938C)
+                            : const Color(0xFF8C7A6E),
                       ),
                     ),
                   ],
@@ -1324,12 +1324,12 @@ class _ScheduledTasksCardState extends State<_ScheduledTasksCard> {
                   decoration: BoxDecoration(
                     color: isDark
                         ? const Color(0xFF131225)
-                        : const Color(0xFFF8FAFC),
+                        : const Color(0xFFFFFBF4),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
                       color: isDark
                           ? const Color(0xFF2A2847)
-                          : const Color(0xFFE2E8F0),
+                          : const Color(0xFFF0E3D3),
                     ),
                   ),
                   child: Row(
@@ -1337,7 +1337,7 @@ class _ScheduledTasksCardState extends State<_ScheduledTasksCard> {
                       Icon(
                         Icons.schedule_rounded,
                         size: 18,
-                        color: const Color(0xFF22D3EE),
+                        color: const Color(0xFFFFB86B),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -1358,8 +1358,8 @@ class _ScheduledTasksCardState extends State<_ScheduledTasksCard> {
                               style: TextStyle(
                                 fontSize: 11,
                                 color: isDark
-                                    ? const Color(0xFF94A3B8)
-                                    : const Color(0xFF64748B),
+                                    ? const Color(0xFFA8938C)
+                                    : const Color(0xFF8C7A6E),
                               ),
                             ),
                           ],

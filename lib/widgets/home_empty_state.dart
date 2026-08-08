@@ -7,12 +7,14 @@ class HomeEmptyState extends StatelessWidget {
   final String mode;
   final bool isDark;
   final void Function(String text) onSend;
+  final VoidCallback? onExplore;
 
   const HomeEmptyState({
     super.key,
     required this.mode,
     required this.isDark,
     required this.onSend,
+    this.onExplore,
   });
 
   @override
@@ -68,7 +70,7 @@ class HomeEmptyState extends StatelessWidget {
               shaderCallback: (bounds) => const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF22D3EE), Color(0xFF8B5CF6)],
+                colors: [Color(0xFFFFB86B), Color(0xFFF65E8B)],
               ).createShader(bounds),
               child: Text(
                 'How can I help you?',
@@ -124,13 +126,13 @@ class HomeEmptyState extends StatelessWidget {
                             horizontal: 20, vertical: 12),
                         decoration: BoxDecoration(
                           color: isDark
-                              ? const Color(0xFF151430)
+                              ? const Color(0xFF241B21)
                               : Colors.white,
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: isDark
-                                ? const Color(0xFF8B5CF6).withValues(alpha: 0.3)
-                                : const Color(0xFFE2E8F0),
+                                ? const Color(0xFFFF6B4A).withValues(alpha: 0.3)
+                                : const Color(0xFFF0E3D3),
                             width: 1.2,
                           ),
                           boxShadow: [
@@ -149,7 +151,7 @@ class HomeEmptyState extends StatelessWidget {
                               Icon(
                                 Icons.bolt_rounded,
                                 size: 14,
-                                color: const Color(0xFF8B5CF6),
+                                color: const Color(0xFFFF6B4A),
                               ),
                               const SizedBox(width: 6),
                               Text(
@@ -158,8 +160,8 @@ class HomeEmptyState extends StatelessWidget {
                                   fontSize: 12.5,
                                   fontWeight: FontWeight.w600,
                                   color: isDark
-                                      ? const Color(0xFFF8FAFC)
-                                      : const Color(0xFF1E293B),
+                                      ? const Color(0xFFF9F1EA)
+                                      : const Color(0xFF2E1F1A),
                                 ),
                               ),
                             ],
@@ -171,6 +173,50 @@ class HomeEmptyState extends StatelessWidget {
                 },
               ),
             ),
+            if (onExplore != null) ...[
+              const SizedBox(height: 20),
+              Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: onExplore,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 18, vertical: 10),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: isDark
+                            ? const Color(0xFFFF6B4A).withValues(alpha: 0.5)
+                            : const Color(0xFFFF6B4A).withValues(alpha: 0.4),
+                        width: 1.2,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.explore_rounded,
+                          size: 16,
+                          color: Color(0xFFFF6B4A),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Explore capabilities',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? const Color(0xFFFF9A6B)
+                                : const Color(0xFFC2503A),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),

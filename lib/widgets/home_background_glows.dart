@@ -22,11 +22,11 @@ class HomeBackgroundGlows extends StatelessWidget {
                 gradient: RadialGradient(
                   colors: [
                     isDark
-                        ? const Color(0xFF6366F1).withValues(alpha: 0.24)
-                        : const Color(0xFF4F46E5).withValues(alpha: 0.12),
+                        ? const Color(0xFFFF6B4A).withValues(alpha: 0.22)
+                        : const Color(0xFFFF8A5C).withValues(alpha: 0.14),
                     isDark
-                        ? const Color(0xFF6366F1).withValues(alpha: 0)
-                        : const Color(0xFF4F46E5).withValues(alpha: 0),
+                        ? const Color(0xFFFF6B4A).withValues(alpha: 0)
+                        : const Color(0xFFFF8A5C).withValues(alpha: 0),
                   ],
                 ),
               ),
@@ -43,11 +43,11 @@ class HomeBackgroundGlows extends StatelessWidget {
                 gradient: RadialGradient(
                   colors: [
                     isDark
-                        ? const Color(0xFF38BDF8).withValues(alpha: 0.18)
-                        : const Color(0xFF0EA5E9).withValues(alpha: 0.09),
+                        ? const Color(0xFFFFB86B).withValues(alpha: 0.18)
+                        : const Color(0xFFFFB86B).withValues(alpha: 0.12),
                     isDark
-                        ? const Color(0xFF38BDF8).withValues(alpha: 0)
-                        : const Color(0xFF0EA5E9).withValues(alpha: 0),
+                        ? const Color(0xFFFFB86B).withValues(alpha: 0)
+                        : const Color(0xFFFFB86B).withValues(alpha: 0),
                   ],
                 ),
               ),

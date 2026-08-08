@@ -1,42 +1,42 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Shared palette for the "Nebula" design language.
+/// Shared palette for the "Aurora" design language.
 ///
-/// Brand DNA: deep space + aurora neon. Indigo/violet core with a cyan glow,
-/// warm accents for status, and glassy surfaces that keep both light and dark
-/// modes high-contrast and readable.
+/// Brand DNA: warm sunrise. Coral/peach core with amber glow, mint status
+/// accents, and creamy surfaces that keep both light and dark modes
+/// high-contrast and readable.
 class AppColors {
   AppColors._();
 
   // Brand core
-  static const Color indigo = Color(0xFF6366F1);
-  static const Color violet = Color(0xFF8B5CF6);
-  static const Color purple = Color(0xFFA855F7);
-  static const Color cyan = Color(0xFF22D3EE);
-  static const Color teal = Color(0xFF2DD4BF);
+  static const Color indigo = Color(0xFFFF6B4A);
+  static const Color violet = Color(0xFFFF8A5C);
+  static const Color purple = Color(0xFFF65E8B);
+  static const Color cyan = Color(0xFFFFB86B);
+  static const Color teal = Color(0xFF2FBF8F);
 
   // Status
-  static const Color success = Color(0xFF34D399);
-  static const Color warning = Color(0xFFFBBF24);
-  static const Color danger = Color(0xFFF87171);
-  static const Color info = Color(0xFF38BDF8);
-  static const Color orange = Color(0xFFFB923C);
+  static const Color success = Color(0xFF2FBF8F);
+  static const Color warning = Color(0xFFFFB020);
+  static const Color danger = Color(0xFFFF4D5E);
+  static const Color info = Color(0xFF38A6F5);
+  static const Color orange = Color(0xFFFF8A3D);
 
-  // Light surfaces
-  static const Color lightBg = Color(0xFFF4F6FB);
+  // Light surfaces (warm cream)
+  static const Color lightBg = Color(0xFFFBF4EC);
   static const Color lightSurface = Color(0xFFFFFFFF);
-  static const Color lightText = Color(0xFF0F172A);
-  static const Color lightMuted = Color(0xFF64748B);
-  static const Color lightBorder = Color(0xFFE2E8F0);
+  static const Color lightText = Color(0xFF2E1F1A);
+  static const Color lightMuted = Color(0xFF8C7A6E);
+  static const Color lightBorder = Color(0xFFF0E3D3);
 
-  // Dark surfaces
-  static const Color darkBg = Color(0xFF090812);
-  static const Color darkSurface = Color(0xFF131225);
-  static const Color darkSurfaceHigh = Color(0xFF1B1A33);
-  static const Color darkText = Color(0xFFF4F6FF);
-  static const Color darkMuted = Color(0xFF9AA3BF);
-  static const Color darkBorder = Color(0xFF2A2847);
+  // Dark surfaces (warm espresso)
+  static const Color darkBg = Color(0xFF171015);
+  static const Color darkSurface = Color(0xFF241B21);
+  static const Color darkSurfaceHigh = Color(0xFF2E2228);
+  static const Color darkText = Color(0xFFF9F1EA);
+  static const Color darkMuted = Color(0xFFA8938C);
+  static const Color darkBorder = Color(0xFF3B2C33);
 }
 
 /// Reusable gradient recipes used across screens.
@@ -46,25 +46,25 @@ class AppGradients {
   static const LinearGradient brand = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [AppColors.indigo, AppColors.violet, AppColors.purple],
+    colors: [Color(0xFFFF6B4A), Color(0xFFFF8A5C), Color(0xFFF65E8B)],
   );
 
   static const LinearGradient aurora = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [AppColors.cyan, AppColors.indigo, AppColors.violet],
+    colors: [Color(0xFFFFB86B), Color(0xFFFF6B4A), Color(0xFFF65E8B)],
   );
 
   static const LinearGradient fire = LinearGradient(
-    colors: [Color(0xFFF472B6), Color(0xFFF97316)],
+    colors: [Color(0xFFF65E8B), Color(0xFFFF8A3D)],
   );
 
   static LinearGradient screen(bool isDark) => LinearGradient(
         begin: Alignment.topCenter,
         end: Alignment.bottomCenter,
         colors: isDark
-            ? const [AppColors.darkBg, Color(0xFF131228)]
-            : const [Color(0xFFF8FAFF), Color(0xFFE8ECFB)],
+            ? const [Color(0xFF171015), Color(0xFF241A20)]
+            : const [Color(0xFFFFF7EE), Color(0xFFFBE7DA)],
       );
 }
 
@@ -85,11 +85,11 @@ class AppTheme {
     final isDark = brightness == Brightness.dark;
     final scheme = isDark
         ? const ColorScheme.dark(
-            primary: Color(0xFF8B8DF8),
-            onPrimary: Color(0xFF11102B),
-            secondary: AppColors.cyan,
-            onSecondary: Color(0xFF06202B),
-            tertiary: AppColors.violet,
+            primary: Color(0xFFFF8A5C),
+            onPrimary: Color(0xFF241B21),
+            secondary: Color(0xFFFFB86B),
+            onSecondary: Color(0xFF241B21),
+            tertiary: Color(0xFFF65E8B),
             surface: AppColors.darkSurface,
             onSurface: AppColors.darkText,
             surfaceContainerHighest: AppColors.darkSurfaceHigh,
@@ -99,12 +99,12 @@ class AppTheme {
             primary: AppColors.indigo,
             onPrimary: Colors.white,
             secondary: AppColors.cyan,
-            onSecondary: Color(0xFF06202B),
-            tertiary: AppColors.violet,
+            onSecondary: Color(0xFF241B21),
+            tertiary: AppColors.purple,
             surface: AppColors.lightSurface,
             onSurface: AppColors.lightText,
             surfaceContainerHighest: AppColors.lightBorder,
-            error: Color(0xFFEF4444),
+            error: Color(0xFFE8455A),
           );
 
     final cardBorder = BorderSide(
@@ -272,7 +272,7 @@ class AppTheme {
 
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
-        backgroundColor: isDark ? AppColors.darkSurfaceHigh : const Color(0xFF1E293B),
+        backgroundColor: isDark ? AppColors.darkSurfaceHigh : const Color(0xFF2E1F1A),
         contentTextStyle: const TextStyle(
           color: Colors.white,
           fontSize: 13.5,

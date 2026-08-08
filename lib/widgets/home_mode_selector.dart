@@ -16,7 +16,7 @@ class HomeModeSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeBg = isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+    final activeBg = isDark ? const Color(0xFF2E2228) : const Color(0xFFF0E3D3);
 
     return Center(
       child: Container(
@@ -73,7 +73,7 @@ class HomeModeSelector extends StatelessWidget {
               size: 15,
               color: isSelected
                   ? Colors.white
-                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                  : (isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52)),
             ),
             const SizedBox(width: 8),
             Text(
@@ -81,7 +81,7 @@ class HomeModeSelector extends StatelessWidget {
               style: TextStyle(
                 color: isSelected
                     ? Colors.white
-                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
+                    : (isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52)),
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
               ),

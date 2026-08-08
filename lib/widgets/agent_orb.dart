@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Reusable "agent orb" — a glowing gradient orb with a soft halo, used as the
+/// Reusable "agent orb" — a warm sunrise orb with a soft halo, used as the
 /// brand avatar across the app (header, empty state, message bubbles).
 class AgentOrb extends StatelessWidget {
   final double size;
@@ -19,19 +19,19 @@ class AgentOrb extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Color(0xFF6366F1),
-            Color(0xFF8B5CF6),
-            Color(0xFFA855F7),
+            Color(0xFFFFB86B),
+            Color(0xFFFF6B4A),
+            Color(0xFFF65E8B),
           ],
         ),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.35),
-          width: 1.2,
+          color: Colors.white.withValues(alpha: 0.5),
+          width: 1.4,
         ),
         boxShadow: glow
             ? [
                 BoxShadow(
-                  color: const Color(0xFF8B5CF6).withValues(alpha: 0.45),
+                  color: const Color(0xFFFF6B4A).withValues(alpha: 0.45),
                   blurRadius: size * 0.55,
                   spreadRadius: size * 0.12,
                 ),
@@ -55,7 +55,7 @@ class AgentOrb extends StatelessWidget {
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [Color(0xFF22D3EE), Color(0xFF6366F1)],
+                  colors: [Color(0xFFFFB86B), Color(0xFFFF6B4A)],
                 ),
               ),
             ),

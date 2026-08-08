@@ -44,10 +44,10 @@ class MessageBubble extends StatelessWidget {
             ? const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                colors: [Color(0xFFFF6B4A), Color(0xFFF65E8B)],
               )
             : null,
-        color: isUser ? null : (isDark ? const Color(0xFF151430) : const Color(0xFFFFFFFF)),
+        color: isUser ? null : (isDark ? const Color(0xFF241B21) : const Color(0xFFFFFBF4)),
         borderRadius: BorderRadius.only(
           topLeft: const Radius.circular(20),
           topRight: const Radius.circular(20),
@@ -56,14 +56,14 @@ class MessageBubble extends StatelessWidget {
         ),
         border: isUser
             ? (highlight
-                ? Border.all(color: const Color(0xFF22D3EE), width: 2)
+                ? Border.all(color: const Color(0xFFFFB86B), width: 2)
                 : null)
             : Border.all(
                 color: highlight
-                    ? const Color(0xFF22D3EE)
+                    ? const Color(0xFFFFB86B)
                     : isDark
-                        ? const Color(0xFF8B5CF6).withValues(alpha: 0.25)
-                        : const Color(0xFFE2E8F0),
+                        ? const Color(0xFFFF6B4A).withValues(alpha: 0.25)
+                        : const Color(0xFFF0E3D3),
                 width: highlight ? 2 : 1.2,
               ),
         boxShadow: [
@@ -151,7 +151,7 @@ class MessageBubble extends StatelessWidget {
                   fontSize: 15,
                 ),
                 strong: TextStyle(
-                  color: isDark ? const Color(0xFFC4B5FD) : const Color(0xFF5B21B6),
+                  color: isDark ? const Color(0xFFFFC9A8) : const Color(0xFFC2503A),
                   fontSize: 15,
                   fontWeight: FontWeight.w800,
                 ),
@@ -274,8 +274,8 @@ class MessageBubble extends StatelessWidget {
   void _showActions(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isUser = message.isUser;
-    final bg = isDark ? const Color(0xFF1E1B4B) : Colors.white;
-    final sub = isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B);
+    final bg = isDark ? const Color(0xFF241B21) : Colors.white;
+    final sub = isDark ? const Color(0xFFA8938C) : const Color(0xFF8C7A6E);
 
     showModalBottomSheet(
       context: context,
@@ -288,8 +288,8 @@ class MessageBubble extends StatelessWidget {
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: isDark
-                  ? const Color(0xFF8B5CF6).withValues(alpha: 0.25)
-                  : const Color(0xFFE2E8F0),
+                  ? const Color(0xFFFF6B4A).withValues(alpha: 0.25)
+                  : const Color(0xFFF0E3D3),
             ),
           ),
           padding: const EdgeInsets.symmetric(vertical: 12),
@@ -400,8 +400,8 @@ class MessageBubble extends StatelessWidget {
     bool destructive = false,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final fg = isDark ? const Color(0xFFF8FAFC) : const Color(0xFF1E293B);
-    final color = destructive ? const Color(0xFFEF4444) : fg;
+    final fg = isDark ? const Color(0xFFF9F1EA) : const Color(0xFF2E1F1A);
+    final color = destructive ? const Color(0xFFFF4D5E) : fg;
     return ListTile(
       dense: true,
       leading: Icon(icon, size: 20, color: color),

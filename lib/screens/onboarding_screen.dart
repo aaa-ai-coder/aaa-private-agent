@@ -420,7 +420,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     return Scaffold(
       backgroundColor: isDark
           ? const Color(0xFF0B0F19)
-          : const Color(0xFFF8FAFC),
+          : const Color(0xFFFFFBF4),
       body: Stack(
         children: [
           // Background fluid glow effect
@@ -487,11 +487,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 gradient: RadialGradient(
                   colors: [
                     isDark
-                        ? const Color(0xFF6366F1).withValues(alpha: 0.18)
-                        : const Color(0xFF4F46E5).withValues(alpha: 0.08),
+                        ? const Color(0xFFFF6B4A).withValues(alpha: 0.18)
+                        : const Color(0xFFFF8A5C).withValues(alpha: 0.08),
                     isDark
-                        ? const Color(0xFF6366F1).withValues(alpha: 0)
-                        : const Color(0xFF4F46E5).withValues(alpha: 0),
+                        ? const Color(0xFFFF6B4A).withValues(alpha: 0)
+                        : const Color(0xFFFF8A5C).withValues(alpha: 0),
                   ],
                 ),
               ),
@@ -508,11 +508,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 gradient: RadialGradient(
                   colors: [
                     isDark
-                        ? const Color(0xFF38BDF8).withValues(alpha: 0.15)
-                        : const Color(0xFF0EA5E9).withValues(alpha: 0.06),
+                        ? const Color(0xFFFFB86B).withValues(alpha: 0.15)
+                        : const Color(0xFFFF8A5C).withValues(alpha: 0.06),
                     isDark
-                        ? const Color(0xFF38BDF8).withValues(alpha: 0)
-                        : const Color(0xFF0EA5E9).withValues(alpha: 0),
+                        ? const Color(0xFFFFB86B).withValues(alpha: 0)
+                        : const Color(0xFFFF8A5C).withValues(alpha: 0),
                   ],
                 ),
               ),
@@ -546,8 +546,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     : isCompleted
                     ? Theme.of(context).primaryColor.withValues(alpha: 0.5)
                     : (isDark
-                          ? const Color(0xFF1E293B)
-                          : const Color(0xFFE2E8F0)),
+                          ? const Color(0xFF2E1F1A)
+                          : const Color(0xFFF0E3D3)),
                 boxShadow: isActive
                     ? [
                         BoxShadow(
@@ -589,8 +589,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         color: isActive
             ? Theme.of(context).primaryColor
             : isCompleted
-            ? (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569))
-            : (isDark ? const Color(0xFF475569) : const Color(0xFF94A3B8)),
+            ? (isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52))
+            : (isDark ? const Color(0xFF6B5A52) : const Color(0xFFA8938C)),
       ),
     );
   }
@@ -649,7 +649,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             style: TextStyle(
               fontSize: 34,
               fontWeight: FontWeight.w900,
-              color: isDark ? Colors.white : const Color(0xFF1E293B),
+              color: isDark ? Colors.white : const Color(0xFF2E1F1A),
               letterSpacing: -0.5,
             ),
           ),
@@ -659,7 +659,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 15,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+              color: isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
               height: 1.55,
             ),
           ),
@@ -780,8 +780,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   style: TextStyle(
                     fontSize: 12,
                     color: isDark
-                        ? const Color(0xFF94A3B8)
-                        : const Color(0xFF475569),
+                        ? const Color(0xFFA8938C)
+                        : const Color(0xFF6B5A52),
                   ),
                 ),
               ],
@@ -813,7 +813,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             'Permissions are needed to interact with other apps.',
             style: TextStyle(
               fontSize: 14,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+              color: isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
             ),
           ),
           const SizedBox(height: 16),
@@ -905,7 +905,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 style: TextButton.styleFrom(
                   foregroundColor: isDark
                       ? Colors.white
-                      : const Color(0xFF475569),
+                      : const Color(0xFF6B5A52),
                 ),
                 child: const Text(
                   'Back',
@@ -920,8 +920,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   color: _canProceedToModel
                       ? Theme.of(context).colorScheme.primary
                       : (isDark
-                            ? const Color(0xFF1E293B)
-                            : const Color(0xFFE2E8F0)),
+                            ? const Color(0xFF2E1F1A)
+                            : const Color(0xFFF0E3D3)),
                   boxShadow: _canProceedToModel
                       ? [
                           BoxShadow(
@@ -948,8 +948,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     foregroundColor: Colors.white,
                     shadowColor: Colors.transparent,
                     disabledForegroundColor: isDark
-                        ? const Color(0xFF475569)
-                        : const Color(0xFF94A3B8),
+                        ? const Color(0xFF6B5A52)
+                        : const Color(0xFFA8938C),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -983,7 +983,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         style: TextStyle(
           fontSize: 11,
           fontWeight: FontWeight.w800,
-          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+          color: isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
           letterSpacing: 1.5,
         ),
       ),
@@ -1084,8 +1084,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   fontSize: 12.5,
                   height: 1.45,
                   color: isDark
-                      ? const Color(0xFF94A3B8)
-                      : const Color(0xFF475569),
+                      ? const Color(0xFFA8938C)
+                      : const Color(0xFF6B5A52),
                 ),
               ),
             ],
@@ -1116,7 +1116,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             'Select a provider to prefill API details automatically.',
             style: TextStyle(
               fontSize: 13,
-              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+              color: isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
             ),
           ),
           const SizedBox(height: 20),
@@ -1248,7 +1248,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 style: TextButton.styleFrom(
                   foregroundColor: isDark
                       ? Colors.white
-                      : const Color(0xFF475569),
+                      : const Color(0xFF6B5A52),
                 ),
                 child: const Text(
                   'Back',
@@ -1262,8 +1262,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   borderRadius: BorderRadius.circular(16),
                   color: _isValidating
                       ? (isDark
-                            ? const Color(0xFF1E293B)
-                            : const Color(0xFFE2E8F0))
+                            ? const Color(0xFF2E1F1A)
+                            : const Color(0xFFF0E3D3))
                       : Theme.of(context).colorScheme.primary,
                   boxShadow: _isValidating
                       ? null
@@ -1424,7 +1424,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           labelText: label,
           labelStyle: TextStyle(
             fontSize: 13,
-            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+            color: isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
           ),
           hintText: hint,
           hintStyle: TextStyle(

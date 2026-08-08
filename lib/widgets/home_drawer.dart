@@ -14,6 +14,9 @@ class HomeDrawer extends StatefulWidget {
   final VoidCallback onSettings;
   final VoidCallback onSummarize;
   final VoidCallback onClearChat;
+  final VoidCallback onControlPanel;
+  final VoidCallback onDiscover;
+  final VoidCallback onExportChat;
 
   const HomeDrawer({
     super.key,
@@ -25,6 +28,9 @@ class HomeDrawer extends StatefulWidget {
     required this.onSettings,
     required this.onSummarize,
     required this.onClearChat,
+    required this.onControlPanel,
+    required this.onDiscover,
+    required this.onExportChat,
   });
 
   @override
@@ -44,14 +50,14 @@ class _HomeDrawerState extends State<HomeDrawer> {
 
   @override
   Widget build(BuildContext context) {
-    final drawerBg = widget.isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC);
+    final drawerBg = widget.isDark ? const Color(0xFF171015) : const Color(0xFFFFFBF4);
     final textStyle = TextStyle(
-      color: widget.isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+      color: widget.isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
       fontWeight: FontWeight.w600,
       fontSize: 13.5,
     );
     final headerStyle = TextStyle(
-      color: widget.isDark ? Colors.white : const Color(0xFF1E293B),
+      color: widget.isDark ? Colors.white : const Color(0xFF2E1F1A),
       fontSize: 17,
       fontWeight: FontWeight.w900,
       letterSpacing: -0.5,
@@ -67,7 +73,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
             decoration: BoxDecoration(
               border: Border(
                 bottom: BorderSide(
-                  color: widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                  color: widget.isDark ? const Color(0xFF3B2C33) : const Color(0xFFF0E3D3),
                   width: 0.5,
                 ),
               ),
@@ -82,7 +88,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                       height: 36,
                       decoration: BoxDecoration(
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)],
+                          colors: [Color(0xFFFF8A5C), Color(0xFFF65E8B)],
                         ),
                         borderRadius: BorderRadius.circular(10),
                       ),
@@ -103,7 +109,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      _CloudBadge(label: 'Supabase', color: const Color(0xFF10B981), isDark: widget.isDark),
+                      _CloudBadge(label: 'Supabase', color: const Color(0xFF2FBF8F), isDark: widget.isDark),
                       const SizedBox(width: 6),
                       _CloudBadge(label: 'Firebase', color: Colors.amber, isDark: widget.isDark),
                       const SizedBox(width: 6),
@@ -118,8 +124,8 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   children: [
                     CircleAvatar(
                       radius: 14,
-                      backgroundColor: const Color(0xFF7C3AED).withValues(alpha: 0.15),
-                      child: const Icon(Icons.person_rounded, size: 16, color: Color(0xFFA78BFA)),
+                      backgroundColor: const Color(0xFFFF6B4A).withValues(alpha: 0.15),
+                      child: const Icon(Icons.person_rounded, size: 16, color: Color(0xFFFF9A6B)),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
@@ -128,7 +134,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w600,
-                          color: widget.isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                          color: widget.isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -154,12 +160,12 @@ class _HomeDrawerState extends State<HomeDrawer> {
               width: double.infinity,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF7C3AED), Color(0xFF8B5CF6)],
+                  colors: [Color(0xFFFF8A5C), Color(0xFFF65E8B)],
                 ),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                    color: const Color(0xFFFF6B4A).withValues(alpha: 0.35),
                     blurRadius: 10,
                     offset: const Offset(0, 3),
                   ),
@@ -202,7 +208,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
             child: Container(
               height: 36,
               decoration: BoxDecoration(
-                color: widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                color: widget.isDark ? const Color(0xFF2E2228) : const Color(0xFFF0E3D3),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: TextField(
@@ -216,12 +222,12 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   hintText: 'Search chats...',
                   hintStyle: TextStyle(
                     fontSize: 12,
-                    color: widget.isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                    color: widget.isDark ? const Color(0xFFA8938C) : const Color(0xFF8C7A6E),
                   ),
                   prefixIcon: Icon(
                     Icons.search_rounded,
                     size: 16,
-                    color: widget.isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+                    color: widget.isDark ? const Color(0xFFA8938C) : const Color(0xFF8C7A6E),
                   ),
                   border: InputBorder.none,
                   contentPadding: const EdgeInsets.only(top: 8),
@@ -242,7 +248,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w800,
-                  color: const Color(0xFFA78BFA),
+                  color: const Color(0xFFFF9A6B),
                   letterSpacing: 1.5,
                 ),
               ),
@@ -300,12 +306,12 @@ class _HomeDrawerState extends State<HomeDrawer> {
                       margin: const EdgeInsets.symmetric(vertical: 2, horizontal: 8),
                       decoration: BoxDecoration(
                         color: isCurrent
-                            ? const Color(0xFF7C3AED).withValues(alpha: 0.12)
+                            ? const Color(0xFFFF6B4A).withValues(alpha: 0.12)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(12),
                         border: isCurrent
                             ? Border.all(
-                                color: const Color(0xFF7C3AED).withValues(alpha: 0.3),
+                                color: const Color(0xFFFF6B4A).withValues(alpha: 0.3),
                               )
                             : null,
                       ),
@@ -316,7 +322,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                           Icons.chat_bubble_outline_rounded,
                           size: 15,
                           color: isCurrent
-                              ? const Color(0xFFA78BFA)
+                              ? const Color(0xFFFF9A6B)
                               : (widget.isDark ? Colors.grey[600] : Colors.grey[500]),
                         ),
                         title: Text(
@@ -326,7 +332,7 @@ class _HomeDrawerState extends State<HomeDrawer> {
                           style: textStyle.copyWith(
                             fontWeight: isCurrent ? FontWeight.bold : FontWeight.w500,
                             color: isCurrent
-                                ? (widget.isDark ? Colors.white : const Color(0xFF1E293B))
+                                ? (widget.isDark ? Colors.white : const Color(0xFF2E1F1A))
                                 : null,
                           ),
                         ),
@@ -359,13 +365,64 @@ class _HomeDrawerState extends State<HomeDrawer> {
             decoration: BoxDecoration(
               border: Border(
                 top: BorderSide(
-                  color: widget.isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0),
+                  color: widget.isDark ? const Color(0xFF3B2C33) : const Color(0xFFF0E3D3),
                   width: 0.5,
                 ),
               ),
             ),
             child: Column(
               children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 10, 20, 4),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'TOOLS',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFFFF9A6B),
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                ),
+                ListTile(
+                  horizontalTitleGap: 8,
+                  leading: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFFFF8A5C), Color(0xFFF65E8B)],
+                      ),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Icon(Icons.tune_rounded, color: Colors.white, size: 17),
+                  ),
+                  title: Text('Phone Control Panel', style: textStyle),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onControlPanel();
+                  },
+                ),
+                ListTile(
+                  horizontalTitleGap: 8,
+                  leading: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFB86B).withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Icon(Icons.explore_rounded, color: Color(0xFFFFB86B), size: 17),
+                  ),
+                  title: Text('Discover Capabilities', style: textStyle),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onDiscover();
+                  },
+                ),
                 ListTile(
                   horizontalTitleGap: 8,
                   leading: Icon(
@@ -377,6 +434,19 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   onTap: () {
                     Navigator.pop(context);
                     widget.onTaskHistory();
+                  },
+                ),
+                ListTile(
+                  horizontalTitleGap: 8,
+                  leading: Icon(
+                    Icons.ios_share_rounded,
+                    color: widget.isDark ? Colors.grey[400] : Colors.grey[600],
+                    size: 20,
+                  ),
+                  title: Text('Export & Share Chat', style: textStyle),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onExportChat();
                   },
                 ),
                 ListTile(

@@ -371,11 +371,11 @@ class _OverlayAppState extends State<OverlayApp> with WidgetsBindingObserver {
   }
 
   Color get _surface => _isDark ? const Color(0xFF131B2E) : Colors.white;
-  Color get _background => _isDark ? const Color(0xFF0A0E1A) : const Color(0xFFF8FAFC);
-  Color get _text => _isDark ? const Color(0xFFF8FAFC) : Colors.black87;
-  Color get _textSecondary => _isDark ? const Color(0xFF94A3B8) : Colors.black45;
-  Color get _border => _isDark ? const Color(0xFF1E293B) : const Color(0xFFEAEAEA);
-  Color get _primary => const Color(0xFF6366F1);
+  Color get _background => _isDark ? const Color(0xFF0A0E1A) : const Color(0xFFFFFBF4);
+  Color get _text => _isDark ? const Color(0xFFF9F1EA) : Colors.black87;
+  Color get _textSecondary => _isDark ? const Color(0xFFA8938C) : Colors.black45;
+  Color get _border => _isDark ? const Color(0xFF3B2C33) : const Color(0xFFEAEAEA);
+  Color get _primary => const Color(0xFFFF6B4A);
 
   Widget _buildContent() {
     final c = this;
@@ -484,7 +484,7 @@ class _OverlayAppState extends State<OverlayApp> with WidgetsBindingObserver {
                           padding: const EdgeInsets.all(4),
                           decoration: BoxDecoration(
                             color: _isDark
-                                ? const Color(0xFF1E293B)
+                                ? const Color(0xFF2E1F1A)
                                 : const Color(0xFFF2F2F5),
                             shape: BoxShape.circle,
                           ),
