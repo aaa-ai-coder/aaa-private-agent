@@ -17,6 +17,7 @@ class HomeDrawer extends StatefulWidget {
   final VoidCallback onControlPanel;
   final VoidCallback onDiscover;
   final VoidCallback onExportChat;
+  final VoidCallback onPermissions;
 
   const HomeDrawer({
     super.key,
@@ -31,6 +32,7 @@ class HomeDrawer extends StatefulWidget {
     required this.onControlPanel,
     required this.onDiscover,
     required this.onExportChat,
+    required this.onPermissions,
   });
 
   @override
@@ -421,6 +423,23 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   onTap: () {
                     Navigator.pop(context);
                     widget.onDiscover();
+                  },
+                ),
+                ListTile(
+                  horizontalTitleGap: 8,
+                  leading: Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2FBF8F).withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Icon(Icons.security_rounded, color: Color(0xFF2FBF8F), size: 17),
+                  ),
+                  title: Text('App Permissions', style: textStyle),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onPermissions();
                   },
                 ),
                 ListTile(

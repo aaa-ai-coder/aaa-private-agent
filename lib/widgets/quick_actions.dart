@@ -1,15 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../services/custom_commands_service.dart';
 
 /// A sleek, glassmorphic horizontal list of quick action chips for the AI Agent.
 class QuickActions extends StatelessWidget {
   final void Function(String command) onSend;
   final bool isDark;
+  final List<CustomCommand> customCommands;
+  final VoidCallback? onEditCustom;
 
   const QuickActions({
     super.key,
     required this.onSend,
     required this.isDark,
+    this.customCommands = const [],
+    this.onEditCustom,
   });
 
   static const List<_QuickAction> _actions = [
@@ -76,10 +81,35 @@ class QuickActions extends StatelessWidget {
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
-              itemCount: _actions.length,
+              itemCount: customCommands.length + _actions.length + 1,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
-                final action = _actions[index];
+                if (index < customCommands.length) {
+                  final custom = customCommands[index];
+                  return _ActionChip(
+                    icon: IconData(custom.iconCode, fontFamily: 'MaterialIcons'),
+                    label: custom.label,
+                    isDark: isDark,
+                    custom: true,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      onSend(custom.command);
+                    },
+                  );
+                }
+                final builtInIndex = index - customCommands.length;
+                if (builtInIndex >= _actions.length) {
+                  return _ActionChip(
+                    icon: Icons.add_rounded,
+                    label: 'Customize',
+                    isDark: isDark,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      onEditCustom?.call();
+                    },
+                  );
+                }
+                final action = _actions[builtInIndex];
                 return _ActionChip(
                   icon: action.icon,
                   label: action.label,
@@ -114,23 +144,35 @@ class _ActionChip extends StatelessWidget {
   final String label;
   final bool isDark;
   final VoidCallback onTap;
+  final bool custom;
 
   const _ActionChip({
     required this.icon,
     required this.label,
     required this.isDark,
     required this.onTap,
+    this.custom = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final primary = isDark ? const Color(0xFFFF9A6B) : const Color(0xFFFF6B4A);
+    final primary = custom
+        ? (isDark ? const Color(0xFFFFB86B) : const Color(0xFFFF8A5C))
+        : (isDark ? const Color(0xFFFF9A6B) : const Color(0xFFFF6B4A));
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF241B21).withValues(alpha: 0.4) : const Color(0xFFF7EDE0),
+        color: custom
+            ? const Color(0xFFFFB86B).withValues(alpha: isDark ? 0.14 : 0.16)
+            : (isDark
+                  ? const Color(0xFF241B21).withValues(alpha: 0.4)
+                  : const Color(0xFFF7EDE0)),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isDark ? const Color(0xFFFF6B4A).withValues(alpha: 0.2) : const Color(0xFFE3D2BF),
+          color: custom
+              ? const Color(0xFFFFB86B).withValues(alpha: 0.45)
+              : (isDark
+                    ? const Color(0xFFFF6B4A).withValues(alpha: 0.2)
+                    : const Color(0xFFE3D2BF)),
           width: 1.0,
         ),
       ),

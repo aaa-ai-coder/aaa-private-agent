@@ -24,6 +24,7 @@ import '../widgets/model_picker_sheet.dart';
 import '../widgets/api_warning_banner.dart';
 import '../services/telegram_service.dart';
 import '../services/chat_history_service.dart';
+import '../services/custom_commands_service.dart';
 import '../services/notification_service.dart';
 import '../services/storage_service.dart';
 import '../services/scheduler_service.dart';
@@ -35,6 +36,7 @@ import 'task_history_screen.dart';
 import 'accounts_screen.dart';
 import 'control_panel_screen.dart';
 import 'discover_screen.dart';
+import 'permissions_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:share_plus/share_plus.dart';
 import '../main.dart';
@@ -58,6 +60,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   final List<ChatMessage> _messages = [];
   final Map<int, GlobalKey> _messageKeys = {};
+  List<CustomCommand> _customCommands = [];
   int? _searchHighlightIndex;
   bool _isLoading = false;
   bool _stopRequested = false;
@@ -95,6 +98,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _telegramService = TelegramService(_actionHandler, _aiService);
     _initServices();
     _startOverlayHistorySync();
+    _loadCustomCommands();
     // Register as the handler for overlay bubble tasks
     onOverlayTask = _onOverlayTask;
   }
@@ -493,6 +497,259 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       _messageKeys.clear();
       _searchHighlightIndex = null;
     });
+  }
+
+  Future<void> _loadCustomCommands() async {
+    final commands = await CustomCommandsService.load();
+    if (!mounted) return;
+    setState(() => _customCommands = commands);
+  }
+
+  /// Editor for user-defined quick command chips (add / remove).
+  Future<void> _openQuickActionsEditor() async {
+    final labelCtrl = TextEditingController();
+    final commandCtrl = TextEditingController();
+    IconData selectedIcon = Icons.star_rounded;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (ctx, setSheetState) {
+            final icons = <IconData>[
+              Icons.star_rounded,
+              Icons.favorite_rounded,
+              Icons.home_rounded,
+              Icons.email_rounded,
+              Icons.work_rounded,
+              Icons.restaurant_rounded,
+              Icons.directions_car_rounded,
+              Icons.school_rounded,
+              Icons.shopping_bag_rounded,
+              Icons.fitness_center_rounded,
+            ];
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 12,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF241B21) : Colors.white,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: isDark
+                        ? const Color(0xFFFF6B4A).withValues(alpha: 0.25)
+                        : const Color(0xFFF0E3D3),
+                  ),
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Custom Quick Commands',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Pin your own frequent requests as home-screen chips.',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: isDark
+                              ? const Color(0xFFA8938C)
+                              : const Color(0xFF8C7A6E),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      // Existing custom commands
+                      if (_customCommands.isEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            'No custom commands yet — add one below.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: isDark
+                                  ? const Color(0xFFA8938C)
+                                  : const Color(0xFF8C7A6E),
+                            ),
+                          ),
+                        )
+                      else
+                        ...List.generate(_customCommands.length, (index) {
+                          final c = _customCommands[index];
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            leading: Icon(
+                              IconData(c.iconCode,
+                                  fontFamily: 'MaterialIcons'),
+                              size: 20,
+                              color: const Color(0xFFFF8A5C),
+                            ),
+                            title: Text(
+                              c.label,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            subtitle: Text(
+                              c.command,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                color: isDark
+                                    ? const Color(0xFFA8938C)
+                                    : const Color(0xFF8C7A6E),
+                              ),
+                            ),
+                            trailing: IconButton(
+                              icon: const Icon(Icons.delete_outline_rounded,
+                                  size: 20, color: Color(0xFFFF4D5E)),
+                              onPressed: () async {
+                                await CustomCommandsService.removeAt(index);
+                                final updated =
+                                    await CustomCommandsService.load();
+                                setSheetState(() => _customCommands = updated);
+                              },
+                            ),
+                          );
+                        }),
+                      const Divider(height: 20),
+                      const Text(
+                        'Add new command',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: labelCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Label (short, e.g. "Work email")',
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: commandCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'Command (what the AI should do)',
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Pick an icon',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? const Color(0xFFA8938C)
+                              : const Color(0xFF8C7A6E),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: icons.map((icon) {
+                          final selected = icon == selectedIcon;
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(12),
+                            onTap: () => setSheetState(
+                                () => selectedIcon = icon),
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                color: selected
+                                    ? const Color(0xFFFF6B4A)
+                                        .withValues(alpha: 0.18)
+                                    : (isDark
+                                          ? const Color(0xFF2E2228)
+                                          : const Color(0xFFF7EDE0)),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: selected
+                                      ? const Color(0xFFFF6B4A)
+                                      : Colors.transparent,
+                                  width: 1.4,
+                                ),
+                              ),
+                              child: Icon(
+                                icon,
+                                size: 20,
+                                color: selected
+                                    ? const Color(0xFFFF6B4A)
+                                    : (isDark
+                                          ? const Color(0xFFA8938C)
+                                          : const Color(0xFF8C7A6E)),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: () async {
+                            final label = labelCtrl.text.trim();
+                            final command = commandCtrl.text.trim();
+                            if (label.isEmpty || command.isEmpty) return;
+                            final ok = await CustomCommandsService.add(
+                              CustomCommand(
+                                label: label,
+                                command: command,
+                                iconCode: selectedIcon.codePoint,
+                              ),
+                            );
+                            if (!ok) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                      'Maximum 12 custom commands reached.'),
+                                ),
+                              );
+                              return;
+                            }
+                            final updated =
+                                await CustomCommandsService.load();
+                            setSheetState(() {
+                              _customCommands = updated;
+                              labelCtrl.clear();
+                              commandCtrl.clear();
+                            });
+                          },
+                          icon: const Icon(Icons.add_rounded, size: 18),
+                          label: const Text('Add command'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    final updated = await CustomCommandsService.load();
+    if (mounted) setState(() => _customCommands = updated);
   }
 
   /// Clears the current view without opening a new session.
@@ -1242,6 +1499,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         },
         onDiscover: () => _openDiscover(),
         onExportChat: _showExportSheet,
+        onPermissions: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PermissionsScreen(
+              shizukuService: _actionHandler.shizuku,
+              screenAutomationService: _actionHandler.screenAutomation,
+            ),
+          ),
+        ),
         onTaskHistory: () => Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
@@ -1450,6 +1716,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 QuickActions(
                   onSend: _sendMessage,
                   isDark: isDark,
+                  customCommands: _customCommands,
+                  onEditCustom: _openQuickActionsEditor,
                 ),
 
               // Custom Input bar

@@ -27,9 +27,15 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
 - Discover Capabilities hub: browse every feature in one place (voice, Wi-Fi,
   calls & SMS, media, device controls, productivity, privacy recovery) and tap
   any card to send it to the AI agent
+- App Permissions dashboard: live status for screen control, microphone,
+  overlay, notifications, contacts, calls, SMS, Shizuku and battery-optimization
+  exemption, with one-tap Grant / Open-settings for each; reachable from the
+  drawer and Settings
+- Custom Quick Commands: pin your own frequent requests as home-screen chips
+  (icon, label and AI command) right from the quick-command bar
 - Decluttered chat AppBar (7 -> 4 actions) with a reorganised drawer that groups
-  tools into a dedicated section (Control Panel, Discover, Task History, Export,
-  Summarize, Clear, Settings)
+  tools into a dedicated section (Control Panel, Discover, Permissions, Task
+  History, Export, Summarize, Clear, Settings)
 - Smarter AI replies: rewritten system prompts (cleaner action parsing, concise
   chat style, same-language replies) and fenced-JSON (```json) action parsing
 - Long-press any message: Rewrite with AI (polish the text) or Translate with

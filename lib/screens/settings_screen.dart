@@ -21,6 +21,7 @@ import '../models/api_key_config.dart';
 import 'task_history_screen.dart';
 import 'accounts_screen.dart';
 import 'app_lock_screen.dart';
+import 'permissions_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -190,6 +191,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
               // 6. DEVICE AUTOMATION & AUTHORITY
               _buildDeviceAuthorityCard(isDark),
+              const SizedBox(height: 16),
+
+              // 6a. PERMISSIONS & ACCESS
+              _buildPermissionsCard(isDark),
               const SizedBox(height: 16),
 
               // 6b. SCHEDULED TASKS
@@ -976,6 +981,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPermissionsCard(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.shield_outlined, color: Color(0xFF2FBF8F), size: 20),
+                SizedBox(width: 8),
+                Text('App Permissions & Access', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const Divider(height: 20),
+            Text(
+              'Microphone, screen control, overlay bubble, notifications, '
+              'contacts, calls, SMS and Shizuku — check each one and grant '
+              'anything that is missing.',
+              style: TextStyle(
+                fontSize: 12.5,
+                height: 1.45,
+                color: isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PermissionsScreen(
+                        shizukuService: widget.shizukuService,
+                        screenAutomationService: widget.screenAutomationService,
+                      ),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.security_rounded, size: 18),
+                label: const Text('Manage permissions'),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
