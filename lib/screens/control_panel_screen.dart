@@ -133,8 +133,8 @@ class _ControlPanelScreenState extends State<ControlPanelScreen> {
     String actionType = 'set_alarm';
     Map<String, dynamic> params = {'hour': 7, 'minute': 30, 'label': 'Wake up'};
     final labelCtrl = TextEditingController(text: 'Wake up');
-    final now = TimeOfDay.now();
-    final nextMinuteOfDay = now.hour * 60 + now.minute + 60;
+    final nowTime = TimeOfDay.now();
+    final nextMinuteOfDay = nowTime.hour * 60 + nowTime.minute + 60;
     TimeOfDay time = TimeOfDay(
       hour: (nextMinuteOfDay ~/ 60) % 24,
       minute: nextMinuteOfDay % 60,
