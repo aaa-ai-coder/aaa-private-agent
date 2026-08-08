@@ -34,13 +34,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   bool _isOverlayGranted = false;
 
   // AI config states
-  String _selectedProvider = 'deepseek';
+  String _selectedProvider = 'free';
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _baseUrlController = TextEditingController(
-    text: 'https://api.deepseek.com',
+    text: AiService.keylessBaseUrl,
   );
   final TextEditingController _modelController = TextEditingController(
-    text: 'deepseek-chat',
+    text: AiService.keylessDefaultModel,
   );
   bool _obscureKey = true;
   bool _isValidating = false;
@@ -159,7 +159,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     setState(() {
       _selectedProvider = provider;
       _validationError = null;
-      if (provider == 'groq') {
+      if (provider == 'free') {
+        _baseUrlController.text = AiService.keylessBaseUrl;
+        _modelController.text = AiService.keylessDefaultModel;
+        _apiKeyController.clear();
+      } else if (provider == 'groq') {
         _baseUrlController.text = 'https://api.groq.com/openai/v1';
         _modelController.text = 'llama-3.3-70b-versatile';
       } else if (provider == 'openrouter') {
@@ -174,15 +178,18 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       } else if (provider == 'ollama_cloud') {
         _baseUrlController.text = 'https://api.ollama.com/v1';
         _modelController.text = 'llama3.3';
+        _apiKeyController.clear();
       } else if (provider == 'deepseek') {
         _baseUrlController.text = 'https://api.deepseek.com';
         _modelController.text = 'deepseek-chat';
       } else if (provider == 'puter') {
         _baseUrlController.text = AiService.puterBaseUrl;
         _modelController.text = AiService.puterDefaultModel;
+        _apiKeyController.clear();
       } else if (provider == 'local') {
         _baseUrlController.text = 'http://10.0.2.2:1234/v1';
         _modelController.text = 'qwen2.5-7b-instruct';
+        _apiKeyController.clear();
       } else {
         _baseUrlController.clear();
         _modelController.clear();
@@ -208,7 +215,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       return;
     }
 
-    if (_selectedProvider != 'ollama' &&
+    if (_selectedProvider != 'free' &&
+        _selectedProvider != 'ollama' &&
         _selectedProvider != 'ollama_cloud' &&
         _selectedProvider != 'local' &&
         _selectedProvider != 'puter' &&
@@ -1113,9 +1121,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           ),
           const SizedBox(height: 4),
           Text(
-            'Select a provider to prefill API details automatically.',
+            'Free AI works instantly with no key. Pick a provider to prefill '
+            'details, or connect your own API key for more power.',
             style: TextStyle(
               fontSize: 13,
+              height: 1.4,
               color: isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
             ),
           ),
@@ -1128,11 +1138,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               children: [
+                _buildProviderCard('free', 'Free AI', Icons.auto_awesome_rounded, isDark, highlight: true),
+                const SizedBox(width: 10),
                 _buildProviderCard('groq', 'Groq Free', Icons.bolt_rounded, isDark),
                 const SizedBox(width: 10),
                 _buildProviderCard('openrouter', 'OpenRouter', Icons.public_rounded, isDark),
                 const SizedBox(width: 10),
-                _buildProviderCard('gemini', 'Gemini', Icons.auto_awesome_rounded, isDark),
+                _buildProviderCard('gemini', 'Gemini', Icons.smart_toy_rounded, isDark),
                 const SizedBox(width: 10),
                 _buildProviderCard('nvidia', 'NVIDIA NIM', Icons.memory_rounded, isDark),
                 const SizedBox(width: 10),
@@ -1152,9 +1164,11 @@ class _OnboardingScreenState extends State<OnboardingScreen>
             child: ListView(
               physics: const BouncingScrollPhysics(),
               children: [
-                if (_selectedProvider != 'ollama' &&
+                if (_selectedProvider != 'free' &&
+                    _selectedProvider != 'ollama' &&
                     _selectedProvider != 'ollama_cloud' &&
-                    _selectedProvider != 'local') ...[
+                    _selectedProvider != 'local' &&
+                    _selectedProvider != 'puter') ...[
                   _buildFormTextField(
                     controller: _apiKeyController,
                     label: 'API Key',
@@ -1206,6 +1220,30 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     onPressed: _isValidating ? null : _fetchModels,
                   ),
                 ),
+
+                if (_selectedProvider == 'free' || _selectedProvider == 'puter') ...[
+                  const SizedBox(height: 14),
+                  Text(
+                    'Quick free models',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: (_selectedProvider == 'puter'
+                            ? const ['gpt-4o-mini', 'gpt-4o', 'llama-3.1-8b', 'claude-3-5-haiku']
+                            : const ['openai-fast', 'openai', 'llama-3.1-8b', 'mistral-7b', 'deepseek-v3'])
+                        .map(
+                          (m) => _modelChip(m, isDark),
+                        )
+                        .toList(),
+                  ),
+                ],
 
                 if (_validationError != null) ...[
                   const SizedBox(height: 16),
@@ -1322,12 +1360,54 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     );
   }
 
+  Widget _modelChip(String model, bool isDark) {
+    final selected = _modelController.text.trim() == model;
+    return InkWell(
+      borderRadius: BorderRadius.circular(20),
+      onTap: () {
+        setState(() {
+          _modelController.text = model;
+          _validationError = null;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+        decoration: BoxDecoration(
+          color: selected
+              ? const Color(0xFFFF6B4A).withValues(alpha: 0.14)
+              : (isDark
+                  ? const Color(0xFF241B21)
+                  : const Color(0xFFF7F0E9)),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? const Color(0xFFFF6B4A)
+                : (isDark
+                    ? const Color(0xFF3B2C33)
+                    : const Color(0xFFEADFD1)),
+          ),
+        ),
+        child: Text(
+          model,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+            color: selected
+                ? const Color(0xFFFF6B4A)
+                : (isDark ? const Color(0xFFEDE0D8) : const Color(0xFF5A4638)),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildProviderCard(
     String id,
     String label,
     IconData icon,
-    bool isDark,
-  ) {
+    bool isDark, {
+    bool highlight = false,
+  }) {
     final isSelected = _selectedProvider == id;
 
     return Container(
@@ -1335,10 +1415,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isSelected
-              ? Theme.of(context).colorScheme.primary
-              : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
-          width: isSelected ? 2 : 1.2,
+          color: highlight && !isSelected
+              ? const Color(0xFFFF8A5C)
+              : isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.08),
+          width: highlight && !isSelected ? 1.6 : (isSelected ? 2 : 1.2),
         ),
         boxShadow: isSelected
             ? [
@@ -1350,7 +1432,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   offset: const Offset(0, 4),
                 ),
               ]
-            : null,
+            : highlight
+                ? [
+                    BoxShadow(
+                      color: const Color(0xFFFF6B4A).withValues(alpha: 0.12),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
       ),
       child: Card(
         margin: EdgeInsets.zero,

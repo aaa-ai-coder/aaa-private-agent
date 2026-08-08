@@ -33,6 +33,20 @@ AI-powered Android agent app with floating overlay, voice control, and full devi
   drawer and Settings
 - Custom Quick Commands: pin your own frequent requests as home-screen chips
   (icon, label and AI command) right from the quick-command bar
+- Offline AI Assistant (v4.3): a fully on-device intent-based assistant that
+  controls the phone (WiFi, Bluetooth, hotspot, mobile data, DND, brightness,
+  volume, ringer, media, alarms, timers, screenshots, open apps, lock/wake,
+  home, system settings, battery & device info) and chats — no API key, no
+  internet. Emits the same actions as the cloud agent and speaks via TTS.
+  Enable it in Settings > Offline AI & Memory.
+- AI Memory (v4.3): the assistant remembers facts about you across
+  conversations ("my name is Alex", "remember that I like short answers").
+  Facts are stored on-device, injected into the AI system prompt, and
+  manageable in Settings > Offline AI & Memory > AI Memory.
+- Free AI first-open (v4.3): onboarding defaults to the keyless Free AI
+  provider and hides the API-key field for keyless options (Free AI, Puter,
+  Ollama, local) — you can start chatting immediately with no key.
+- Share any message to other apps straight from the long-press menu
 - Decluttered chat AppBar (7 -> 4 actions) with a reorganised drawer that groups
   tools into a dedicated section (Control Panel, Discover, Permissions, Task
   History, Export, Summarize, Clear, Settings)

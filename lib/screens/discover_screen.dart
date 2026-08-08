@@ -37,6 +37,18 @@ class DiscoverScreen extends StatelessWidget {
           subtitle: 'See the current display',
           command: "What's on my screen?",
         ),
+        _Capability(
+          icon: Icons.wifi_tethering_rounded,
+          label: 'Offline AI',
+          subtitle: 'Works with no internet',
+          command: 'What can you do offline?',
+        ),
+        _Capability(
+          icon: Icons.memory_rounded,
+          label: 'Remember this',
+          subtitle: 'Teach the AI about you',
+          command: 'Remember that I like short answers',
+        ),
       ],
     ),
     _CapabilityGroup(

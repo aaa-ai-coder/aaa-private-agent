@@ -8,6 +8,7 @@ import '../models/agent_action.dart';
 import '../models/api_key_config.dart';
 import 'database_service.dart';
 import 'ari_ai_engine.dart';
+import 'memory_service.dart';
 
 class AiResponse {
   final String content;
@@ -119,6 +120,7 @@ class AiService {
   int _maxTokens = 1024;
   bool _useScreenCompression = true;
   bool _useSystemPrompt = true;
+  String _memory = '';
   final List<Map<String, String>> _conversationHistory = [];
 
   /// Separate history for the Telegram channel. Kept independent from the
@@ -508,6 +510,9 @@ RULES:
     _useScreenCompression = prefs.getBool('api_use_screen_compression') ?? true;
     _useSystemPrompt = prefs.getBool('api_use_system_prompt') ?? true;
 
+    // Load remembered facts about the user into the system prompt.
+    _memory = await MemoryService.memoryBlock();
+
     // Load cached models and multi-key cache
     await _loadCachedModels();
     await _loadApiKeys();
@@ -518,8 +523,12 @@ RULES:
     }
   }
 
-  Future<void> saveSettings({
-    required String apiKey,
+  /// Reloads the on-device memory block so new facts take effect immediately.
+  Future<void> reloadMemory() async {
+    _memory = await MemoryService.memoryBlock();
+  }
+
+  Future<void> saveSettings({    required String apiKey,
     String? baseUrl,
     String? model,
     String? name,
@@ -799,7 +808,7 @@ RULES:
 
     try {
       // Build the prompt including system instructions
-      final systemPrompt = isAgentMode ? _systemPrompt : _chatSystemPrompt;
+      final systemPrompt = (isAgentMode ? _systemPrompt : _chatSystemPrompt) + _memory;
       final messages = [
         if (_useSystemPrompt) {'role': 'system', 'content': systemPrompt},
         ..._telegramHistory,
@@ -922,7 +931,7 @@ RULES:
     }
 
     try {
-      final systemPrompt = isAgentMode ? _systemPrompt : _chatSystemPrompt;
+      final systemPrompt = (isAgentMode ? _systemPrompt : _chatSystemPrompt) + _memory;
       final messagesList = [
         if (_useSystemPrompt) {'role': 'system', 'content': systemPrompt},
         ..._conversationHistory,

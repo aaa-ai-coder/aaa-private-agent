@@ -523,6 +523,30 @@ class _HomeDrawerState extends State<HomeDrawer> {
                   },
                 ),
                 const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.only(left: 16, bottom: 8),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.auto_awesome_rounded,
+                        size: 12,
+                        color: widget.isDark
+                            ? Colors.grey[500]
+                            : Colors.grey[400],
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        '$kAppName v$kAppVersion \u2022 $kAppTagline Edition',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: widget.isDark
+                              ? Colors.grey[500]
+                              : Colors.grey[400],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
           ),

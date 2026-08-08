@@ -28,6 +28,8 @@ import '../services/custom_commands_service.dart';
 import '../services/notification_service.dart';
 import '../services/storage_service.dart';
 import '../services/scheduler_service.dart';
+import '../services/memory_service.dart';
+import '../services/offline_assistant_service.dart';
 import '../widgets/home_header.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/agent_orb.dart';
@@ -198,8 +200,103 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _scrollToBottom();
     await _safeSaveSession();
 
-    await _streamAssistantResponse(text.trim(), isAgent: _mode == 'agent');
+    final trimmed = text.trim();
+
+    // On-device AI memory: remember facts about the user without any API call.
+    final remembered = await MemoryService.tryRemember(trimmed);
+    if (remembered != null) {
+      setState(() {
+        _isLoading = false;
+        _messages.add(ChatMessage(role: 'assistant', content: remembered));
+      });
+      _scrollToBottom();
+      await _safeSaveSession();
+      await _speakIfEnabled(remembered);
+      return;
+    }
+
+    // Offline Assistant mode: full on-device AI, no API key or network needed.
+    final prefs = await SharedPreferences.getInstance();
+    final useOffline = prefs.getBool('use_offline_ai') ?? false;
+    if (useOffline) {
+      setState(() {
+        _isLoading = false;
+      });
+      await _handleOfflineMessage(trimmed);
+      return;
+    }
+
+    await _streamAssistantResponse(trimmed, isAgent: _mode == 'agent');
   }
+
+  /// Runs the fully offline assistant: executes device-control actions it
+  /// recognizes or replies with plain text (spoken when auto-read is on).
+  Future<void> _handleOfflineMessage(String text) async {
+    if (!mounted) return;
+    final result = OfflineAssistantService.handle(text);
+
+    if (result.action != null) {
+      await _showTaskProgressOverlay('Starting: $text');
+      final actionResult = await _actionHandler.execute(
+        result.action!,
+        aiService: _aiService,
+        onProgress: (msg) {
+          if (mounted) {
+            setState(() {
+              _messages.add(ChatMessage(role: 'assistant', content: '⏳ $msg'));
+            });
+            _scrollToBottom();
+          }
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _messages.add(
+          ChatMessage(
+            role: 'assistant',
+            content: actionResult.success
+                ? (result.action!.response.isNotEmpty
+                    ? result.action!.response
+                    : (actionResult.details ?? 'Done.'))
+                : '⚠️ ${actionResult.details ?? 'Action could not be completed.'}',
+            actionResult: actionResult,
+          ),
+        );
+      });
+      _scrollToBottom();
+      _sendOverlayEvent(
+        'OVERLAY_TASK_FINISHED',
+        actionResult.success
+            ? (actionResult.details ?? 'Task complete.')
+            : 'Task failed: ${actionResult.details ?? 'Unknown error'}',
+      );
+    } else {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(ChatMessage(role: 'assistant', content: result.reply));
+      });
+      _scrollToBottom();
+      await _speakIfEnabled(result.reply);
+    }
+    await _safeSaveSession();
+    _updateOverlayState();
+  }
+
+  /// Speaks [text] when auto-read TTS is enabled (or voice mode is active).
+  Future<void> _speakIfEnabled(String text) async {
+    if (text.isEmpty || !mounted) return;
+    final prefs = await SharedPreferences.getInstance();
+    final autoRead = prefs.getBool('auto_read_tts') ?? true;
+    if (autoRead || _continuousVoiceMode) {
+      final detectedLang = LanguageConfig.detectFromText(text);
+      if (detectedLang.code != _voiceService.currentLanguage.code) {
+        await _voiceService.setLanguage(detectedLang);
+        await prefs.setString('voice_language', detectedLang.code);
+      }
+      _voiceService.speak(text);
+    }
+  }
+
 
   /// Deletes a message and rebuilds the in-memory AI history so subsequent
   /// turns don't reference removed content.

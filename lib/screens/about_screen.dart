@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
+import '../utils/app_info.dart';
 
 /// About & "What's new" screen: version, mission, and the feature history of
 /// the Aurora redesign so users can see what changed.
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
-
-  static const String _version = '4.0.0';
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +62,7 @@ class AboutScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        'Version $_version \u2022 Aurora',
+                        'Version $kAppVersion \u2022 $kAppTagline',
                         style: TextStyle(
                           color: Colors.white.withValues(alpha: 0.92),
                           fontSize: 12.5,
@@ -91,6 +90,40 @@ class AboutScreen extends StatelessWidget {
                 height: 1.5,
                 color: isDark ? AppColors.darkMuted : AppColors.lightMuted,
               ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          _section('What\u2019s new in v4.3', isDark),
+          const SizedBox(height: 8),
+          _card(
+            isDark,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                _WhatNewItem(
+                  icon: Icons.wifi_tethering_rounded,
+                  color: AppColors.success,
+                  text: 'Offline AI Assistant — full on-device phone control and '
+                      'chat with no API key or internet. Turn it on in Settings.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.memory_rounded,
+                  color: AppColors.warning,
+                  text: 'AI Memory — the assistant remembers facts about you '
+                      '("my name is Alex") across conversations.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.auto_awesome_rounded,
+                  color: AppColors.info,
+                  text: 'Free AI as the default first-open provider — no key '
+                      'required to start chatting.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.share_rounded,
+                  color: AppColors.purple,
+                  text: 'Share any message to other apps from the long-press menu.',
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 20),

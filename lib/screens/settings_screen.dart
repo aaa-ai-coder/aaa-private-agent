@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../config/feature_flags.dart';
+import '../utils/app_info.dart';
 import '../services/app_lock_service.dart';
 import '../services/auth_service.dart';
 import '../services/ai_service.dart';
@@ -23,6 +24,7 @@ import 'accounts_screen.dart';
 import 'app_lock_screen.dart';
 import 'about_screen.dart';
 import 'permissions_screen.dart';
+import 'memory_screen.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -202,7 +204,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const _ScheduledTasksCard(),
               const SizedBox(height: 16),
 
-               // 6c. ABOUT & WHAT'S NEW
+               // 6c. OFFLINE AI & MEMORY
+               _buildOfflineAiCard(isDark),
+               const SizedBox(height: 16),
+
+               // 6d. ABOUT & WHAT'S NEW
                _buildAboutCard(isDark),
                const SizedBox(height: 16),
 
@@ -1121,6 +1127,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  Widget _buildOfflineAiCard(bool isDark) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: const [
+                Icon(Icons.wifi_tethering_rounded, color: Color(0xFF2FBF8F), size: 20),
+                SizedBox(width: 8),
+                Text('Offline AI & Memory', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              ],
+            ),
+            const Divider(height: 20),
+            FutureBuilder<bool>(
+              future: SharedPreferences.getInstance()
+                  .then((p) => p.getBool('use_offline_ai') ?? false),
+              builder: (context, snapshot) {
+                return SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Offline Assistant'),
+                  subtitle: const Text(
+                    'Use the built-in on-device AI for phone control and chat — '
+                    'no API key or internet needed.',
+                  ),
+                  value: snapshot.data ?? false,
+                  onChanged: (val) async {
+                    final prefs = await SharedPreferences.getInstance();
+                    await prefs.setBool('use_offline_ai', val);
+                    if (mounted) setState(() {});
+                  },
+                );
+              },
+            ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFB86B).withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.memory_rounded, size: 18, color: Color(0xFFFFB86B)),
+              ),
+              title: const Text('AI Memory'),
+              subtitle: const Text('Facts the assistant remembers about you'),
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const MemoryScreen()),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildAboutCard(bool isDark) {
     return Card(
       child: Padding(
@@ -1137,8 +1204,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const Divider(height: 20),
             Text(
-              'Version 4.0.0 (Aurora) — warm redesign, Discover hub, permission '
-              'dashboard, custom commands and more. See the full changelog.',
+              'Version $kAppVersion ($kAppTagline) — warm redesign, Discover hub, '
+              'permission dashboard, custom commands and more. See the full '
+              'changelog.',
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.45,
@@ -1195,7 +1263,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             Center(
               child: Text(
-                'AAA Private Agent v2.1 • Nebula Edition',
+                '$kAppName v$kAppVersion \u2022 $kAppTagline Edition',
                 style: TextStyle(fontSize: 11, color: isDark ? Colors.white38 : Colors.black38),
               ),
             ),

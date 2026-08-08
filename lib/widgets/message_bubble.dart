@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:share_plus/share_plus.dart';
 import '../models/chat_message.dart';
 import 'agent_orb.dart';
 
@@ -344,6 +345,20 @@ class MessageBubble extends StatelessWidget {
                       onSpeakTap!();
                     },
                   ),
+                _actionTile(
+                  ctx,
+                  icon: Icons.ios_share_rounded,
+                  label: 'Share message',
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    SharePlus.instance.share(
+                      ShareParams(
+                        text: message.content,
+                        subject: 'AAA Private Agent message',
+                      ),
+                    );
+                  },
+                ),
                 if (!isUser && onRegenerateTap != null)
                   _actionTile(
                     ctx,
