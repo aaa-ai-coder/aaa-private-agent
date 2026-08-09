@@ -18,7 +18,7 @@ import '../services/screen_automation_service.dart';
 import '../services/telegram_service.dart';
 import '../services/storage_service.dart';
 import '../services/scheduler_service.dart';
-import '../services/bundled_llm_service.dart';
+import '../services/local_llm_service.dart';
 import '../models/api_key_config.dart';
 import 'task_history_screen.dart';
 import 'accounts_screen.dart';
@@ -1152,9 +1152,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: const Text('Offline AI'),
                   subtitle: const Text(
                     'Real on-device AI that works with no internet or API key: '
-                    'a bundled LLM inside this app, plus optional Ollama, with '
-                    'an instant assistant as fallback. Auto-engages when the '
-                    'network is unreachable.',
+                    'a Qwen LLM you download once inside the app, plus optional '
+                    'Ollama, with an instant assistant as fallback. Auto-engages '
+                    'when the network is unreachable.',
                   ),
                   value: snapshot.data ?? false,
                   onChanged: (val) async {
@@ -1165,7 +1165,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
-            const _BundledModelSection(),
+            const _LocalModelSection(),
             const _LocalOllamaConfig(),
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -1209,9 +1209,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const Divider(height: 20),
             Text(
-              'Version $kAppVersion ($kAppTagline) — a real on-device LLM '
-              '(Qwen 2.5, 620 MB) is now bundled inside the app for fully '
-              'offline AI with automatic fallback when the network drops. '
+              'Version $kAppVersion ($kAppTagline) — download a small on-device '
+              'LLM (Qwen 2.5, ~470–620 MB) once inside the app and it runs fully '
+              'offline, with automatic fallback when the network drops. '
               'See the full changelog.',
               style: TextStyle(
                 fontSize: 12.5,
@@ -1567,19 +1567,21 @@ class _ScheduledTasksCardState extends State<_ScheduledTasksCard> {
   }
 }
 
-/// Manages the built-in on-device AI (Qwen 2.5 GGUF bundled inside the APK):
-/// enable toggle, one-time extraction progress and model-storage removal.
-class _BundledModelSection extends StatefulWidget {
-  const _BundledModelSection();
+/// Manages the on-device AI model (Qwen 2.5 GGUF): enable toggle, model
+/// choice, one-time in-app download with progress/cancel, and storage removal.
+class _LocalModelSection extends StatefulWidget {
+  const _LocalModelSection();
 
   @override
-  State<_BundledModelSection> createState() => _BundledModelSectionState();
+  State<_LocalModelSection> createState() => _LocalModelSectionState();
 }
 
-class _BundledModelSectionState extends State<_BundledModelSection> {
+class _LocalModelSectionState extends State<_LocalModelSection> {
   bool _enabled = true;
-  bool? _extracted;
-  bool _extracting = false;
+  LocalModelOption? _selected;
+  bool? _downloaded;
+  bool _downloading = false;
+  bool _cancelRequested = false;
   double _progress = 0;
   String? _status;
 
@@ -1591,57 +1593,84 @@ class _BundledModelSectionState extends State<_BundledModelSection> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
-    final enabled =
-        prefs.getBool(BundledLlmService.prefEnabled) ?? true;
-    final extracted = await BundledLlmService.instance.isExtracted();
+    final enabled = prefs.getBool(LocalLlmService.prefEnabled) ?? true;
+    final selected = await LocalLlmService.instance.selectedModel();
+    final downloaded = await LocalLlmService.instance.isDownloaded(model: selected);
     if (!mounted) return;
     setState(() {
       _enabled = enabled;
-      _extracted = extracted;
+      _selected = selected;
+      _downloaded = downloaded;
     });
   }
 
-  Future<void> _extract() async {
+  Future<void> _pickModel(LocalModelOption model) async {
+    if (_downloading) return;
+    await LocalLlmService.instance.setSelectedModel(model);
+    final downloaded = await LocalLlmService.instance.isDownloaded(model: model);
+    if (!mounted) return;
     setState(() {
-      _extracting = true;
+      _selected = model;
+      _downloaded = downloaded;
+      _status = null;
+    });
+  }
+
+  Future<void> _download() async {
+    final model = _selected;
+    if (model == null) return;
+    setState(() {
+      _downloading = true;
+      _cancelRequested = false;
       _progress = 0;
       _status = null;
     });
     try {
-      await BundledLlmService.instance.extract(
+      await LocalLlmService.instance.download(
+        model,
         onProgress: (p) {
           if (mounted) setState(() => _progress = p);
         },
+        shouldCancel: () => _cancelRequested,
       );
       if (!mounted) return;
       setState(() {
-        _extracted = true;
-        _extracting = false;
+        _downloading = false;
+        _downloaded = true;
         _status = 'Model ready. Uses RAM only while chatting.';
       });
     } catch (e) {
       if (!mounted) return;
+      final cancelled = e is LocalModelCancelException;
       setState(() {
-        _extracting = false;
-        _status =
-            'Could not prepare the model: ${e.toString().replaceFirst('Exception: ', '')}';
+        _downloading = false;
+        _status = cancelled
+            ? 'Download cancelled.'
+            : 'Download failed: '
+                '${e.toString().replaceFirst('Exception: ', '')}';
       });
     }
   }
 
+  void _cancel() {
+    _cancelRequested = true;
+  }
+
   Future<void> _remove() async {
+    final model = _selected;
+    if (model == null) return;
     setState(() {
-      _extracting = false;
+      _downloading = false;
       _status = null;
     });
-    await BundledLlmService.instance.removeModel();
+    await LocalLlmService.instance.removeModel(model: model);
     if (!mounted) return;
-    setState(() => _extracted = false);
+    setState(() => _downloaded = false);
   }
 
   Future<void> _toggleEnabled(bool val) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(BundledLlmService.prefEnabled, val);
+    await prefs.setBool(LocalLlmService.prefEnabled, val);
     if (mounted) setState(() => _enabled = val);
   }
 
@@ -1672,7 +1701,7 @@ class _BundledModelSectionState extends State<_BundledModelSection> {
             const SizedBox(width: 10),
             const Expanded(
               child: Text(
-                'Built-in On-Device AI',
+                'On-Device AI',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
             ),
@@ -1682,15 +1711,15 @@ class _BundledModelSectionState extends State<_BundledModelSection> {
         Padding(
           padding: const EdgeInsets.only(left: 44),
           child: Text(
-            'Qwen 2.5 0.5B (620 MB) is included inside this app — a real LLM '
-            'that answers chat and runs phone actions with no internet. Loaded '
-            'into RAM only while chatting, then unloads itself.',
+            'Download a small GGUF model once (Qwen 2.5, ~470–620 MB) and it '
+            'runs fully offline — chat and phone actions with no internet. '
+            'Loaded into RAM only while chatting, then unloads itself.',
             style: TextStyle(fontSize: 12.5, height: 1.45, color: subColor),
           ),
         ),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Use built-in model'),
+          title: const Text('Use on-device AI'),
           subtitle: const Text(
             'Answers offline automatically when there is no connection',
           ),
@@ -1702,19 +1731,32 @@ class _BundledModelSectionState extends State<_BundledModelSection> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (_extracting) ...[
+              for (final model in LocalLlmService.models)
+                _modelTile(model, isDark, subColor),
+              if (_downloading) ...[
+                const SizedBox(height: 4),
                 LinearProgressIndicator(
                   value: _progress,
                   minHeight: 6,
                   borderRadius: BorderRadius.circular(3),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  'Preparing model… ${(_progress * 100).toStringAsFixed(0)}% '
-                  '(one time, ~620 MB)',
-                  style: TextStyle(fontSize: 11.5, color: subColor),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Downloading ${_selected?.sizeLabel ?? ''}… '
+                        '${(_progress * 100).toStringAsFixed(0)}%',
+                        style: TextStyle(fontSize: 11.5, color: subColor),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _cancel,
+                      child: const Text('Cancel'),
+                    ),
+                  ],
                 ),
-              ] else if (_extracted == true)
+              ] else if (_downloaded == true)
                 Row(
                   children: [
                     const Icon(
@@ -1735,17 +1777,17 @@ class _BundledModelSectionState extends State<_BundledModelSection> {
                     ),
                   ],
                 )
-              else ...[
+              else if (_selected != null) ...[
                 Text(
-                  'Model not prepared yet — the first offline message prepares '
-                  'it, or extract now to use it immediately.',
+                  'Not downloaded yet — download ${_selected!.sizeLabel} once '
+                  'while online to enable real offline answers.',
                   style: TextStyle(fontSize: 11.5, color: subColor),
                 ),
                 const SizedBox(height: 8),
                 OutlinedButton.icon(
-                  onPressed: _extract,
+                  onPressed: _download,
                   icon: const Icon(Icons.download_rounded, size: 16),
-                  label: const Text('Extract model now'),
+                  label: const Text('Download model now'),
                   style: OutlinedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(horizontal: 12),
                   ),
@@ -1768,6 +1810,51 @@ class _BundledModelSectionState extends State<_BundledModelSection> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _modelTile(LocalModelOption model, bool isDark, Color subColor) {
+    final selected = _selected?.key == model.key;
+    final ready = _downloaded == true && selected;
+    return Padding(
+      padding: const EdgeInsets.only(top: 2),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: selected ? null : () => _pickModel(model),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: [
+              Icon(
+                ready
+                    ? Icons.check_circle_rounded
+                    : Icons.radio_button_unchecked_rounded,
+                size: 18,
+                color: ready
+                    ? const Color(0xFF2FBF8F)
+                    : (selected
+                        ? const Color(0xFF2FBF8F)
+                        : subColor.withValues(alpha: 0.6)),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  model.name,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: subColor,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                  ),
+                ),
+              ),
+              Text(
+                model.sizeLabel,
+                style: TextStyle(fontSize: 11, color: subColor),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -93,7 +93,7 @@ class AboutScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
-          _section('What\u2019s new in v4.5', isDark),
+          _section('What\u2019s new in v4.6', isDark),
           const SizedBox(height: 8),
           _card(
             isDark,
@@ -103,23 +103,24 @@ class AboutScreen extends StatelessWidget {
                 _WhatNewItem(
                   icon: Icons.phonelink_erase_rounded,
                   color: AppColors.success,
-                  text: 'A real on-device LLM is now bundled inside the app — '
-                      'Qwen 2.5 (620 MB), fully offline, no downloads. It '
-                      'answers chat and phone actions with no internet and '
-                      'uses RAM only while chatting.',
+                  text: 'Real on-device LLM, downloaded in-app — pick Qwen 2.5 '
+                      '(~470–620 MB), download it once from Settings, and it '
+                      'runs fully offline. The APK stays small and no extra '
+                      'download is needed at install time.',
                 ),
                 _WhatNewItem(
                   icon: Icons.wifi_off_rounded,
                   color: AppColors.warning,
                   text: 'Automatic offline fallback — if the network drops, '
-                      'the built-in model answers right away, so the assistant '
-                      'never goes silent.',
+                      'the downloaded model answers right away, so the '
+                      'assistant never goes silent.',
                 ),
                 _WhatNewItem(
                   icon: Icons.settings_rounded,
                   color: AppColors.info,
-                  text: 'Settings now has a Built-in On-Device AI card to '
-                      'prepare or remove the model and monitor its status.',
+                  text: 'Settings has an On-Device AI card to download, '
+                      'switch between model sizes, cancel or remove the model '
+                      'and monitor its status.',
                 ),
               ],
             ),

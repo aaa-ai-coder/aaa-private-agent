@@ -32,7 +32,7 @@ import '../services/storage_service.dart';
 import '../services/scheduler_service.dart';
 import '../services/memory_service.dart';
 import '../services/offline_assistant_service.dart';
-import '../services/bundled_llm_service.dart';
+import '../services/local_llm_service.dart';
 import '../widgets/home_header.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/agent_orb.dart';
@@ -266,7 +266,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     await _streamAssistantResponse(trimmed, isAgent: _mode == 'agent');
   }
 
-  /// Offline AI mode: prefers the built-in on-device LLM (bundled in the APK),
+  /// Offline AI mode: prefers the on-device LLM (downloaded in-app),
   /// then a user-configured local model (e.g. Ollama at localhost), and finally
   /// falls back to the instant intent-based assistant when no model is ready.
   Future<void> _handleOfflineMessage(String text) async {
@@ -274,11 +274,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final prefs = await SharedPreferences.getInstance();
 
-    // 1) Built-in on-device AI: real LLM shipped inside the app itself.
+    // 1) On-device AI: real LLM downloaded once inside the app (Settings → Offline AI).
     final bundledEnabled = prefs.getBool('use_bundled_llm') ?? true;
     if (bundledEnabled) {
-      if (await BundledLlmService.instance.isExtracted()) {
-        final bundledReply = await BundledLlmService.instance.complete(
+      if (await LocalLlmService.instance.isDownloaded()) {
+        final bundledReply = await LocalLlmService.instance.complete(
           text,
           history: _recentHistory(),
         );
@@ -300,11 +300,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           _updateOverlayState();
           return;
         }
-      } else {
-        // First offline use: prepare the bundled model in the background so
-        // the next message is answered by the real on-device LLM.
-        unawaited(_prepareBundledModel());
       }
+      // If the model has not been downloaded yet, fall through to the other
+      // offline tiers (Ollama, then the instant intent assistant). The user can
+      // download it once from Settings → Offline AI.
     }
 
     // 2) User-configured local model (e.g. Ollama running on the phone).
@@ -361,8 +360,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   /// Builds a short alternating [user, assistant] history from the chat for
-  /// the bundled on-device LLM, capped to the last few turns. The current
-  /// (just-sent) message is passed separately, so it is excluded here.
+  /// the on-device LLM, capped to the last few turns. The current (just-sent)
+  /// message is passed separately, so it is excluded here.
   List<String> _recentHistory() {
     final stack = <String>[];
     for (var i = _messages.length - 2; i >= 0 && stack.length < 8; i--) {
@@ -373,16 +372,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       stack.add(m.content.trim());
     }
     return stack.reversed.toList();
-  }
-
-  /// Kicks off the one-time extraction of the bundled model. Any failure is
-  /// logged and ignored so chat never blocks on it.
-  Future<void> _prepareBundledModel() async {
-    try {
-      await BundledLlmService.instance.extract();
-    } catch (e) {
-      developer.log('Bundled model extraction failed: $e', name: 'PrivateAgent');
-    }
   }
 
   bool? _onlineCache;

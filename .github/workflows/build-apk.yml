@@ -57,26 +57,6 @@ jobs:
             echo '{"project_info":{"project_number":"844358886395","project_id":"aaa-private-agent","storage_bucket":"aaa-private-agent.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:844358886395:android:a1b2c3d4e5f6g7h8","android_client_info":{"package_name":"com.aaa.privateagent"}},"oauth_client":[{"client_id":"844358886395-tsh4o7eo55r14e6cbrs6oc1faisu6l33.apps.googleusercontent.com","client_type":3}],"api_key":[{"current_key":"AIzaSyDummyKeyForAAAAppBuild123456"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > android/app/google-services.json
           fi
 
-      - name: Download bundled on-device AI model
-        run: |
-          mkdir -p assets/models
-          EXPECTED=650379104
-          MODEL_FILE=assets/models/qwen2.5-0.5b-instruct-q6_k.gguf
-          for url in \
-            "https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q6_k.gguf" \
-            "https://modelscope.cn/models/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/master/qwen2.5-0.5b-instruct-q6_k.gguf"; do
-            echo "Downloading on-device AI model from: $url"
-            if curl -fL --retry 5 --retry-delay 3 --connect-timeout 30 -o "$MODEL_FILE" "$url"; then
-              break
-            fi
-          done
-          SIZE=$(stat -c%s "$MODEL_FILE")
-          echo "Downloaded model size: $SIZE bytes (expected $EXPECTED)"
-          if [ "$SIZE" -lt $((EXPECTED - 1000000)) ]; then
-            echo "Model download looks wrong (too small). Aborting build."
-            exit 1
-          fi
-
       - name: Build Release APK
         run: flutter build apk --release
 
@@ -102,15 +82,20 @@ jobs:
           tag_name: ${{ steps.date.outputs.tag }}
           body: |
             ## AAA Private Agent APK
-            
+
             Latest build from main branch.
-            
+
             📱 **How to install on your phone:**
             1. Download this APK from the release page
             2. Open the downloaded file on your Android phone
             3. Tap "Install Anyway" if Play Protect shows a warning
             4. Open the app and enjoy!
-            
+
+            🧠 **Turn on Offline AI:**
+            1. Open Settings → Offline AI
+            2. Tap "Download model now" (Qwen 2.5, ~470–620 MB, one time)
+            3. The assistant runs fully offline when the network drops
+
             Release: ${{ steps.date.outputs.tag }}
           draft: false
           prerelease: false
