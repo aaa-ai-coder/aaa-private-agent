@@ -325,19 +325,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
 
     if (localReply != null && localReply.trim().isNotEmpty) {
-      final localAction = _aiService.parseAction(localReply);
+      final reply = localReply;
+      final localAction = _aiService.parseAction(reply);
       if (localAction != null) {
         await _executeOfflineAction(localAction, text);
       } else {
         if (!mounted) return;
         setState(() {
           _messages.add(
-            ChatMessage(role: 'assistant', content: localReply),
+            ChatMessage(role: 'assistant', content: reply),
           );
         });
         _scrollToBottom();
         await _safeSaveSession();
-        await _speakIfEnabled(localReply);
+        await _speakIfEnabled(reply);
       }
       _updateOverlayState();
       return;

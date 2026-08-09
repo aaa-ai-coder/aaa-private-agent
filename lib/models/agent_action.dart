@@ -3,7 +3,7 @@ class AgentAction {
   final Map<String, dynamic> params;
   final String response;
 
-  AgentAction({
+  const AgentAction({
     required this.action,
     required this.params,
     required this.response,
