@@ -18,6 +18,7 @@ import '../services/screen_automation_service.dart';
 import '../services/telegram_service.dart';
 import '../services/storage_service.dart';
 import '../services/scheduler_service.dart';
+import '../services/bundled_llm_service.dart';
 import '../models/api_key_config.dart';
 import 'task_history_screen.dart';
 import 'accounts_screen.dart';
@@ -1150,9 +1151,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Offline AI'),
                   subtitle: const Text(
-                    'Use a real on-device LLM (Ollama) for phone control and '
-                    'chat — no internet or API key. Falls back to the instant '
-                    'assistant when no local model is running.',
+                    'Real on-device AI that works with no internet or API key: '
+                    'a bundled LLM inside this app, plus optional Ollama, with '
+                    'an instant assistant as fallback. Auto-engages when the '
+                    'network is unreachable.',
                   ),
                   value: snapshot.data ?? false,
                   onChanged: (val) async {
@@ -1163,6 +1165,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 );
               },
             ),
+            const _BundledModelSection(),
             const _LocalOllamaConfig(),
             ListTile(
               contentPadding: EdgeInsets.zero,
@@ -1206,9 +1209,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const Divider(height: 20),
             Text(
-              'Version $kAppVersion ($kAppTagline) — warm redesign, Discover hub, '
-              'permission dashboard, custom commands and more. See the full '
-              'changelog.',
+              'Version $kAppVersion ($kAppTagline) — a real on-device LLM '
+              '(Qwen 2.5, 620 MB) is now bundled inside the app for fully '
+              'offline AI with automatic fallback when the network drops. '
+              'See the full changelog.',
               style: TextStyle(
                 fontSize: 12.5,
                 height: 1.45,
@@ -1559,6 +1563,211 @@ class _ScheduledTasksCardState extends State<_ScheduledTasksCard> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Manages the built-in on-device AI (Qwen 2.5 GGUF bundled inside the APK):
+/// enable toggle, one-time extraction progress and model-storage removal.
+class _BundledModelSection extends StatefulWidget {
+  const _BundledModelSection();
+
+  @override
+  State<_BundledModelSection> createState() => _BundledModelSectionState();
+}
+
+class _BundledModelSectionState extends State<_BundledModelSection> {
+  bool _enabled = true;
+  bool? _extracted;
+  bool _extracting = false;
+  double _progress = 0;
+  String? _status;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabled =
+        prefs.getBool(BundledLlmService.prefEnabled) ?? true;
+    final extracted = await BundledLlmService.instance.isExtracted();
+    if (!mounted) return;
+    setState(() {
+      _enabled = enabled;
+      _extracted = extracted;
+    });
+  }
+
+  Future<void> _extract() async {
+    setState(() {
+      _extracting = true;
+      _progress = 0;
+      _status = null;
+    });
+    try {
+      await BundledLlmService.instance.extract(
+        onProgress: (p) {
+          if (mounted) setState(() => _progress = p);
+        },
+      );
+      if (!mounted) return;
+      setState(() {
+        _extracted = true;
+        _extracting = false;
+        _status = 'Model ready. Uses RAM only while chatting.';
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _extracting = false;
+        _status =
+            'Could not prepare the model: ${e.toString().replaceFirst('Exception: ', '')}';
+      });
+    }
+  }
+
+  Future<void> _remove() async {
+    setState(() {
+      _extracting = false;
+      _status = null;
+    });
+    await BundledLlmService.instance.removeModel();
+    if (!mounted) return;
+    setState(() => _extracted = false);
+  }
+
+  Future<void> _toggleEnabled(bool val) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(BundledLlmService.prefEnabled, val);
+    if (mounted) setState(() => _enabled = val);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final subColor =
+        isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Divider(height: 20),
+        Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: const Color(0xFF2FBF8F).withValues(alpha: 0.16),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.phonelink_erase_rounded,
+                size: 18,
+                color: Color(0xFF2FBF8F),
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Expanded(
+              child: Text(
+                'Built-in On-Device AI',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.only(left: 44),
+          child: Text(
+            'Qwen 2.5 0.5B (620 MB) is included inside this app — a real LLM '
+            'that answers chat and runs phone actions with no internet. Loaded '
+            'into RAM only while chatting, then unloads itself.',
+            style: TextStyle(fontSize: 12.5, height: 1.45, color: subColor),
+          ),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Use built-in model'),
+          subtitle: const Text(
+            'Answers offline automatically when there is no connection',
+          ),
+          value: _enabled,
+          onChanged: _toggleEnabled,
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: 44),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (_extracting) ...[
+                LinearProgressIndicator(
+                  value: _progress,
+                  minHeight: 6,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Preparing model… ${(_progress * 100).toStringAsFixed(0)}% '
+                  '(one time, ~620 MB)',
+                  style: TextStyle(fontSize: 11.5, color: subColor),
+                ),
+              ] else if (_extracted == true)
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      size: 16,
+                      color: Color(0xFF2FBF8F),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Model ready on this device',
+                        style: TextStyle(fontSize: 12.5, color: subColor),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _remove,
+                      child: const Text('Remove'),
+                    ),
+                  ],
+                )
+              else ...[
+                Text(
+                  'Model not prepared yet — the first offline message prepares '
+                  'it, or extract now to use it immediately.',
+                  style: TextStyle(fontSize: 11.5, color: subColor),
+                ),
+                const SizedBox(height: 8),
+                OutlinedButton.icon(
+                  onPressed: _extract,
+                  icon: const Icon(Icons.download_rounded, size: 16),
+                  label: const Text('Extract model now'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                ),
+              ],
+              if (_status != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  _status!,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    height: 1.4,
+                    color: _status!.startsWith('Model ready')
+                        ? const Color(0xFF2FBF8F)
+                        : const Color(0xFFFF6B4A),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

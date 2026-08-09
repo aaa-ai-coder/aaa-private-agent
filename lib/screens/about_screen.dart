@@ -93,6 +93,38 @@ class AboutScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
+          _section('What\u2019s new in v4.5', isDark),
+          const SizedBox(height: 8),
+          _card(
+            isDark,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                _WhatNewItem(
+                  icon: Icons.phonelink_erase_rounded,
+                  color: AppColors.success,
+                  text: 'A real on-device LLM is now bundled inside the app — '
+                      'Qwen 2.5 (620 MB), fully offline, no downloads. It '
+                      'answers chat and phone actions with no internet and '
+                      'uses RAM only while chatting.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.wifi_off_rounded,
+                  color: AppColors.warning,
+                  text: 'Automatic offline fallback — if the network drops, '
+                      'the built-in model answers right away, so the assistant '
+                      'never goes silent.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.settings_rounded,
+                  color: AppColors.info,
+                  text: 'Settings now has a Built-in On-Device AI card to '
+                      'prepare or remove the model and monitor its status.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           _section('What\u2019s new in v4.4', isDark),
           const SizedBox(height: 8),
           _card(

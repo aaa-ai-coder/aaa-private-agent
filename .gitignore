@@ -60,6 +60,9 @@ google-services.json
 firebase-service-account.json
 .env
 
+# Bundled on-device LLM (650 MB GGUF) is downloaded by CI, never committed
+/assets/models/
+
 # Never commit real credentials
 lib/config/credentials.dart
 workers/**/.dev.vars

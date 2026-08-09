@@ -727,6 +727,10 @@ RULES:
   bool get useScreenCompression => _useScreenCompression;
   bool get useSystemPrompt => _useSystemPrompt;
 
+  /// The chat-mode system prompt (same rules used by cloud chat), exposed so
+  /// the bundled on-device LLM keeps identical tone and action behavior.
+  String get chatSystemPrompt => _chatSystemPrompt;
+
   int get _effectiveMaxTokens {
     // GLM is a reasoning model. With the app's 1,024-token default it can
     // consume the whole budget reasoning and finish without visible content.

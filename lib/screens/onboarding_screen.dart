@@ -1125,8 +1125,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           ),
           const SizedBox(height: 4),
           Text(
-            'Free AI works instantly with no key. Pick a provider to prefill '
-            'details, or connect your own API key for more power.',
+            'Free AI works instantly with no key, and a real on-device LLM '
+            '(Qwen 2.5, 620 MB) is built into this app for fully offline '
+            'chat. Pick a provider to prefill details, or connect your own '
+            'API key for more power.',
             style: TextStyle(
               fontSize: 13,
               height: 1.4,

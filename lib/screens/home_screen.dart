@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer' as developer;
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -31,6 +32,7 @@ import '../services/storage_service.dart';
 import '../services/scheduler_service.dart';
 import '../services/memory_service.dart';
 import '../services/offline_assistant_service.dart';
+import '../services/bundled_llm_service.dart';
 import '../widgets/home_header.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/agent_orb.dart';
@@ -249,15 +251,63 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return;
     }
 
+    // Automatic offline fallback: when the network is unreachable, answer
+    // locally (bundled on-device LLM if ready, otherwise the intent assistant)
+    // so the assistant never goes silent just because the phone lost signal.
+    final bundledEnabled = prefs.getBool('use_bundled_llm') ?? true;
+    if (bundledEnabled && !await _isProbablyOnline()) {
+      setState(() {
+        _isLoading = false;
+      });
+      await _handleOfflineMessage(trimmed);
+      return;
+    }
+
     await _streamAssistantResponse(trimmed, isAgent: _mode == 'agent');
   }
 
-  /// Offline AI mode: prefers a real on-device LLM (Ollama at localhost), and
-  /// falls back to the instant intent-based assistant when no model is running.
+  /// Offline AI mode: prefers the built-in on-device LLM (bundled in the APK),
+  /// then a user-configured local model (e.g. Ollama at localhost), and finally
+  /// falls back to the instant intent-based assistant when no model is ready.
   Future<void> _handleOfflineMessage(String text) async {
     if (!mounted) return;
 
     final prefs = await SharedPreferences.getInstance();
+
+    // 1) Built-in on-device AI: real LLM shipped inside the app itself.
+    final bundledEnabled = prefs.getBool('use_bundled_llm') ?? true;
+    if (bundledEnabled) {
+      if (await BundledLlmService.instance.isExtracted()) {
+        final bundledReply = await BundledLlmService.instance.complete(
+          text,
+          history: _recentHistory(),
+        );
+        if (bundledReply != null) {
+          final bundledAction = _aiService.parseAction(bundledReply);
+          if (bundledAction != null) {
+            await _executeOfflineAction(bundledAction, text);
+          } else {
+            if (!mounted) return;
+            setState(() {
+              _messages.add(
+                ChatMessage(role: 'assistant', content: bundledReply),
+              );
+            });
+            _scrollToBottom();
+            await _safeSaveSession();
+            await _speakIfEnabled(bundledReply);
+          }
+          _updateOverlayState();
+          return;
+        }
+      } else {
+        // First offline use: prepare the bundled model in the background so
+        // the next message is answered by the real on-device LLM.
+        unawaited(_prepareBundledModel());
+      }
+    }
+
+    // 2) User-configured local model (e.g. Ollama running on the phone).
     final localBase = prefs.getString('offline_llm_base_url') ??
         'http://127.0.0.1:11434/v1';
     final localModel =
@@ -293,6 +343,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return;
     }
 
+    // 3) Instant intent-based assistant (no model at all).
     final result = OfflineAssistantService.handle(text);
     if (result.action != null) {
       await _executeOfflineAction(result.action!, text);
@@ -306,6 +357,71 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await _speakIfEnabled(result.reply);
     }
     _updateOverlayState();
+  }
+
+  /// Builds a short alternating [user, assistant] history from the chat for
+  /// the bundled on-device LLM, capped to the last few turns. The current
+  /// (just-sent) message is passed separately, so it is excluded here.
+  List<String> _recentHistory() {
+    final stack = <String>[];
+    for (var i = _messages.length - 2; i >= 0 && stack.length < 8; i--) {
+      final m = _messages[i];
+      if ((!m.isUser && m.role != 'assistant') || m.content.trim().isEmpty) {
+        continue;
+      }
+      stack.add(m.content.trim());
+    }
+    return stack.reversed.toList();
+  }
+
+  /// Kicks off the one-time extraction of the bundled model. Any failure is
+  /// logged and ignored so chat never blocks on it.
+  Future<void> _prepareBundledModel() async {
+    try {
+      await BundledLlmService.instance.extract();
+    } catch (e) {
+      developer.log('Bundled model extraction failed: $e', name: 'PrivateAgent');
+    }
+  }
+
+  bool? _onlineCache;
+  DateTime _onlineCacheAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  /// Cheap cached connectivity probe used to auto-route to the on-device AI.
+  /// Re-checks at most every 20 seconds to avoid per-message overhead.
+  Future<bool> _isProbablyOnline() async {
+    final now = DateTime.now();
+    if (_onlineCache != null &&
+        now.difference(_onlineCacheAt).inSeconds < 20) {
+      return _onlineCache!;
+    }
+    final result = await _probeNetwork();
+    _onlineCache = result;
+    _onlineCacheAt = now;
+    return result;
+  }
+
+  Future<bool> _probeNetwork() async {
+    final probe = _aiService.baseUrl.isNotEmpty
+        ? _aiService.baseUrl
+        : 'https://www.gstatic.com/generate_204';
+    final uri = Uri.tryParse(probe);
+    if (uri == null) return true;
+    final client = HttpClient()
+      ..connectionTimeout = const Duration(seconds: 4);
+    try {
+      final request = await client
+          .getUrl(uri)
+          .timeout(const Duration(seconds: 4));
+      final response = await request
+          .close()
+          .timeout(const Duration(seconds: 4));
+      return response.statusCode >= 200 && response.statusCode < 500;
+    } catch (_) {
+      return false;
+    } finally {
+      client.close(force: true);
+    }
   }
 
   Future<void> _executeOfflineAction(
