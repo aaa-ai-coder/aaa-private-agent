@@ -1332,6 +1332,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (mounted) setState(() {});
   }
 
+  Future<void> _shareApp() async {
+    await Share.share(
+      '$kAppName v$kAppVersion ($kAppTagline Edition) — your private AI agent '
+      'for Android. On-device AI, device automation and hands-free voice.',
+      subject: kAppName,
+    );
+  }
+
   Future<void> _openSearch() async {
     if (_messages.isEmpty) return;
     final controller = TextEditingController();
@@ -2137,12 +2145,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
               MoreView(
                 isDark: isDark,
                 onOpenSettings: _openSettings,
-                onOpenAccounts: _openAccounts,
-                onOpenDiscover: _openDiscover,
-                onOpenTaskHistory: _openTaskHistory,
-                onOpenMemory: _openMemory,
-                onOpenPermissions: _openPermissions,
-                onOpenControlPanel: _openControlPanel,
+                onExportChat: _showExportSheet,
+                onNewChat: _clearConversation,
+                onShareApp: _shareApp,
                 onOpenAbout: _openAbout,
               ),
             ],

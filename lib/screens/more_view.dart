@@ -1,30 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../theme/app_theme.dart';
 import '../utils/app_info.dart';
 
-/// "More" tab: a beautiful menu of everything else — settings, accounts,
-/// discovery, task history, memory, permissions and about.
+/// "More" tab: the things that don't belong to the Agent Hub tools grid —
+/// settings, conversation actions and app info. Nothing here duplicates the
+/// Agent Hub tab, so every tab stays focused and discoverable.
 class MoreView extends StatelessWidget {
   final bool isDark;
   final VoidCallback onOpenSettings;
-  final VoidCallback onOpenAccounts;
-  final VoidCallback onOpenDiscover;
-  final VoidCallback onOpenTaskHistory;
-  final VoidCallback onOpenMemory;
-  final VoidCallback onOpenPermissions;
-  final VoidCallback onOpenControlPanel;
+  final VoidCallback onExportChat;
+  final VoidCallback onNewChat;
+  final VoidCallback onShareApp;
   final VoidCallback onOpenAbout;
 
   const MoreView({
     super.key,
     required this.isDark,
     required this.onOpenSettings,
-    required this.onOpenAccounts,
-    required this.onOpenDiscover,
-    required this.onOpenTaskHistory,
-    required this.onOpenMemory,
-    required this.onOpenPermissions,
-    required this.onOpenControlPanel,
+    required this.onExportChat,
+    required this.onNewChat,
+    required this.onShareApp,
     required this.onOpenAbout,
   });
 
@@ -53,6 +49,8 @@ class MoreView extends StatelessWidget {
         ),
         const SizedBox(height: 16),
 
+        _sectionTitle(context, 'Quick Actions'),
+        const SizedBox(height: 8),
         _menuItem(
           context,
           icon: Icons.settings_rounded,
@@ -63,61 +61,92 @@ class MoreView extends StatelessWidget {
         ),
         _menuItem(
           context,
-          icon: Icons.cloud_sync_rounded,
+          icon: Icons.ios_share_rounded,
           color: const Color(0xFF38A6F5),
-          title: 'Accounts & Sync',
-          subtitle: 'Sign in, cloud sync and API key backup',
-          onTap: onOpenAccounts,
+          title: 'Export Chat',
+          subtitle: 'Save the current conversation to a text file',
+          onTap: onExportChat,
         ),
         _menuItem(
           context,
-          icon: Icons.explore_rounded,
-          color: const Color(0xFFB86BFF),
-          title: 'Discover Capabilities',
-          subtitle: 'Everything the agent can do on your phone',
-          onTap: onOpenDiscover,
-        ),
-        _menuItem(
-          context,
-          icon: Icons.history_rounded,
+          icon: Icons.add_comment_rounded,
           color: const Color(0xFF2FBF8F),
-          title: 'Task History',
-          subtitle: 'Completed tasks and multi-step runs',
-          onTap: onOpenTaskHistory,
+          title: 'New Chat',
+          subtitle: 'Clear this conversation and start fresh',
+          onTap: onNewChat,
         ),
         _menuItem(
           context,
-          icon: Icons.psychology_rounded,
-          color: const Color(0xFFF65E8B),
-          title: 'AI Memory',
-          subtitle: 'Facts the assistant remembers about you',
-          onTap: onOpenMemory,
-        ),
-        _menuItem(
-          context,
-          icon: Icons.verified_user_rounded,
+          icon: Icons.share_rounded,
           color: const Color(0xFFB86BFF),
-          title: 'Permissions & Access',
-          subtitle: 'Shizuku, automation and overlay access',
-          onTap: onOpenPermissions,
+          title: 'Share the App',
+          subtitle: 'Invite someone to try AAA Private Agent',
+          onTap: onShareApp,
         ),
-        _menuItem(
-          context,
-          icon: Icons.bolt_rounded,
-          color: const Color(0xFFFFB020),
-          title: 'Control Panel',
-          subtitle: 'Advanced device controls and toggles',
-          onTap: onOpenControlPanel,
-        ),
+        const SizedBox(height: 18),
+
+        _sectionTitle(context, 'About'),
+        const SizedBox(height: 8),
         _menuItem(
           context,
           icon: Icons.info_outline_rounded,
           color: const Color(0xFF38A6F5),
           title: 'About & What\u2019s New',
-          subtitle: 'Version, changelog and credits',
+          subtitle: 'Version $kAppVersion, changelog and credits',
           onTap: onOpenAbout,
         ),
+        const SizedBox(height: 20),
+
+        Card(
+          color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .primary
+                        .withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    Icons.auto_awesome_rounded,
+                    size: 18,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Tip: Open the Agent Hub tab for one-tap commands, '
+                    'custom actions and hands-free voice.',
+                    style: TextStyle(fontSize: 12.5, height: 1.4, color: subColor),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ],
+    );
+  }
+
+  Widget _sectionTitle(BuildContext context, String title) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4),
+      child: Text(
+        title.toUpperCase(),
+        style: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w900,
+          letterSpacing: 0.8,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
     );
   }
 
