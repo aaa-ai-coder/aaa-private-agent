@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../config/feature_flags.dart';
 import '../utils/app_info.dart';
+import '../utils/device_profile.dart';
 import '../services/app_lock_service.dart';
 import '../services/auth_service.dart';
 import '../services/ai_service.dart';
@@ -63,6 +64,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   int _retentionDays = 30;
   bool _appLockEnabled = false;
   bool _biometricsEnabled = false;
+  String _visualEffectsMode = 'auto';
 
   @override
   void initState() {
@@ -87,6 +89,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _retentionDays = prefs.getInt(RetentionService.retentionDaysKey) ?? 30;
         _appLockEnabled = appLockEnabled;
         _biometricsEnabled = biometricsEnabled;
+        _visualEffectsMode =
+            prefs.getString(DeviceProfile.prefVisualEffects) ?? 'auto';
       });
     }
   }
@@ -1255,14 +1259,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const Divider(height: 20),
 
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Text(
+                'Theme',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isDark ? const Color(0xFFF9F1EA) : const Color(0xFF2E1F1A),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<ThemeMode>(
+                segments: const [
+                  ButtonSegment(
+                    value: ThemeMode.system,
+                    label: Text('System'),
+                    icon: Icon(Icons.settings_brightness_rounded, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.light,
+                    label: Text('Light'),
+                    icon: Icon(Icons.light_mode_rounded, size: 16),
+                  ),
+                  ButtonSegment(
+                    value: ThemeMode.dark,
+                    label: Text('Dark'),
+                    icon: Icon(Icons.dark_mode_rounded, size: 16),
+                  ),
+                ],
+                selected: {themeNotifier.value},
+                showSelectedIcon: false,
+                onSelectionChanged: (selection) {
+                  final mode = selection.first;
+                  themeNotifier.value = mode;
+                  SharedPreferences.getInstance().then((p) => p.setString(
+                        'themeMode',
+                        mode == ThemeMode.system
+                            ? 'system'
+                            : mode == ThemeMode.dark
+                                ? 'dark'
+                                : 'light',
+                      ));
+                },
+              ),
+            ),
+            const Divider(height: 24),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Dark Mode'),
-              subtitle: const Text('Enable obsidian dark visual theme'),
-              value: isDark,
-              onChanged: (val) {
-                themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
-                SharedPreferences.getInstance().then((p) => p.setString('themeMode', val ? 'dark' : 'light'));
+              title: const Text('Battery-Saver Visuals'),
+              subtitle: const Text(
+                'Reduces background glow effects. Turns on automatically on '
+                'low-RAM phones (like the Galaxy A30) for smoother chat.',
+              ),
+              value: _visualEffectsMode == 'off',
+              onChanged: (val) async {
+                final prefs = await SharedPreferences.getInstance();
+                setState(() {
+                  _visualEffectsMode = val ? 'off' : 'auto';
+                });
+                await prefs.setString(
+                  DeviceProfile.prefVisualEffects,
+                  val ? 'off' : 'auto',
+                );
               },
             ),
 

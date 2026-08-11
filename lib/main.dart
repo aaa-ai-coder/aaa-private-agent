@@ -95,10 +95,13 @@ void main() async {
 
   final prefs = await SharedPreferences.getInstance();
   final themeStr = prefs.getString('themeMode');
-  if (themeStr == 'dark') {
-    themeNotifier.value = ThemeMode.dark;
-  } else {
-    themeNotifier.value = ThemeMode.light;
+  switch (themeStr) {
+    case 'dark':
+      themeNotifier.value = ThemeMode.dark;
+    case 'light':
+      themeNotifier.value = ThemeMode.light;
+    default:
+      themeNotifier.value = ThemeMode.system;
   }
   FeatureFlags.floatingIconEnabled =
       prefs.getBool('floating_icon_enabled') ?? true;

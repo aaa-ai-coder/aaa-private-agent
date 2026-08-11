@@ -36,6 +36,8 @@ import '../services/local_llm_service.dart';
 import '../widgets/home_header.dart';
 import '../widgets/typing_indicator.dart';
 import '../widgets/agent_orb.dart';
+import '../utils/device_profile.dart';
+import '../utils/app_info.dart';
 import 'settings_screen.dart';
 import 'task_history_screen.dart';
 import 'accounts_screen.dart';
@@ -43,6 +45,10 @@ import 'control_panel_screen.dart';
 import 'about_screen.dart';
 import 'discover_screen.dart';
 import 'permissions_screen.dart';
+import 'memory_screen.dart';
+import 'agent_hub_view.dart';
+import 'device_dashboard_view.dart';
+import 'more_view.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:share_plus/share_plus.dart';
 import '../main.dart';
@@ -83,6 +89,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   AppLifecycleState _appLifecycleState = AppLifecycleState.resumed;
   Timer? _overlayHistoryTimer;
 
+  // Bottom navigation tabs: 0=Chat, 1=Agent Hub, 2=Device, 3=More
+  int _tabIndex = 0;
+
+  // Whether expensive background effects are painted (auto-off on weak phones).
+  bool _visualEffects = true;
+
+  static const List<String> _tabTitles = [
+    'AAA Private Agent',
+    'Agent Hub',
+    'Device',
+    'More',
+  ];
+
   /// Human-friendly label for the active AI backend, falling back to the
   /// endpoint host so switching providers (e.g. Puter) shows correctly even
   /// before any custom key is saved.
@@ -105,8 +124,46 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     unawaited(_initServicesSafe());
     _startOverlayHistorySync();
     unawaited(_loadCustomCommandsSafe());
+    unawaited(_initVisualEffects());
+    unawaited(_maybeShowWhatsNew());
     // Register as the handler for overlay bubble tasks
     onOverlayTask = _onOverlayTask;
+  }
+
+  /// Applies the low-end device visual effects mode (off on weak phones).
+  Future<void> _initVisualEffects() async {
+    final enabled = await DeviceProfile.visualsEnabled();
+    if (mounted) setState(() => _visualEffects = enabled);
+  }
+
+  /// Shows the v4.7 "What's new" summary once after the update.
+  Future<void> _maybeShowWhatsNew() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (prefs.getBool('seen_whatsnew_v47') ?? false) return;
+    await prefs.setBool('seen_whatsnew_v47', true);
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('What\u2019s new in v4.7'),
+        content: const Text(
+          '• A brand-new bottom navigation bar: Chat, Agent Hub, Device and More.\n\n'
+          '• Agent Hub — one-tap commands, custom actions, hands-free voice and '
+          'shortcuts to the agent\u2019s power tools.\n\n'
+          '• Device Dashboard — live battery, RAM, storage, phone info, on-device '
+          'AI status, brightness and volume controls.\n\n'
+          '• Dark / Light / System theme.\n\n'
+          '• Smoother on weak phones — background effects turn off automatically '
+          'on low-RAM devices (like the Galaxy A30) to keep chat at 60 fps.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Got it'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Initializes services without ever crashing or blocking first render.
@@ -738,6 +795,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     });
   }
 
+  /// Toggles the hands-free continuous voice mode (AI speaks + listens on loop).
+  void _toggleContinuousVoice() {
+    setState(() {
+      _continuousVoiceMode = !_continuousVoiceMode;
+    });
+    if (_continuousVoiceMode) {
+      if (!_isListening && !_voiceService.isSpeaking) {
+        _toggleVoice();
+      }
+    } else {
+      _voiceService.stopSpeaking();
+      _voiceService.stopListening();
+    }
+  }
+
   Future<void> _toggleVoice() async {
     if (_isListening) {
       await _voiceService.stopListening();
@@ -1181,6 +1253,85 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  /// Reusable navigation helpers used by the bottom tabs and the drawer.
+
+  Future<void> _openSettings() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SettingsScreen(
+          aiService: _aiService,
+          shizukuService: _actionHandler.shizuku,
+          screenAutomationService: _actionHandler.screenAutomation,
+          telegramService: _telegramService,
+        ),
+      ),
+    );
+    await _actionHandler.shizuku.checkAvailability();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openControlPanel() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ControlPanelScreen(actionHandler: _actionHandler),
+      ),
+    );
+    await _actionHandler.shizuku.checkAvailability();
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openMemory() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const MemoryScreen()),
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openTaskHistory() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openPermissions() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PermissionsScreen(
+          shizukuService: _actionHandler.shizuku,
+          screenAutomationService: _actionHandler.screenAutomation,
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openAccounts() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AccountsScreen(
+          aiService: _aiService,
+          telegramService: _telegramService,
+        ),
+      ),
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openAbout() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const AboutScreen()),
+    );
+    if (mounted) setState(() {});
+  }
+
   Future<void> _openSearch() async {
     if (_messages.isEmpty) return;
     final controller = TextEditingController();
@@ -1616,48 +1767,56 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF171015) : const Color(0xFFFFFFFF),
       appBar: AppBar(
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const AgentOrb(size: 26, glow: false),
-            const SizedBox(width: 8),
-            Flexible(
-              child: RichText(
-                text: TextSpan(
-                  style: TextStyle(
-                    fontSize: 20,
-                    color: isDark ? Colors.white : const Color(0xFF2E1F1A),
+        title: _tabIndex == 0
+            ? Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const AgentOrb(size: 26, glow: false),
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          fontSize: 20,
+                          color: isDark ? Colors.white : const Color(0xFF2E1F1A),
+                        ),
+                        children: [
+                          TextSpan(
+                            text: 'AAA ',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w300,
+                              color: Theme.of(context).colorScheme.primary,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          TextSpan(
+                            text: 'Private',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w900,
+                              color: Theme.of(context).colorScheme.primary,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          TextSpan(
+                            text: 'Agent',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w400,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  children: [
-                    TextSpan(
-                      text: 'AAA ',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w300,
-                        color: Theme.of(context).colorScheme.primary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    TextSpan(
-                      text: 'Private',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w900,
-                        color: Theme.of(context).colorScheme.primary,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    TextSpan(
-                      text: 'Agent',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                  ],
+                ],
+              )
+            : Text(
+                _tabTitles[_tabIndex],
+                style: const TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
                 ),
               ),
-            ),
-          ],
-        ),
         backgroundColor: Colors.transparent,
         scrolledUnderElevation: 0,
         leading: Builder(
@@ -1668,72 +1827,54 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
         ),
         actions: [
-          IconButton(
-            icon: Icon(
-              _continuousVoiceMode
-                  ? Icons.record_voice_over_rounded
-                  : Icons.voice_over_off_rounded,
-              color: _continuousVoiceMode ? const Color(0xFFFFB86B) : null,
-            ),
-            tooltip: _continuousVoiceMode
-                ? 'Hands-Free Voice Mode Active'
-                : 'Turn on Hands-Free Voice Mode',
-            onPressed: () {
-              HapticFeedback.selectionClick();
-              setState(() {
-                _continuousVoiceMode = !_continuousVoiceMode;
-              });
-              if (_continuousVoiceMode) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Hands-Free Voice Mode ON: AI will speak and listen continuously!'),
-                    backgroundColor: const Color(0xFF2FBF8F),
-                  ),
-                );
-                if (!_isListening && !_voiceService.isSpeaking) {
-                  _toggleVoice();
+          if (_tabIndex == 0) ...[
+            IconButton(
+              icon: Icon(
+                _continuousVoiceMode
+                    ? Icons.record_voice_over_rounded
+                    : Icons.voice_over_off_rounded,
+                color: _continuousVoiceMode ? const Color(0xFFFFB86B) : null,
+              ),
+              tooltip: _continuousVoiceMode
+                  ? 'Hands-Free Voice Mode Active'
+                  : 'Turn on Hands-Free Voice Mode',
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                _toggleContinuousVoice();
+                if (_continuousVoiceMode) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Hands-Free Voice Mode ON: AI will speak and listen continuously!'),
+                      backgroundColor: const Color(0xFF2FBF8F),
+                    ),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Hands-Free Voice Mode OFF'),
+                    ),
+                  );
                 }
-              } else {
-                _voiceService.stopSpeaking();
-                _voiceService.stopListening();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Hands-Free Voice Mode OFF'),
-                  ),
-                );
-              }
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            tooltip: 'Search conversation',
-            onPressed: _messages.isEmpty ? null : _openSearch,
-          ),
-          IconButton(
-            icon: const Icon(Icons.psychology_rounded),
-            tooltip: 'Quick AI Model Switcher',
-            onPressed: () => ModelPickerSheet.show(context, _aiService, () {
-              setState(() {});
-            }),
-          ),
-          // Settings Action
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.search_rounded),
+              tooltip: 'Search conversation',
+              onPressed: _messages.isEmpty ? null : _openSearch,
+            ),
+            IconButton(
+              icon: const Icon(Icons.psychology_rounded),
+              tooltip: 'Quick AI Model Switcher',
+              onPressed: () => ModelPickerSheet.show(context, _aiService, () {
+                setState(() {});
+              }),
+            ),
+          ],
+          // Settings Action (always available)
           IconButton(
             icon: const Icon(Icons.settings_rounded),
-            onPressed: () async {
-              await Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => SettingsScreen(
-                    aiService: _aiService,
-                    shizukuService: _actionHandler.shizuku,
-                    screenAutomationService: _actionHandler.screenAutomation,
-                    telegramService: _telegramService,
-                  ),
-                ),
-              );
-              await _actionHandler.shizuku.checkAvailability();
-              if (mounted) setState(() {});
-            },
+            tooltip: 'Settings',
+            onPressed: _openSettings,
           ),
         ],
       ),
@@ -1744,67 +1885,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         onLoadSession: _loadSessionMessages,
         onSummarize: _summarizeChat,
         onClearChat: _clearConversation,
-        onControlPanel: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => ControlPanelScreen(
-                actionHandler: _actionHandler,
-              ),
-            ),
-          );
-          await _actionHandler.shizuku.checkAvailability();
-          if (mounted) setState(() {});
-        },
+        onControlPanel: _openControlPanel,
         onDiscover: () => _openDiscover(),
-        onAbout: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const AboutScreen()),
-        ),
+        onAbout: _openAbout,
         onExportChat: _showExportSheet,
-        onPermissions: () => Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PermissionsScreen(
-              shizukuService: _actionHandler.shizuku,
-              screenAutomationService: _actionHandler.screenAutomation,
-            ),
-          ),
-        ),
-        onTaskHistory: () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const TaskHistoryScreen()),
-        ),
-        onSettings: () async {
-          await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => SettingsScreen(
-                aiService: _aiService,
-                shizukuService: _actionHandler.shizuku,
-                screenAutomationService: _actionHandler.screenAutomation,
-                telegramService: _telegramService,
-              ),
-            ),
-          );
-          await _actionHandler.shizuku.checkAvailability();
-          if (mounted) setState(() {});
-        },
+        onPermissions: _openPermissions,
+        onTaskHistory: _openTaskHistory,
+        onSettings: _openSettings,
       ),
       body: Stack(
         children: [
-          // Background mesh glows
-          HomeBackgroundGlows(isDark: isDark),
-
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
-              child: Container(color: Colors.transparent),
+          // Background mesh glows + frosted blur (skipped on weak phones so
+          // chat stays smooth and the battery lasts longer).
+          if (_visualEffects) ...[
+            HomeBackgroundGlows(isDark: isDark),
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 100, sigmaY: 100),
+                child: Container(color: Colors.transparent),
+              ),
             ),
-          ),
+          ],
 
-          Column(
+          IndexedStack(
+            index: _tabIndex,
             children: [
+              // ── Chat tab ──────────────────────────────────────────────
+              Column(
+                children: [
               // Pill selector switcher
               HomeModeSelector(
                 currentMode: _mode,
@@ -1992,7 +2100,81 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 onMicTap: _toggleVoice,
                 onSend: _sendMessage,
               ),
+                ],
+              ),
+
+              // ── Agent Hub tab ─────────────────────────────────────────
+              AgentHubView(
+                isDark: isDark,
+                voiceActive: _continuousVoiceMode,
+                onSendCommand: (cmd) {
+                  if (_tabIndex != 0) {
+                    setState(() => _tabIndex = 0);
+                  }
+                  _sendMessage(cmd);
+                },
+                customCommands: _customCommands,
+                onEditCustom: _openQuickActionsEditor,
+                onToggleVoice: () {
+                  HapticFeedback.selectionClick();
+                  _toggleContinuousVoice();
+                },
+                onOpenControlPanel: _openControlPanel,
+                onOpenMemory: _openMemory,
+                onOpenTaskHistory: _openTaskHistory,
+                onOpenPermissions: _openPermissions,
+                onOpenDiscover: _openDiscover,
+                onOpenAccounts: _openAccounts,
+              ),
+
+              // ── Device Dashboard tab ──────────────────────────────────
+              DeviceDashboardView(
+                isDark: isDark,
+                onOpenSettings: _openSettings,
+              ),
+
+              // ── More tab ──────────────────────────────────────────────
+              MoreView(
+                isDark: isDark,
+                onOpenSettings: _openSettings,
+                onOpenAccounts: _openAccounts,
+                onOpenDiscover: _openDiscover,
+                onOpenTaskHistory: _openTaskHistory,
+                onOpenMemory: _openMemory,
+                onOpenPermissions: _openPermissions,
+                onOpenControlPanel: _openControlPanel,
+                onOpenAbout: _openAbout,
+              ),
             ],
+          ),
+        ],
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tabIndex,
+        onDestinationSelected: (i) {
+          HapticFeedback.selectionClick();
+          setState(() => _tabIndex = i);
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.chat_bubble_outline_rounded),
+            selectedIcon: Icon(Icons.chat_bubble_rounded),
+            label: 'Chat',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.bolt_outlined),
+            selectedIcon: Icon(Icons.bolt_rounded),
+            label: 'Agent',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.monitor_heart_outlined),
+            selectedIcon: Icon(Icons.monitor_heart_rounded),
+            label: 'Device',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view_rounded),
+            label: 'More',
           ),
         ],
       ),

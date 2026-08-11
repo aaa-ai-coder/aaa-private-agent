@@ -93,6 +93,45 @@ class AboutScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
+          _section('What\u2019s new in v4.7', isDark),
+          const SizedBox(height: 8),
+          _card(
+            isDark,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                _WhatNewItem(
+                  icon: Icons.view_agenda_rounded,
+                  color: AppColors.info,
+                  text: 'A brand-new bottom navigation bar — Chat, Agent Hub, '
+                      'Device and More make the whole app easier to reach with '
+                      'one thumb.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.bolt_rounded,
+                  color: AppColors.warning,
+                  text: 'Agent Hub — one-tap commands, custom actions, '
+                      'hands-free voice and shortcuts to the agent\u2019s '
+                      'power tools.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.monitor_heart_rounded,
+                  color: AppColors.success,
+                  text: 'Device Dashboard — live battery, RAM, storage, phone '
+                      'info, on-device AI status plus brightness and volume '
+                      'sliders.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.palette_rounded,
+                  color: AppColors.orange,
+                  text: 'Dark / Light / System theme, and battery-saver '
+                      'visuals that turn off background effects automatically '
+                      'on low-RAM phones (like the Galaxy A30).',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           _section('What\u2019s new in v4.6', isDark),
           const SizedBox(height: 8),
           _card(

@@ -306,6 +306,32 @@ class AppTheme {
         contentPadding: EdgeInsets.zero,
       ),
 
+      navigationBarTheme: NavigationBarThemeData(
+        height: 66,
+        backgroundColor: isDark ? AppColors.darkSurface : AppColors.lightSurface,
+        surfaceTintColor: Colors.transparent,
+        indicatorColor: scheme.primary.withValues(alpha: 0.15),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+        labelTextStyle: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return TextStyle(
+            fontSize: 11,
+            fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+            color: selected
+                ? scheme.primary
+                : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+          );
+        }),
+        iconTheme: WidgetStateProperty.resolveWith((states) {
+          final selected = states.contains(WidgetState.selected);
+          return IconThemeData(
+            color: selected
+                ? scheme.primary
+                : (isDark ? AppColors.darkMuted : AppColors.lightMuted),
+          );
+        }),
+      ),
+
       floatingActionButtonTheme: FloatingActionButtonThemeData(
         backgroundColor: scheme.primary,
         foregroundColor: scheme.onPrimary,
