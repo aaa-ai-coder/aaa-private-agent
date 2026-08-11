@@ -29,7 +29,7 @@ class _DeviceDashboardViewState extends State<DeviceDashboardView> {
   final Battery _battery = Battery();
   final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
   final VolumeController _volume = VolumeController();
-  final ScreenBrightness _brightness = ScreenBrightness();
+  final ScreenBrightness _screenBrightness = ScreenBrightness();
 
   Timer? _timer;
 
@@ -69,7 +69,7 @@ class _DeviceDashboardViewState extends State<DeviceDashboardView> {
       final level = await _battery.batteryLevel;
       var charging = false;
       try {
-        charging = await _battery.isCharging();
+        charging = await _battery.isCharging;
       } catch (_) {}
       if (!mounted) return;
       setState(() {
@@ -111,7 +111,7 @@ class _DeviceDashboardViewState extends State<DeviceDashboardView> {
       if (mounted) setState(() => _volumeLevel = v.clamp(0.0, 1.0));
     } catch (_) {}
     try {
-      final b = await _brightness.getScreenBrightness();
+      final b = await _screenBrightness.getScreenBrightness();
       if (mounted) setState(() => _brightness = b.clamp(0.0, 1.0));
     } catch (_) {}
   }
@@ -122,7 +122,7 @@ class _DeviceDashboardViewState extends State<DeviceDashboardView> {
     setState(() => _volumeLevel = v);
     try {
       _volume.showSystemUI = false;
-      await _volume.setVolume(v);
+      _volume.setVolume(v);
     } catch (_) {}
     _sliderBusy = false;
   }
@@ -132,7 +132,7 @@ class _DeviceDashboardViewState extends State<DeviceDashboardView> {
     _sliderBusy = true;
     setState(() => _brightness = v);
     try {
-      await _brightness.setScreenBrightness(v);
+      await _screenBrightness.setScreenBrightness(v);
     } catch (_) {}
     _sliderBusy = false;
   }
