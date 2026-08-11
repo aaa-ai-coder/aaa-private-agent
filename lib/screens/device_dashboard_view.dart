@@ -69,7 +69,7 @@ class _DeviceDashboardViewState extends State<DeviceDashboardView> {
       final level = await _battery.batteryLevel;
       var charging = false;
       try {
-        charging = await _battery.isCharging;
+        charging = (await _battery.batteryState) == BatteryState.charging;
       } catch (_) {}
       if (!mounted) return;
       setState(() {
@@ -111,7 +111,7 @@ class _DeviceDashboardViewState extends State<DeviceDashboardView> {
       if (mounted) setState(() => _volumeLevel = v.clamp(0.0, 1.0));
     } catch (_) {}
     try {
-      final b = await _screenBrightness.getScreenBrightness();
+      final b = await _screenBrightness.current;
       if (mounted) setState(() => _brightness = b.clamp(0.0, 1.0));
     } catch (_) {}
   }
