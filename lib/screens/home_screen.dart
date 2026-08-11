@@ -51,6 +51,7 @@ import 'device_dashboard_view.dart';
 import 'more_view.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../main.dart';
 import '../config/feature_flags.dart';
 
@@ -94,6 +95,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   // Whether expensive background effects are painted (auto-off on weak phones).
   bool _visualEffects = true;
+
+  // Streaming voice output: complete sentences are spoken as they stream in
+  // from the AI, so replies start talking almost immediately instead of only
+  // after the entire response has been generated.
+  final List<String> _speakQueue = [];
+  bool _streamSpeaking = false;
+  int _spokenTextIndex = 0;
 
   static const List<String> _tabTitles = [
     'AAA Private Agent',
@@ -139,22 +147,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   /// Shows the v4.7 "What's new" summary once after the update.
   Future<void> _maybeShowWhatsNew() async {
     final prefs = await SharedPreferences.getInstance();
-    if (prefs.getBool('seen_whatsnew_v47') ?? false) return;
-    await prefs.setBool('seen_whatsnew_v47', true);
-    if (!mounted) return;
+    final showV48 = !(prefs.getBool('seen_whatsnew_v48') ?? false);
+    final showV47 = !(prefs.getBool('seen_whatsnew_v47') ?? false);
+    if (showV48) {
+      await prefs.setBool('seen_whatsnew_v48', true);
+    }
+    if (showV47) {
+      await prefs.setBool('seen_whatsnew_v47', true);
+    }
+    if (!mounted || (!showV48 && !showV47)) return;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('What\u2019s new in v4.7'),
-        content: const Text(
-          '• A brand-new bottom navigation bar: Chat, Agent Hub, Device and More.\n\n'
-          '• Agent Hub — one-tap commands, custom actions, hands-free voice and '
-          'shortcuts to the agent\u2019s power tools.\n\n'
-          '• Device Dashboard — live battery, RAM, storage, phone info, on-device '
-          'AI status, brightness and volume controls.\n\n'
-          '• Dark / Light / System theme.\n\n'
-          '• Smoother on weak phones — background effects turn off automatically '
-          'on low-RAM devices (like the Galaxy A30) to keep chat at 60 fps.',
+        title: Text(showV48 ? 'What\u2019s new in v4.8' : 'What\u2019s new in v4.7'),
+        content: Text(
+          showV48
+              ? '• Much faster AI voice — replies start talking as they '
+                  'stream, sentence by sentence.\n\n'
+                  '• Fixed the microphone — live transcription while you '
+                  'talk, plus a one-tap fix if the mic permission was '
+                  'denied.\n\n'
+                  '• The AI voice speaks at a natural speed now, with a '
+                  'wider speed range and a Test Voice button in Settings.\n\n'
+                  '• And everything from v4.7: bottom navigation, Agent Hub, '
+                  'Device Dashboard, theme and A30 battery-saver visuals.'
+              : '• A brand-new bottom navigation bar: Chat, Agent Hub, Device and More.\n\n'
+                  '• Agent Hub — one-tap commands, custom actions, hands-free '
+                  'voice and shortcuts to the agent\u2019s power tools.\n\n'
+                  '• Device Dashboard — live battery, RAM, storage, phone info, '
+                  'on-device AI status, brightness and volume controls.\n\n'
+                  '• Dark / Light / System theme.\n\n'
+                  '• Smoother on weak phones — background effects turn off '
+                  'automatically on low-RAM devices (like the Galaxy A30) to '
+                  'keep chat at 60 fps.',
         ),
         actions: [
           TextButton(
@@ -527,6 +552,78 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  // ─── Streaming (chunked) voice output ────────────────────────────
+  //
+  // Instead of waiting for the full AI reply before speaking, we speak each
+  // complete sentence the moment it streams in. This makes the AI voice feel
+  // dramatically faster, especially with the on-device model on a weak phone.
+
+  /// Feeds newly streamed text into the speech queue, extracting complete
+  /// sentences (ending in . ! ? or a newline) so they can be spoken at once.
+  void _enqueueStreamSpeech(String fullText) {
+    if (fullText.isEmpty) return;
+    if (_spokenTextIndex >= fullText.length) return;
+
+    const terminators = ['.', '!', '?', '\n'];
+    var i = _spokenTextIndex;
+    while (i < fullText.length) {
+      if (terminators.contains(fullText[i])) {
+        final sentence = fullText.substring(_spokenTextIndex, i + 1).trim();
+        var next = i + 1;
+        while (next < fullText.length && fullText[next] == ' ') next++;
+        _spokenTextIndex = next;
+        if (sentence.isNotEmpty) {
+          _speakQueue.add(sentence);
+          _pumpStreamSpeech();
+        }
+        i = next;
+      } else {
+        i++;
+      }
+    }
+  }
+
+  /// Speaks queued sentences one at a time, chaining completions.
+  void _pumpStreamSpeech() {
+    if (_streamSpeaking) return;
+    if (_speakQueue.isEmpty) {
+      _streamSpeaking = false;
+      return;
+    }
+    final chunk = _speakQueue.removeAt(0);
+    _streamSpeaking = true;
+    _voiceService.speak(
+      chunk,
+      onComplete: () {
+        _streamSpeaking = false;
+        if (_speakQueue.isNotEmpty) {
+          _pumpStreamSpeech();
+        } else if (_continuousVoiceMode && mounted && !_isLoading) {
+          _toggleVoice();
+        }
+      },
+    );
+  }
+
+  /// Speaks whatever remains after the AI stream finishes.
+  void _flushStreamSpeechTail(String fullText) {
+    if (fullText.isEmpty) return;
+    if (_spokenTextIndex < fullText.length) {
+      final tail = fullText.substring(_spokenTextIndex).trim();
+      _spokenTextIndex = fullText.length;
+      if (tail.isNotEmpty) _speakQueue.add(tail);
+    }
+    _pumpStreamSpeech();
+  }
+
+  /// Drops any queued or ongoing speech (e.g. when the user presses Stop).
+  void _clearStreamSpeech() {
+    _speakQueue.clear();
+    _streamSpeaking = false;
+    _spokenTextIndex = 0;
+    _voiceService.stopSpeaking();
+  }
+
 
   /// Deletes a message and rebuilds the in-memory AI history so subsequent
   /// turns don't reference removed content.
@@ -603,10 +700,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             },
           );
       String accumulated = '';
+      final prefs = await SharedPreferences.getInstance();
+      final autoRead = prefs.getBool('auto_read_tts') ?? true;
+      final speechEnabled = autoRead || _continuousVoiceMode;
+      if (speechEnabled) {
+        _spokenTextIndex = 0;
+        _speakQueue.clear();
+        _streamSpeaking = false;
+      }
 
       await for (final chunk in stream) {
         if (_stopRequested) break;
         accumulated += chunk;
+        if (speechEnabled && !_stopRequested) {
+          _enqueueStreamSpeech(accumulated);
+        }
         if (mounted) {
           setState(() {
             _messages[assistantIndex] = ChatMessage(
@@ -621,12 +729,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
       // User pressed Stop: keep whatever partial text arrived and do not
       // attempt action execution or voice output.
-      if (_stopRequested) return;
+      if (_stopRequested) {
+        _clearStreamSpeech();
+        return;
+      }
 
       // Check if it's an action
       final action = _aiService.parseAction(accumulated);
 
       if (action != null) {
+        // Actions are executed silently; drop any partially spoken text.
+        _clearStreamSpeech();
         // If it's an action, we remove the raw JSON message from display
         setState(() {
           _messages.removeAt(assistantIndex);
@@ -684,24 +797,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         }
         await _safeSaveSession();
       } else {
-        // Plain text response, speak if auto-read or continuous voice mode is enabled
-        final prefs = await SharedPreferences.getInstance();
-        final autoRead = prefs.getBool('auto_read_tts') ?? true;
-        if (autoRead || _continuousVoiceMode) {
-          // Detect AI response language and switch TTS
+        // Plain text response — speak it with streaming (sentence-by-sentence)
+        // voice so the AI starts talking as soon as the text arrives instead of
+        // only after the full reply is generated.
+        if (speechEnabled) {
           final detectedLang = LanguageConfig.detectFromText(accumulated);
           if (detectedLang.code != _voiceService.currentLanguage.code) {
             await _voiceService.setLanguage(detectedLang);
             await prefs.setString('voice_language', detectedLang.code);
           }
-          _voiceService.speak(
-            accumulated,
-            onComplete: () {
-              if (_continuousVoiceMode && mounted && !_isLoading) {
-                _toggleVoice();
-              }
-            },
-          );
+          // Speak any remaining text that streamed without a terminator.
+          _flushStreamSpeechTail(accumulated);
+          // If nothing at all was spoken, keep hands-free mode going.
+          if (_continuousVoiceMode &&
+              mounted &&
+              !_isLoading &&
+              _speakQueue.isEmpty &&
+              !_streamSpeaking) {
+            _toggleVoice();
+          }
         }
       }
     } catch (e) {
@@ -817,17 +931,88 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       return;
     }
 
+    // Fix broken-mic UX: if the permission was denied permanently, guide the
+    // user to the system settings instead of silently doing nothing.
+    if (await _voiceService.isMicrophonePermanentlyDenied) {
+      _showMicPermissionDialog();
+      return;
+    }
+    if (!await _voiceService.ensureMicrophonePermission()) {
+      _showMicPermissionDialog();
+      return;
+    }
+
+    if (!_voiceService.sttReady) {
+      await _voiceService.init();
+    }
+    if (!_voiceService.sttReady) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Speech recognition isn\u2019t available on this device. '
+              'Check that Google or Samsung voice services are installed.',
+            ),
+            backgroundColor: Color(0xFFE05B4B),
+          ),
+        );
+      }
+      return;
+    }
+
     setState(() => _isListening = true);
 
     await _voiceService.startListening(
       onResult: (text) {
+        if (mounted) {
+          _textController.text = text;
+          _textController.selection =
+              TextSelection.collapsed(offset: text.length);
+        }
         _sendMessage(text);
+      },
+      onPartial: (partial) {
+        if (mounted) {
+          _textController.text = partial;
+          _textController.selection =
+              TextSelection.collapsed(offset: partial.length);
+        }
       },
       onDone: () {
         if (mounted) {
           setState(() => _isListening = false);
         }
       },
+    );
+  }
+
+  /// Shows a dialog explaining that the mic permission is required and offers
+  /// a shortcut to the system app settings.
+  void _showMicPermissionDialog() {
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Microphone access needed'),
+        content: const Text(
+          'The mic permission is required for voice chat. It was denied '
+          'before, so please enable it in the app settings.\n\n'
+          'Tap "Open Settings" and turn on Microphone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              openAppSettings();
+            },
+            child: const Text('Open Settings'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2106,6 +2291,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 isLoading: _isLoading,
                 isDark: isDark,
                 onMicTap: _toggleVoice,
+                onTyped: (v) {
+                  if (_isListening) {
+                    _voiceService.stopListening();
+                    setState(() => _isListening = false);
+                  }
+                },
                 onSend: _sendMessage,
               ),
                 ],

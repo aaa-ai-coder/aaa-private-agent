@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../main.dart';
 import '../config/feature_flags.dart';
@@ -65,6 +66,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _appLockEnabled = false;
   bool _biometricsEnabled = false;
   String _visualEffectsMode = 'auto';
+  final FlutterTts _testTts = FlutterTts();
+  bool _ttsBusy = false;
 
   @override
   void initState() {
@@ -81,7 +84,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) {
       setState(() {
         _autoReadTts = prefs.getBool('auto_read_tts') ?? true;
-        _ttsSpeechRate = prefs.getDouble('tts_speech_rate') ?? 0.5;
+        _ttsSpeechRate = prefs.getDouble('tts_speech_rate') ?? 1.0;
         _ttsPitch = prefs.getDouble('tts_pitch') ?? 1.0;
         _liveModels = widget.aiService.cachedModels;
         _floatingIconEnabled = prefs.getBool('floating_icon_enabled') ?? true;
@@ -100,6 +103,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     await prefs.setBool('auto_read_tts', _autoReadTts);
     await prefs.setDouble('tts_speech_rate', _ttsSpeechRate);
     await prefs.setDouble('tts_pitch', _ttsPitch);
+  }
+
+  /// Plays a short sample using the current speech rate and pitch so the user
+  /// can hear the voice settings before saving them.
+  Future<void> _testVoice() async {
+    if (_ttsBusy) return;
+    _ttsBusy = true;
+    try {
+      await _testTts.stop();
+      await _testTts.setVolume(1.0);
+      await _testTts.setSpeechRate(_ttsSpeechRate);
+      await _testTts.setPitch(_ttsPitch);
+      await _testTts.speak(
+        'Hello! I am your AI agent. My voice settings are working perfectly.',
+      );
+    } catch (_) {}
+    _ttsBusy = false;
   }
 
   Future<void> _checkOverlayPermission() async {
@@ -663,9 +683,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Text('Speech Rate (${_ttsSpeechRate.toStringAsFixed(2)}x)', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
             Slider(
               value: _ttsSpeechRate,
-              min: 0.2,
-              max: 1.5,
-              divisions: 13,
+              min: 0.3,
+              max: 2.0,
+              divisions: 17,
               activeColor: const Color(0xFF2FBF8F),
               onChanged: (val) {
                 setState(() => _ttsSpeechRate = val);
@@ -684,6 +704,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 setState(() => _ttsPitch = val);
                 _saveVoiceSettings();
               },
+            ),
+
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _testVoice,
+                icon: const Icon(Icons.volume_up_rounded, size: 18),
+                label: const Text('Test Voice'),
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF2FBF8F),
+                  backgroundColor: const Color(0xFF2FBF8F).withValues(alpha: 0.08),
+                ),
+              ),
             ),
 
             const SizedBox(height: 8),

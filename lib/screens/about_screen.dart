@@ -93,6 +93,39 @@ class AboutScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 20),
+          _section('What\u2019s new in v4.8', isDark),
+          const SizedBox(height: 8),
+          _card(
+            isDark,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: const [
+                _WhatNewItem(
+                  icon: Icons.speaker_phone_rounded,
+                  color: AppColors.success,
+                  text: 'Much faster AI voice. Responses now start talking '
+                      'sentence by sentence as they stream in, instead of '
+                      'waiting for the whole reply to finish.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.mic_rounded,
+                  color: AppColors.danger,
+                  text: 'Fixed the microphone. Live transcription appears in '
+                      'the text box while you talk, typing stops listening, '
+                      'and if the mic permission was denied you get a '
+                      'one-tap shortcut to enable it.',
+                ),
+                _WhatNewItem(
+                  icon: Icons.speed_rounded,
+                  color: AppColors.info,
+                  text: 'The AI now speaks at a natural 1.0x speed by default '
+                      '(was 0.5x), with a wider 0.3x–2.0x range and a Test '
+                      'Voice button in Settings.',
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           _section('What\u2019s new in v4.7', isDark),
           const SizedBox(height: 8),
           _card(

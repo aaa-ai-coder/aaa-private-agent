@@ -78,6 +78,27 @@ class VoiceService {
   bool get isListening => _isListening;
   bool get isSpeaking => _isSpeaking;
 
+  /// True once speech-to-text has been successfully initialized.
+  bool get sttReady => _sttInitialized;
+
+  /// Current microphone permission status.
+  Future<PermissionStatus> get microphonePermission =>
+      Permission.microphone.status;
+
+  /// Requests the microphone permission if it isn't already granted.
+  Future<bool> ensureMicrophonePermission() async {
+    if (await Permission.microphone.isGranted) return true;
+    final status = await Permission.microphone.request();
+    return status.isGranted;
+  }
+
+  /// True when the OS will no longer show the permission prompt and the user
+  /// must enable the microphone from the system app-settings page.
+  Future<bool> get isMicrophonePermanentlyDenied async {
+    final status = await Permission.microphone.status;
+    return status.isPermanentlyDenied;
+  }
+
   Future<void> init() async {
     await _initStt();
     await _initTts();
@@ -114,7 +135,7 @@ class VoiceService {
     if (_ttsInitialized) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      final rate = prefs.getDouble('tts_speech_rate') ?? 0.5;
+      final rate = prefs.getDouble('tts_speech_rate') ?? 1.0;
       final pitch = prefs.getDouble('tts_pitch') ?? 1.0;
 
       await _tts.setLanguage(_currentLanguage.locale);
@@ -189,8 +210,11 @@ class VoiceService {
   // ─── Speech Recognition ─────────────────────────────────────────
 
   /// Start listening for speech. Supports multilingual recognition.
+  /// [onPartial] receives live partial transcriptions so the UI can show the
+  /// mic is working before the final result is committed.
   Future<void> startListening({
     required Function(String) onResult,
+    Function(String)? onPartial,
     required Function() onDone,
   }) async {
     if (!_sttInitialized) await _initStt();
@@ -217,12 +241,18 @@ class VoiceService {
               onResult(recognized);
             }
             onDone();
+          } else {
+            final words = result.recognizedWords;
+            if (words.trim().isNotEmpty) {
+              onPartial?.call(words);
+            }
           }
         },
         listenOptions: stt.SpeechListenOptions(
           localeId: _currentLanguage.sttLocale,
           listenMode: stt.ListenMode.confirmation,
-          partialResults: false,
+          partialResults: true,
+          autoPunctuation: true,
           cancelOnError: true,
         ),
       );

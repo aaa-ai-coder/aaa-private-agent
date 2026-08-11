@@ -9,6 +9,7 @@ class HomeInputBar extends StatefulWidget {
   final bool isDark;
   final VoidCallback onMicTap;
   final ValueChanged<String> onSend;
+  final ValueChanged<String>? onTyped;
 
   const HomeInputBar({
     super.key,
@@ -18,6 +19,7 @@ class HomeInputBar extends StatefulWidget {
     required this.isDark,
     required this.onMicTap,
     required this.onSend,
+    this.onTyped,
   });
 
   @override
@@ -241,6 +243,7 @@ class _HomeInputBarState extends State<HomeInputBar> with SingleTickerProviderSt
                             border: InputBorder.none,
                           ),
                           textInputAction: TextInputAction.send,
+                          onChanged: widget.onTyped,
                           onSubmitted: widget.isLoading
                               ? null
                               : (text) => widget.onSend(text),
