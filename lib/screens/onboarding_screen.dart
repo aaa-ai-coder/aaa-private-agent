@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
+import 'dart:async';
 import 'dart:ui';
 import '../config/feature_flags.dart';
 import '../services/ai_service.dart';
 import '../services/screen_automation_service.dart';
 import '../services/database_service.dart';
+import '../utils/device_profile.dart';
 import '../main.dart';
 import 'home_screen.dart';
 
@@ -33,18 +35,20 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   bool _isSmsGranted = false;
   bool _isOverlayGranted = false;
 
-  // AI config states
-  String _selectedProvider = 'free';
+  // AI config states. Default is Puter Free AI — no API key, no account,
+  // permanently available.
+  String _selectedProvider = 'puter';
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _baseUrlController = TextEditingController(
-    text: AiService.keylessBaseUrl,
+    text: AiService.puterBaseUrl,
   );
   final TextEditingController _modelController = TextEditingController(
-    text: AiService.keylessDefaultModel,
+    text: AiService.puterDefaultModel,
   );
   bool _obscureKey = true;
   bool _isValidating = false;
   String? _validationError;
+  bool _visualEffects = true;
 
   @override
   void initState() {
@@ -52,11 +56,30 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     WidgetsBinding.instance.addObserver(this);
     _loadAiDefaults();
     _checkPermissions();
+    unawaited(_initVisualEffects());
+  }
+
+  /// Applies the low-end visual effects mode so the onboarding background blur
+  /// stays off on weak phones (Galaxy A30) for a snappy first-open flow.
+  Future<void> _initVisualEffects() async {
+    final enabled = await DeviceProfile.visualsEnabled();
+    if (mounted) setState(() => _visualEffects = enabled);
   }
 
   Future<void> _loadAiDefaults() async {
     await _aiService.init();
-    if (!mounted || !_aiService.isConfigured) return;
+    if (!mounted || !_aiService.isConfigured) {
+      // First run: default to Puter Free AI (no key needed).
+      if (mounted) {
+        setState(() {
+          _selectedProvider = 'puter';
+          _baseUrlController.text = AiService.puterBaseUrl;
+          _modelController.text = AiService.puterDefaultModel;
+          _apiKeyController.clear();
+        });
+      }
+      return;
+    }
     setState(() {
       _selectedProvider = 'custom';
       _apiKeyController.text = _aiService.apiKey;
@@ -285,6 +308,39 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     }
   }
 
+  /// One-tap setup: skips every permission and jumps straight to the app using
+  /// Puter Free AI (https://puter.com) — no API key, no account, permanently
+  /// available — so new users can start chatting immediately.
+  Future<void> _quickFreeSetup() async {
+    setState(() {
+      _isValidating = true;
+      _validationError = null;
+    });
+    try {
+      await _aiService.saveSettings(
+        apiKey: '',
+        baseUrl: AiService.puterBaseUrl,
+        model: AiService.puterDefaultModel,
+      );
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('onboarding_completed', true);
+      if (!mounted) return;
+      setState(() => _isValidating = false);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isValidating = false;
+        _validationError =
+            'Error: ${e.toString().replaceFirst('Exception: ', '')}';
+      });
+      _pageController.jumpToPage(2);
+    }
+  }
+
   Future<void> _fetchModels() async {
     final baseUrl = _baseUrlController.text.trim();
     final apiKey = _apiKeyController.text.trim();
@@ -439,12 +495,13 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           _buildBackgroundGlows(isDark),
 
           // Blur filter over background glows
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 120, sigmaY: 120),
-              child: Container(color: Colors.transparent),
+          if (_visualEffects)
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 120, sigmaY: 120),
+                child: Container(color: Colors.transparent),
+              ),
             ),
-          ),
 
           SafeArea(
             child: Column(
@@ -742,7 +799,30 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
             ),
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 12),
+          // One-tap shortcut: skip everything and start chatting with Free AI.
+          SizedBox(
+            width: double.infinity,
+            height: 48,
+            child: TextButton.icon(
+              onPressed: _isValidating ? null : _quickFreeSetup,
+              icon: _isValidating
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.auto_awesome_rounded, size: 18),
+              label: Text(
+                _isValidating ? 'Starting Free AI...' : 'Use Free AI Now',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.primary,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
         ],
       ),
     );
@@ -947,14 +1027,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                       : null,
                 ),
                 child: ElevatedButton(
-                  onPressed: _canProceedToModel
-                      ? () {
-                          _pageController.nextPage(
-                            duration: const Duration(milliseconds: 400),
-                            curve: Curves.easeOutCubic,
-                          );
-                        }
-                      : null,
+                  onPressed: () {
+                    _pageController.nextPage(
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeOutCubic,
+                    );
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.transparent,
                     foregroundColor: Colors.white,
@@ -981,6 +1059,31 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               ),
             ],
           ),
+          if (!_canProceedToModel) ...[
+            const SizedBox(height: 8),
+            Text(
+              'You can skip permissions for now and grant them later in Settings.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? const Color(0xFFA8938C) : const Color(0xFF6B5A52),
+              ),
+            ),
+            TextButton.icon(
+              onPressed: _isValidating ? null : _quickFreeSetup,
+              icon: _isValidating
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.skip_next_rounded, size: 18),
+              label: const Text(
+                'Skip for now — start with Free AI',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
           const SizedBox(height: 24),
         ],
       ),
@@ -1125,10 +1228,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           ),
           const SizedBox(height: 4),
           Text(
-            'Free AI works instantly with no key, and a real on-device LLM '
-            '(Qwen 2.5, ~470–620 MB) can be downloaded once inside the app for '
-            'fully offline chat. Pick a provider to prefill details, or connect '
-            'your own API key for more power.',
+            'Puter Free AI (powered by puter.com) works instantly with no API '
+            'key or account, and is set as your default so you can chat right '
+            'away. Add your own key for more power, or run Ollama locally for '
+            'fully offline chat.',
             style: TextStyle(
               fontSize: 13,
               height: 1.4,
@@ -1144,7 +1247,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               children: [
-                _buildProviderCard('free', 'Free AI', Icons.auto_awesome_rounded, isDark, highlight: true),
+                _buildProviderCard('puter', 'Puter Free AI', Icons.auto_awesome_rounded, isDark, highlight: true),
+                const SizedBox(width: 10),
+                _buildProviderCard('free', 'Free AI', Icons.bolt_rounded, isDark),
                 const SizedBox(width: 10),
                 _buildProviderCard('ollama', 'Ollama On-device', Icons.memory_rounded, isDark),
                 const SizedBox(width: 10),
@@ -1159,8 +1264,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 _buildProviderCard('ollama_cloud', 'Ollama Cloud', Icons.cloud_circle_rounded, isDark),
                 const SizedBox(width: 10),
                 _buildProviderCard('deepseek', 'DeepSeek', Icons.analytics_rounded, isDark),
-                const SizedBox(width: 10),
-                _buildProviderCard('puter', 'Puter AI', Icons.terminal_rounded, isDark),
                 const SizedBox(width: 10),
                 _buildProviderCard('local', 'Local Server', Icons.dns_rounded, isDark),
               ],
@@ -1244,7 +1347,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     spacing: 8,
                     runSpacing: 8,
                     children: (_selectedProvider == 'puter'
-                            ? const ['gpt-4o-mini', 'gpt-4o', 'llama-3.1-8b', 'claude-3-5-haiku']
+                            ? const ['gpt-4o-mini', 'gpt-4o', 'llama-3.3-70b', 'claude-haiku-4']
                             : const ['openai-fast', 'openai', 'llama-3.1-8b', 'mistral-7b', 'deepseek-v3'])
                         .map(
                           (m) => _modelChip(m, isDark),
@@ -1357,10 +1460,25 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                             SizedBox(width: 8),
                             Icon(Icons.check_circle_outline_rounded, size: 20),
                           ],
-                        ),
+                  ),
                 ),
               ),
             ],
+          ),
+          const SizedBox(height: 6),
+          TextButton.icon(
+            onPressed: _isValidating ? null : _quickFreeSetup,
+            icon: _isValidating
+                ? const SizedBox(
+                    width: 14,
+                    height: 14,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.skip_next_rounded, size: 18),
+            label: const Text(
+              'Skip setup — use Puter Free AI',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
           const SizedBox(height: 24),
         ],
