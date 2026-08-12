@@ -35,15 +35,15 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   bool _isSmsGranted = false;
   bool _isOverlayGranted = false;
 
-  // AI config states. Default is Puter Free AI — no API key, no account,
-  // permanently available.
-  String _selectedProvider = 'puter';
+  // AI config states. Default is Pollinations Free AI — truly keyless,
+  // anonymous, zero-setup. Puter (puter.com) now needs a free dashboard token.
+  String _selectedProvider = 'free';
   final TextEditingController _apiKeyController = TextEditingController();
   final TextEditingController _baseUrlController = TextEditingController(
-    text: AiService.puterBaseUrl,
+    text: AiService.keylessBaseUrl,
   );
   final TextEditingController _modelController = TextEditingController(
-    text: AiService.puterDefaultModel,
+    text: AiService.keylessDefaultModel,
   );
   bool _obscureKey = true;
   bool _isValidating = false;
@@ -69,12 +69,12 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   Future<void> _loadAiDefaults() async {
     await _aiService.init();
     if (!mounted || !_aiService.isConfigured) {
-      // First run: default to Puter Free AI (no key needed).
+      // First run: default to Pollinations Free AI (keyless, zero setup).
       if (mounted) {
         setState(() {
-          _selectedProvider = 'puter';
-          _baseUrlController.text = AiService.puterBaseUrl;
-          _modelController.text = AiService.puterDefaultModel;
+          _selectedProvider = 'free';
+          _baseUrlController.text = AiService.keylessBaseUrl;
+          _modelController.text = AiService.keylessDefaultModel;
           _apiKeyController.clear();
         });
       }
@@ -212,7 +212,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
       } else if (provider == 'puter') {
         _baseUrlController.text = AiService.puterBaseUrl;
         _modelController.text = AiService.puterDefaultModel;
-        _apiKeyController.clear();
       } else if (provider == 'local') {
         _baseUrlController.text = 'http://10.0.2.2:1234/v1';
         _modelController.text = 'qwen2.5-7b-instruct';
@@ -246,7 +245,6 @@ class _OnboardingScreenState extends State<OnboardingScreen>
         _selectedProvider != 'ollama' &&
         _selectedProvider != 'ollama_cloud' &&
         _selectedProvider != 'local' &&
-        _selectedProvider != 'puter' &&
         apiKey.isEmpty) {
       setState(() {
         _validationError = 'API Key is required for this provider.';
@@ -309,8 +307,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
   }
 
   /// One-tap setup: skips every permission and jumps straight to the app using
-  /// Puter Free AI (https://puter.com) — no API key, no account, permanently
-  /// available — so new users can start chatting immediately.
+  /// Pollinations Free AI (keyless, anonymous, zero-setup) so new users can
+  /// start chatting immediately.
   Future<void> _quickFreeSetup() async {
     setState(() {
       _isValidating = true;
@@ -319,8 +317,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
     try {
       await _aiService.saveSettings(
         apiKey: '',
-        baseUrl: AiService.puterBaseUrl,
-        model: AiService.puterDefaultModel,
+        baseUrl: AiService.keylessBaseUrl,
+        model: AiService.keylessDefaultModel,
       );
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('onboarding_completed', true);
@@ -1228,10 +1226,10 @@ class _OnboardingScreenState extends State<OnboardingScreen>
           ),
           const SizedBox(height: 4),
           Text(
-            'Puter Free AI (powered by puter.com) works instantly with no API '
-            'key or account, and is set as your default so you can chat right '
-            'away. Add your own key for more power, or run Ollama locally for '
-            'fully offline chat.',
+            'Free AI (Pollinations) works instantly with zero setup — no API '
+            'key or account. Puter gives you 500+ models (GPT-5, Claude, '
+            'Gemini) with a free token from puter.com. Pick a provider to '
+            'prefill details, or connect your own API key for more power.',
             style: TextStyle(
               fontSize: 13,
               height: 1.4,
@@ -1247,9 +1245,9 @@ class _OnboardingScreenState extends State<OnboardingScreen>
               scrollDirection: Axis.horizontal,
               physics: const BouncingScrollPhysics(),
               children: [
-                _buildProviderCard('puter', 'Puter Free AI', Icons.auto_awesome_rounded, isDark, highlight: true),
+                _buildProviderCard('free', 'Free AI', Icons.auto_awesome_rounded, isDark, highlight: true),
                 const SizedBox(width: 10),
-                _buildProviderCard('free', 'Free AI', Icons.bolt_rounded, isDark),
+                _buildProviderCard('puter', 'Puter (Free Token)', Icons.terminal_rounded, isDark),
                 const SizedBox(width: 10),
                 _buildProviderCard('ollama', 'Ollama On-device', Icons.memory_rounded, isDark),
                 const SizedBox(width: 10),
@@ -1278,8 +1276,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                 if (_selectedProvider != 'free' &&
                     _selectedProvider != 'ollama' &&
                     _selectedProvider != 'ollama_cloud' &&
-                    _selectedProvider != 'local' &&
-                    _selectedProvider != 'puter') ...[
+                    _selectedProvider != 'local') ...[
                   _buildFormTextField(
                     controller: _apiKeyController,
                     label: 'API Key',
@@ -1347,8 +1344,8 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                     spacing: 8,
                     runSpacing: 8,
                     children: (_selectedProvider == 'puter'
-                            ? const ['gpt-4o-mini', 'gpt-4o', 'llama-3.3-70b', 'claude-haiku-4']
-                            : const ['openai-fast', 'openai', 'llama-3.1-8b', 'mistral-7b', 'deepseek-v3'])
+                            ? const ['gpt-5.4-nano', 'gpt-5.4-mini', 'gemini-3.5-flash', 'claude-haiku-4-5-20251001']
+                            : const ['openai-fast', 'openai'])
                         .map(
                           (m) => _modelChip(m, isDark),
                         )

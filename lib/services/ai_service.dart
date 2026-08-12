@@ -20,29 +20,42 @@ class AiService {
   static final AiService instance = AiService();
 
   /// Free, keyless, OpenAI-compatible chat endpoint. Used as the out-of-the-box
-  /// default so the agent works with zero configuration. Best-effort: if the
-  /// keyless backend is unreachable, the ARI failover engine surfaces a clear
-  /// error that nudges the user to add their own API key in Settings.
+  /// default so the agent works with zero configuration. As of 2026 the
+  /// anonymous tier serves the GPT-OSS 20B reasoning model (`openai-fast` /
+  /// alias `openai`); everything else on the legacy surface 404s for
+  /// anonymous requests, so the quick list stays honest.
   static const String keylessBaseUrl = 'https://text.pollinations.ai/openai';
   static const String keylessDefaultModel = 'openai-fast';
+  static const List<String> keylessModels = ['openai-fast', 'openai'];
 
-  /// Puter.js free AI gateway (https://puter.com). Uses its own REST format
-  /// (`/v2/chat`), not the OpenAI shape — handled by dedicated adapters.
-  static const String puterBaseUrl = 'https://api.puter.com/v2/chat';
-  static const String puterDefaultModel = 'gpt-4o-mini';
+  /// Puter.js free AI gateway (https://puter.com). Now OpenAI-compatible:
+  /// `POST /puterai/openai/v1/chat/completions` with a free personal access
+  /// token minted at https://puter.com (anonymous access was retired in 2026;
+  /// each user covers their own usage). Model ids verified live against
+  /// `api.puter.com/puterai/chat/models/details`.
+  static const String puterBaseUrl = 'https://api.puter.com/puterai/openai/v1';
+  static const String puterDefaultModel = 'gpt-5.4-nano';
   static const List<String> puterModels = [
-    'gpt-5-mini',
+    'gpt-5.4-nano',
+    'gpt-5.4-mini',
+    'gpt-5.4',
+    'gpt-5.2',
     'gpt-5',
     'gpt-4o',
-    'gpt-4o-mini',
-    'gpt-4.1',
-    'gpt-4.1-mini',
-    'claude-sonnet-4',
-    'claude-haiku-4',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash',
-    'llama-3.3-70b',
-    'deepseek-v3',
+    'claude-fable-5',
+    'claude-haiku-4-5-20251001',
+    'claude-sonnet-5',
+    'claude-opus-5',
+    'gemini-3.5-flash',
+    'gemini-3-flash-preview',
+    'gemini-2.5-pro',
+    'grok-4.3',
+    'grok-4-1-fast-reasoning',
+    'deepseek-v4-pro',
+    'deepseek-v4-flash',
+    'qwen3.6-plus',
+    'qwen3.5-plus',
+    'qwen3-max',
   ];
 
   static const String _defaultBaseUrl = keylessBaseUrl;
@@ -715,7 +728,7 @@ RULES:
     return [];
   }
 
-  bool get isConfigured => _isKeyless || _isPuter || (_apiKey != null && _apiKey!.isNotEmpty);
+  bool get isConfigured => _isKeyless || (_apiKey != null && _apiKey!.isNotEmpty);
   String get baseUrl => _baseUrl;
   String get model => _model;
   String get apiKey => _apiKey ?? '';
@@ -763,89 +776,8 @@ RULES:
     return '$url/chat/completions';
   }
 
-  bool get _isPuter => _baseUrl.trim().contains('api.puter.com');
-
-  /// Puter.js gateway: non-streaming `/v2/chat` request.
-  /// Works anonymously (guest) without a token, or with `Bearer <token>`
-  /// from https://puter.com dashboard for higher limits.
-  Future<String> _sendPuter(List<Map<String, String>> messages) async {
-    final token = (_apiKey ?? '').trim();
-    final response = await http
-        .post(
-          Uri.parse(puterBaseUrl),
-          headers: {
-            'Content-Type': 'application/json',
-            if (token.isNotEmpty) 'Authorization': 'Bearer $token',
-          },
-          body: jsonEncode({
-            'model': _model,
-            'messages': messages,
-          }),
-        )
-        .timeout(const Duration(minutes: 5));
-    if (response.statusCode != 200) {
-      throw Exception('Puter error (${response.statusCode}): ${response.body}');
-    }
-    final decoded = jsonDecode(response.body);
-    if (decoded is Map<String, dynamic>) {
-      final msg = decoded['message'];
-      if (msg is Map<String, dynamic> && msg['content'] is String) {
-        return msg['content'] as String;
-      }
-    }
-    throw Exception('Unexpected Puter response: $decoded');
-  }
-
-  /// Puter.js gateway: streaming `/v2/chat` SSE adapter.
-  /// Puter sends `data: {"message":{"role":"assistant","content":"..."}}`
-  /// chunks and marks the last one with `status.finished`.
-  Stream<String> _streamPuter(List<Map<String, String>> messages) async* {
-    final token = (_apiKey ?? '').trim();
-    final client = http.Client();
-    try {
-      final request = http.Request('POST', Uri.parse(puterBaseUrl))
-        ..headers.addAll({
-          'Content-Type': 'application/json',
-          if (token.isNotEmpty) 'Authorization': 'Bearer $token',
-        })
-        ..body = jsonEncode({
-          'model': _model,
-          'messages': messages,
-          'stream': true,
-        });
-      final response = await client.send(request).timeout(const Duration(minutes: 5));
-      if (response.statusCode != 200) {
-        final body = await response.stream.bytesToString();
-        throw Exception('Puter error (${response.statusCode}): $body');
-      }
-      await for (final line in response.stream
-          .transform(utf8.decoder)
-          .transform(const LineSplitter())) {
-        final trimmed = line.trim();
-        if (trimmed.isEmpty || trimmed.startsWith(':')) continue;
-        if (!trimmed.startsWith('data:')) continue;
-        final payload = trimmed.substring(5).trim();
-        if (payload == '[DONE]') break;
-        try {
-          final data = jsonDecode(payload) as Map<String, dynamic>;
-          final msg = data['message'];
-          if (msg is Map<String, dynamic>) {
-            final content = msg['content'];
-            if (content is String && content.isNotEmpty) yield content;
-            final status = msg['status'];
-            if (status is Map && status['finished'] == true) break;
-          }
-        } catch (_) {
-          // Skip malformed SSE events.
-        }
-      }
-    } finally {
-      client.close();
-    }
-  }
-
   Future<String> sendMessage(String message, {bool isAgentMode = true}) async {
-    if ((_apiKey == null || _apiKey!.isEmpty) && !_isKeyless && !_isPuter) {
+    if ((_apiKey == null || _apiKey!.isEmpty) && !_isKeyless) {
       throw Exception('API Key is not configured. Please go to Settings.');
     }
 
@@ -865,23 +797,8 @@ RULES:
         ..._telegramHistory,
       ];
 
-      // Puter uses its own /v2/chat REST format, not OpenAI shape.
-      if (_isPuter) {
-        final raw = await _sendPuter(messages);
-        final assistantMessage = raw
-            .replaceAll(RegExp(r'<think>.*?</think>', dotAll: true), '')
-            .trim();
-        if (assistantMessage.isEmpty) {
-          throw Exception(
-            'API returned an empty response. This may be due to rate limits or API instability.',
-          );
-        }
-        _telegramHistory.add({
-          'role': 'assistant',
-          'content': assistantMessage,
-        });
-        return assistantMessage;
-      }
+      // Puter now speaks the OpenAI wire shape on `/puterai/openai/v1`, so it
+      // flows through the standard path below with its Bearer token.
 
       final requestUrl = _buildChatUrl(_baseUrl);
 
@@ -996,14 +913,12 @@ RULES:
           .toList();
 
       String fullResponse = '';
-      final stream = _isPuter
-          ? _streamPuter(castMessages)
-          : AriAiEngine.instance.executeStreamWithFailover(
-              messages: castMessages,
-              temperature: _temperature,
-              maxTokens: _effectiveMaxTokens,
-              activeCustomKey: activeKey,
-            );
+      final stream = AriAiEngine.instance.executeStreamWithFailover(
+        messages: castMessages,
+        temperature: _temperature,
+        maxTokens: _effectiveMaxTokens,
+        activeCustomKey: activeKey,
+      );
 
       await for (final chunk in stream) {
         fullResponse += chunk;

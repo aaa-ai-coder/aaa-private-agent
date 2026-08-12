@@ -1412,7 +1412,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     _presetChip('Gemini', 'https://generativelanguage.googleapis.com/v1beta/openai/', 'gemini-1.5-flash', urlCtrl, modelCtrl, nameCtrl),
                     _presetChip('NVIDIA NIM', 'https://integrate.api.nvidia.com/v1', 'z-ai/glm-5.2', urlCtrl, modelCtrl, nameCtrl),
                     _presetChip('DeepSeek', 'https://api.deepseek.com', 'deepseek-chat', urlCtrl, modelCtrl, nameCtrl),
-                    _presetChip('Puter', 'https://api.puter.com/v2/chat', 'gpt-4o-mini', urlCtrl, modelCtrl, nameCtrl),
+                    _presetChip('Puter', 'https://api.puter.com/puterai/openai/v1', 'gpt-5.4-nano', urlCtrl, modelCtrl, nameCtrl),
                     _presetChip('Ollama (on-device)', 'http://127.0.0.1:11434/v1', 'llama3.2', urlCtrl, modelCtrl, nameCtrl),
                   ],
                 ),
