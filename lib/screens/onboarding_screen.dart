@@ -1473,7 +1473,7 @@ class _OnboardingScreenState extends State<OnboardingScreen>
                   )
                 : const Icon(Icons.skip_next_rounded, size: 18),
             label: const Text(
-              'Skip setup — use Puter Free AI',
+              'Skip setup — use Free AI',
               style: TextStyle(fontWeight: FontWeight.bold),
             ),
           ),

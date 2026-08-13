@@ -24,6 +24,7 @@ import '../services/local_llm_service.dart';
 import '../models/api_key_config.dart';
 import 'task_history_screen.dart';
 import 'accounts_screen.dart';
+import 'login_screen.dart';
 import 'app_lock_screen.dart';
 import 'about_screen.dart';
 import 'permissions_screen.dart';
@@ -68,6 +69,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _visualEffectsMode = 'auto';
   final FlutterTts _testTts = FlutterTts();
   bool _ttsBusy = false;
+  int _settingsTab = 0;
 
   @override
   void initState() {
@@ -186,63 +188,167 @@ class _SettingsScreenState extends State<SettingsScreen> {
       body: Container(
         decoration: BoxDecoration(gradient: bgGradient),
         child: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: IndexedStack(
+            index: _settingsTab,
             children: [
-              // 1. ACCOUNT & CLOUD SYNC HEADER
-              _buildAccountCard(isDark),
-              const SizedBox(height: 16),
+              // ── AI & Keys ──────────────────────────────────────────────
+              _buildTabList([
+                _buildAccountCard(isDark),
+                _buildAutoBackupStatusCard(isDark),
+                _buildAiProviderCard(isDark),
+              ]),
 
-              // 1b. ACCOUNTS & CLOUD HEALTH
-              _buildAccountsHealthCard(isDark),
-              const SizedBox(height: 16),
+              // ── Voice & Agent ──────────────────────────────────────────
+              _buildTabList([
+                _buildVoiceSettingsCard(isDark),
+                _buildOfflineAiCard(isDark),
+                _buildDeviceAuthorityCard(isDark),
+              ]),
 
-              // 1c. SECURITY & PRIVACY
-              _buildSecurityCard(isDark),
-              const SizedBox(height: 16),
+              // ── Privacy & Access ───────────────────────────────────────
+              _buildTabList([
+                _buildSecurityCard(isDark),
+                _buildPermissionsCard(isDark),
+                _buildPreferencesCard(isDark),
+              ]),
 
-              // 2. AI PROVIDER & SAVED KEYS
-              _buildAiProviderCard(isDark),
-              const SizedBox(height: 16),
-
-              // 3. VOICE & MULTILINGUAL SPEECH
-              _buildVoiceSettingsCard(isDark),
-              const SizedBox(height: 16),
-
-              // 4. CLOUD BACKENDS STATUS
-              _buildCloudStorageCard(isDark),
-              const SizedBox(height: 16),
-
-              // 5. BACKUP & KEEP-ALIVE
-              _buildBackupCard(isDark),
-              const SizedBox(height: 16),
-
-              // 6. DEVICE AUTOMATION & AUTHORITY
-              _buildDeviceAuthorityCard(isDark),
-              const SizedBox(height: 16),
-
-              // 6a. PERMISSIONS & ACCESS
-              _buildPermissionsCard(isDark),
-              const SizedBox(height: 16),
-
-              // 6b. SCHEDULED TASKS
-              const _ScheduledTasksCard(),
-              const SizedBox(height: 16),
-
-               // 6c. OFFLINE AI & MEMORY
-               _buildOfflineAiCard(isDark),
-               const SizedBox(height: 16),
-
-               // 6d. ABOUT & WHAT'S NEW
-               _buildAboutCard(isDark),
-               const SizedBox(height: 16),
-
-               // 7. APP PREFERENCES & THEMING
-               _buildPreferencesCard(isDark),
-               const SizedBox(height: 24),
+              // ── About & App ────────────────────────────────────────────
+              _buildTabList([
+                _buildAboutCard(isDark),
+                _buildAdvancedSection(isDark),
+              ]),
             ],
           ),
         ),
+      ),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _settingsTab,
+        onDestinationSelected: (i) {
+          HapticFeedback.selectionClick();
+          setState(() => _settingsTab = i);
+        },
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.smart_toy_outlined),
+            selectedIcon: Icon(Icons.smart_toy_rounded),
+            label: 'AI & Keys',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.record_voice_over_outlined),
+            selectedIcon: Icon(Icons.record_voice_over_rounded),
+            label: 'Voice & Agent',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.shield_outlined),
+            selectedIcon: Icon(Icons.shield_rounded),
+            label: 'Privacy',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.info_outline_rounded),
+            selectedIcon: Icon(Icons.info_rounded),
+            label: 'About',
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Wraps a list of cards into a scrollable tab with even spacing.
+  Widget _buildTabList(List<Widget> children) {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      children: [
+        for (var i = 0; i < children.length; i++) ...[
+          children[i],
+          const SizedBox(height: 16),
+        ],
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  /// Compact always-visible status for the automated cloud backup.
+  Widget _buildAutoBackupStatusCard(bool isDark) {
+    final loggedIn = _authService.isLoggedIn;
+    final accent = const Color(0xFF2FBF8F);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                loggedIn ? Icons.cloud_done_rounded : Icons.cloud_outlined,
+                size: 20,
+                color: accent,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Automatic cloud backup',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    loggedIn
+                        ? 'ON — every API key and AI setting syncs to your '
+                            'private Supabase account automatically, in the '
+                            'background.'
+                        : 'Sign in to back up your API keys to the cloud '
+                            'automatically.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.35,
+                      color: isDark ? Colors.white70 : Colors.black54,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            IconButton(
+              onPressed: loggedIn ? _openAccounts : _openLogin,
+              icon: Icon(
+                loggedIn ? Icons.chevron_right_rounded : Icons.login_rounded,
+                color: accent,
+              ),
+              tooltip: loggedIn ? 'Manage account' : 'Sign in',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Advanced/developer controls hidden from normal users.
+  Widget _buildAdvancedSection(bool isDark) {
+    return Card(
+      clipBehavior: Clip.antiAlias,
+      child: ExpansionTile(
+        leading: const Icon(Icons.tune_rounded),
+        title: const Text('Advanced', style: TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: const Text(
+          'Cloud health, backup & restore, scheduled tasks, developer tools',
+        ),
+        childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        children: [
+          _buildAccountsHealthCard(isDark),
+          const SizedBox(height: 12),
+          _buildCloudStorageCard(isDark),
+          const SizedBox(height: 12),
+          _buildBackupCard(isDark),
+          const SizedBox(height: 12),
+          const _ScheduledTasksCard(),
+        ],
       ),
     );
   }
@@ -444,7 +550,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _openAccounts() async {
-    await Navigator.of(context).push(
+    await Navigator.push(
+      context,
       MaterialPageRoute(
         builder: (_) => AccountsScreen(
           aiService: widget.aiService,
@@ -452,6 +559,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       ),
     );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _openLogin() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => LoginScreen(authService: _authService)),
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> _toggleAppLock(bool value) async {

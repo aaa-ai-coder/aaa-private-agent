@@ -89,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   AppLifecycleState _appLifecycleState = AppLifecycleState.resumed;
   Timer? _overlayHistoryTimer;
+  Timer? _cloudSyncTimer;
 
   // Bottom navigation tabs: 0=Chat, 1=Agent Hub, 2=Device, 3=More
   int _tabIndex = 0;
@@ -131,6 +132,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _telegramService = TelegramService(_actionHandler, _aiService);
     unawaited(_initServicesSafe());
     _startOverlayHistorySync();
+    _startCloudAutoBackup();
     unawaited(_loadCustomCommandsSafe());
     unawaited(_initVisualEffects());
     unawaited(_maybeShowWhatsNew());
@@ -1825,6 +1827,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _overlayHistoryTimer?.cancel();
+    _cloudSyncTimer?.cancel();
     // Never leave a dangling handler that could call setState on a disposed state.
     if (onOverlayTask != null && identical(onOverlayTask, _onOverlayTask)) {
       onOverlayTask = null;
@@ -1870,6 +1873,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Future<void> _handleAppForegrounded() async {
     await _updateOverlayState();
     await _importOverlayChatHistory();
+    // Re-sync cloud backup whenever the app returns to the foreground.
+    unawaited(_aiService.autoBackupToCloud());
+  }
+
+  /// Automatic cloud backup: syncs all API keys + AI settings to Supabase on
+  /// startup and every few minutes while the app runs (silent, background).
+  void _startCloudAutoBackup() {
+    unawaited(_aiService.autoBackupToCloud());
+    _cloudSyncTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      unawaited(_aiService.autoBackupToCloud());
+    });
   }
 
   Future<void> _importOverlayChatHistory() async {
@@ -2136,6 +2150,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     );
                     if (mounted) setState(() {});
+                    unawaited(_aiService.autoBackupToCloud());
                   },
                 ),
               ),
@@ -2155,10 +2170,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           telegramService: _telegramService,
                         ),
                       ),
-                    );
-                    if (mounted) setState(() {});
-                  },
-                ),
+                        );
+                        if (mounted) setState(() {});
+                        unawaited(_aiService.autoBackupToCloud());
+                      },
+                    ),
 
               // Chat content area
               Expanded(

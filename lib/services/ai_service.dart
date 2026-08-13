@@ -386,6 +386,27 @@ class AiService {
     }
   }
 
+  /// Automatic background cloud backup: pushes every saved API key plus the
+  /// current base URL/model to Supabase for the signed-in user. No-ops when
+  /// not signed in, never throws, and is safe to call repeatedly (called on
+  /// app start, on every settings change and on a periodic timer).
+  Future<void> autoBackupToCloud() async {
+    final userId = _syncUserId;
+    if (userId == null) return;
+    try {
+      await syncKeysToSupabase(userId);
+      await DatabaseService.saveSettings(
+        userId: userId,
+        settings: {
+          'api_base_url': _baseUrl,
+          'api_model': _model,
+        },
+      );
+    } catch (e) {
+      developer.log('Cloud auto-backup failed: $e', name: 'AiService');
+    }
+  }
+
   static const String _systemPrompt = '''
 You are AAA Private Agent, an Android phone automation assistant. You can control this device through a set of predefined actions (open apps, make calls, send messages, manage settings, control media, manage WiFi, read the screen, run automation, interact with cloud storage) and you can also chat like a normal assistant.
 
@@ -641,6 +662,10 @@ RULES:
 
     // Auto-refresh available models from the provider
     unawaited(refreshCachedModels());
+
+    // Automatic cloud backup: keys are pushed per-change above; also persist
+    // the active base URL/model so a fresh install can restore the same setup.
+    unawaited(autoBackupToCloud());
   }
 
   Future<void> saveMaxSteps(int steps) async {
