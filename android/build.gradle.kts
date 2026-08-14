@@ -1,14 +1,3 @@
-buildscript {
-    repositories {
-        google()
-        mavenCentral()
-    }
-    dependencies {
-        classpath("com.google.gms:google-services:4.4.2")
-        classpath("com.google.firebase:firebase-crashlytics-gradle:3.0.2")
-    }
-}
-
 allprojects {
     repositories {
         google()
@@ -28,6 +17,24 @@ subprojects {
 }
 subprojects {
     project.evaluationDependsOn(":app")
+}
+
+subprojects {
+    if (project.name != "app") {
+        afterEvaluate {
+            tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+                compilerOptions {
+                    jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+                }
+            }
+            extensions.findByType<com.android.build.gradle.BaseExtension>()?.apply {
+                compileOptions {
+                    sourceCompatibility = JavaVersion.VERSION_17
+                    targetCompatibility = JavaVersion.VERSION_17
+                }
+            }
+        }
+    }
 }
 
 tasks.register<Delete>("clean") {

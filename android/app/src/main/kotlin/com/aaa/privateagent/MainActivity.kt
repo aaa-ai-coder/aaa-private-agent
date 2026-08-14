@@ -1,256 +1,612 @@
 package com.aaa.privateagent
 
+import android.app.AlertDialog
+import android.app.AlarmManager
+import android.app.DownloadManager
+import android.app.PendingIntent
+import android.content.Context
 import android.content.Intent
-import android.provider.Settings
+import android.net.Uri
+import android.util.Log
+import android.os.Handler
+import android.os.Looper
+import android.os.Environment
+import android.provider.OpenableColumns
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import io.flutter.plugin.common.EventChannel
-import android.graphics.PixelFormat
-import android.graphics.Color
-import android.view.Gravity
-import android.view.WindowManager
-import android.view.View
-import android.widget.Button
-import android.net.Uri
+import java.io.File
+import kotlin.concurrent.thread
+import kotlin.system.exitProcess
+import java.util.concurrent.ConcurrentHashMap
+import org.json.JSONObject
 
 class MainActivity : FlutterActivity() {
-    private val CHANNEL = "com.privateagent/accessibility"
-    private val EVENT_CHANNEL = "com.privateagent/accessibility_events"
-    private var eventSink: EventChannel.EventSink? = null
-    private var overlayView: View? = null
+    private val importChannelName = "com.aichat.ai_chat/model_import"
+    private val importRequestCode = 4207
+    private val mainHandler = Handler(Looper.getMainLooper())
+
+    private var importChannel: MethodChannel? = null
+    private var pendingImportResult: MethodChannel.Result? = null
+    private var pendingModelsDir: String? = null
+    private val monitoredInAppDownloads = ConcurrentHashMap.newKeySet<Long>()
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-
-        io.flutter.embedding.engine.FlutterEngineCache.getInstance()
-            .put("myCachedEngine", flutterEngine)
-
-        EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL).setStreamHandler(
-            object : EventChannel.StreamHandler {
-                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                    eventSink = events
-                    AgentAccessibilityService.eventListener = { eventMap ->
-                        runOnUiThread {
-                            eventSink?.success(eventMap)
+        importChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, importChannelName)
+        importChannel?.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "pickAndImportModel" -> {
+                    if (pendingImportResult != null) {
+                        result.error("IMPORT_BUSY", "Another model import is already running.", null)
+                        return@setMethodCallHandler
+                    }
+                    val modelsDir = call.argument<String>("modelsDir")
+                    if (modelsDir.isNullOrBlank()) {
+                        result.error("INVALID_DIR", "Models directory is missing.", null)
+                        return@setMethodCallHandler
+                    }
+                    pendingModelsDir = modelsDir
+                    pendingImportResult = result
+                    openModelPicker()
+                }
+                "downloadToDownloads" -> {
+                    val url = call.argument<String>("url")
+                    val filename = call.argument<String>("filename")
+                    if (url.isNullOrBlank() || filename.isNullOrBlank()) {
+                        result.error("INVALID_DOWNLOAD", "Model URL or filename is missing.", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val downloadId = enqueueDownloadToDownloads(url, filename)
+                        result.success(mapOf("downloadId" to downloadId, "filename" to sanitizeFilename(filename)))
+                    } catch (e: Exception) {
+                        result.error("DOWNLOAD_FAILED", e.message ?: e.toString(), null)
+                    }
+                }
+                "cancelDownloadToDownloads" -> {
+                    val downloadId = (call.argument<Any>("downloadId") as? Number)?.toLong()
+                    if (downloadId != null) {
+                        try {
+                            val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                            manager.remove(downloadId)
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("CANCEL_FAILED", e.message ?: e.toString(), null)
+                        }
+                    } else {
+                        result.error("INVALID_DOWNLOAD_ID", "Download ID is missing.", null)
+                    }
+                }
+                "downloadModelInApp" -> {
+                    val url = call.argument<String>("url")
+                    val filename = call.argument<String>("filename")
+                    val modelsDir = call.argument<String>("modelsDir")
+                    if (url.isNullOrBlank() || filename.isNullOrBlank() || modelsDir.isNullOrBlank()) {
+                        result.error("INVALID_DOWNLOAD", "URL, filename, or modelsDir is missing.", null)
+                        return@setMethodCallHandler
+                    }
+                    try {
+                        val downloadId = enqueueDownloadInApp(url, filename, modelsDir)
+                        result.success(mapOf("downloadId" to downloadId, "filename" to sanitizeFilename(filename)))
+                    } catch (e: Exception) {
+                        result.error("DOWNLOAD_FAILED", e.message ?: e.toString(), null)
+                    }
+                }
+                "cancelDownloadInApp" -> {
+                    val downloadId = (call.argument<Any>("downloadId") as? Number)?.toLong()
+                    if (downloadId != null) {
+                        try {
+                            val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                            manager.remove(downloadId)
+                            removeInAppDownload(downloadId)
+                            val filename = call.argument<String>("filename")
+                            if (!filename.isNullOrBlank()) {
+                                val destFile = File(File(getExternalFilesDir(null), "temp_downloads"), sanitizeFilename(filename))
+                                if (destFile.exists()) destFile.delete()
+                            }
+                            result.success(true)
+                        } catch (e: Exception) {
+                            result.error("CANCEL_FAILED", e.message ?: e.toString(), null)
+                        }
+                    } else {
+                        result.error("INVALID_DOWNLOAD_ID", "Download ID is missing.", null)
+                    }
+                }
+                "getActiveDownloads" -> {
+                    thread(name = "download-inapp-reconcile") {
+                        try {
+                            val activeList = reconcileInAppDownloads()
+                            mainHandler.post { result.success(activeList) }
+                        } catch (e: java.lang.Exception) {
+                            mainHandler.post {
+                                result.error("QUERY_FAILED", e.message ?: e.toString(), null)
+                            }
                         }
                     }
                 }
+                "restartApp" -> {
+                    restartApp()
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
 
-                override fun onCancel(arguments: Any?) {
-                    eventSink = null
-                    AgentAccessibilityService.eventListener = null
+    }
+
+    private fun restartApp() {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
+        if (launchIntent == null) {
+            finishAffinity()
+            return
+        }
+        launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        val pendingIntent = PendingIntent.getActivity(
+            this,
+            9208,
+            launchIntent,
+            PendingIntent.FLAG_CANCEL_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val alarmManager = getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        alarmManager.set(
+            AlarmManager.RTC,
+            System.currentTimeMillis() + 350L,
+            pendingIntent
+        )
+        finishAffinity()
+        exitProcess(0)
+    }
+
+    private fun enqueueDownloadToDownloads(url: String, filename: String): Long {
+        val safeName = sanitizeFilename(filename)
+        val request = DownloadManager.Request(Uri.parse(url)).apply {
+            setTitle(safeName)
+            setDescription("Downloading AI model")
+            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            setAllowedOverMetered(true)
+            setAllowedOverRoaming(true)
+            setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, safeName)
+            addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+            addRequestHeader("Accept", "*/*")
+        }
+        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val downloadId = manager.enqueue(request)
+
+        thread(name = "download-monitor-$downloadId") {
+            var isFinished = false
+            var lastBytes = 0L
+            var lastTime = System.currentTimeMillis()
+            var lastReportedSpeed = 0.0
+
+            while (!isFinished) {
+                Thread.sleep(1000)
+                val query = DownloadManager.Query().setFilterById(downloadId)
+                manager.query(query)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                        val bytesDownloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                        val bytesTotalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+
+                        if (statusIndex >= 0 && bytesDownloadedIndex >= 0 && bytesTotalIndex >= 0) {
+                            val status = cursor.getInt(statusIndex)
+                            val downloaded = cursor.getLong(bytesDownloadedIndex)
+                            val total = cursor.getLong(bytesTotalIndex)
+
+                            val now = System.currentTimeMillis()
+                            val elapsedSeconds = (now - lastTime) / 1000.0
+                            var bytesPerSecond = 0.0
+
+                            if (downloaded > lastBytes) {
+                                bytesPerSecond = if (elapsedSeconds > 0) ((downloaded - lastBytes) / elapsedSeconds) else 0.0
+                                lastBytes = downloaded
+                                lastTime = now
+                                lastReportedSpeed = bytesPerSecond
+                            } else {
+                                if (elapsedSeconds > 3.0) {
+                                    lastReportedSpeed = 0.0
+                                }
+                                bytesPerSecond = lastReportedSpeed
+                            }
+
+                            if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                                isFinished = true
+                                emitProgress(safeName, total, total, 0.0, "Download complete")
+                            } else if (status == DownloadManager.STATUS_FAILED) {
+                                isFinished = true
+                                emitProgress(safeName, downloaded, total, 0.0, "Download failed")
+                            } else {
+                                emitProgress(safeName, downloaded, total, bytesPerSecond, "Downloading to phone...")
+                            }
+                        }
+                    } else {
+                        isFinished = true
+                        emitProgress(safeName, 0, 0, 0.0, "Download cancelled")
+                    }
+                } ?: run {
+                    isFinished = true
                 }
             }
-        )
-
-        registerAccessibilityChannel(flutterEngine, this)
+        }
+        return downloadId
     }
 
-    companion object {
-        fun registerAccessibilityChannel(flutterEngine: FlutterEngine, context: android.content.Context) {
-            MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.privateagent/accessibility")
-                .setMethodCallHandler { call, result ->
-                    android.util.Log.d("PrivateAgentKotlin", "Received method call: ${call.method}")
-                    when (call.method) {
-                        "ping" -> result.success(true)
+    private fun enqueueDownloadInApp(url: String, filename: String, modelsDir: String): Long {
+        val safeName = sanitizeFilename(filename)
+        val tempDownloadsDir = File(getExternalFilesDir(null), "temp_downloads")
+        tempDownloadsDir.mkdirs()
+        val destFile = File(tempDownloadsDir, safeName)
+        if (destFile.exists()) destFile.delete()
 
-                        "logToNative" -> {
-                            val msg = call.argument<String>("message") ?: ""
-                            android.util.Log.d("PrivateAgentDart", msg)
-                            result.success(true)
-                        }
+        val request = DownloadManager.Request(Uri.parse(url)).apply {
+            setTitle(safeName)
+            setDescription("Downloading local AI model")
+            setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
+            setAllowedOverMetered(true)
+            setAllowedOverRoaming(true)
+            setDestinationUri(Uri.fromFile(destFile))
+            addRequestHeader("User-Agent", "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36")
+            addRequestHeader("Accept", "*/*")
+        }
+        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val downloadId = manager.enqueue(request)
+        persistInAppDownload(downloadId, safeName, modelsDir)
+        monitorInAppDownload(downloadId, safeName, modelsDir)
+        return downloadId
+    }
 
-                        "isServiceRunning" -> {
-                            result.success(AgentAccessibilityService.isRunning())
-                        }
+    private fun monitorInAppDownload(downloadId: Long, safeName: String, modelsDir: String) {
+        if (!monitoredInAppDownloads.add(downloadId)) return
+        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val destFile = File(File(getExternalFilesDir(null), "temp_downloads"), safeName)
+        thread(name = "download-inapp-monitor-$downloadId") {
+            var isFinished = false
+            var lastBytes = 0L
+            var lastTime = System.currentTimeMillis()
+            var lastReportedSpeed = 0.0
 
-                        "checkOverlayPermission" -> {
-                            result.success(Settings.canDrawOverlays(context))
-                        }
+            while (!isFinished) {
+                Thread.sleep(1000)
+                val query = DownloadManager.Query().setFilterById(downloadId)
+                manager.query(query)?.use { cursor ->
+                    if (cursor.moveToFirst()) {
+                        val statusIndex = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+                        val bytesDownloadedIndex = cursor.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+                        val bytesTotalIndex = cursor.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
 
-                        "requestOverlayPermission" -> {
-                            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
-                            result.success(true)
-                        }
+                        if (statusIndex >= 0 && bytesDownloadedIndex >= 0 && bytesTotalIndex >= 0) {
+                            val status = cursor.getInt(statusIndex)
+                            val downloaded = cursor.getLong(bytesDownloadedIndex)
+                            val total = cursor.getLong(bytesTotalIndex)
 
-                        "showMacroOverlay" -> {
-                            // Macro overlay requires an Activity context, so we just ignore or return error if called from background
-                            result.error("NOT_SUPPORTED", "Macro overlay not supported from background", null)
-                        }
+                            val now = System.currentTimeMillis()
+                            val elapsedSeconds = (now - lastTime) / 1000.0
+                            var bytesPerSecond = 0.0
 
-                        "hideMacroOverlay" -> {
-                            result.success(true)
-                        }
-
-                        "openAccessibilitySettings" -> {
-                            val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            context.startActivity(intent)
-                            result.success(true)
-                        }
-
-                        "dumpScreen" -> {
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            if (downloaded > lastBytes) {
+                                bytesPerSecond = if (elapsedSeconds > 0) ((downloaded - lastBytes) / elapsedSeconds) else 0.0
+                                lastBytes = downloaded
+                                lastTime = now
+                                lastReportedSpeed = bytesPerSecond
                             } else {
-                                val nodes = service.dumpScreen()
-                                result.success(nodes)
-                            }
-                        }
-
-                        "takeScreenshot" -> {
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                            } else {
-                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                                    service.takeScreenshot { base64 ->
-                                        if (base64 != null) {
-                                            result.success(base64)
-                                        } else {
-                                            result.error("SCREENSHOT_FAILED", "Failed to capture screenshot", null)
-                                        }
-                                    }
-                                } else {
-                                    result.error("UNSUPPORTED_VERSION", "Screenshot requires Android 11 (API 30) or higher", null)
+                                if (elapsedSeconds > 3.0) {
+                                    lastReportedSpeed = 0.0
                                 }
+                                bytesPerSecond = lastReportedSpeed
                             }
-                        }
 
-                        "clickByText" -> {
-                            val text = call.argument<String>("text") ?: ""
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
+                            if (status == DownloadManager.STATUS_SUCCESSFUL) {
+                                isFinished = true
+                                finalizeInAppDownload(downloadId, safeName, modelsDir, downloaded, total)
+                            } else if (status == DownloadManager.STATUS_FAILED) {
+                                isFinished = true
+                                removeInAppDownload(downloadId)
+                                emitProgress(safeName, downloaded, total, 0.0, "Download failed")
                             } else {
-                                result.success(service.clickByText(text))
+                                emitProgress(safeName, downloaded, total, bytesPerSecond, "Downloading...")
                             }
                         }
-
-                        "clickAt" -> {
-                            val x = call.argument<Double>("x")?.toFloat() ?: 0f
-                            val y = call.argument<Double>("y")?.toFloat() ?: 0f
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                            } else {
-                                result.success(service.clickAtCoordinates(x, y))
-                            }
-                        }
-
-                        "typeText" -> {
-                            val text = call.argument<String>("text") ?: ""
-                            val hint = call.argument<String>("fieldHint")
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                            } else {
-                                result.success(service.typeText(text, hint))
-                            }
-                        }
-
-                        "pressEnter" -> {
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                            } else {
-                                result.success(service.pressEnter())
-                            }
-                        }
-
-                        "scroll" -> {
-                            val direction = call.argument<String>("direction") ?: "down"
-                            val target = call.argument<String>("target")
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                            } else {
-                                result.success(service.scroll(direction, target))
-                            }
-                        }
-
-                        "showToast" -> {
-                            val message = call.argument<String>("message") ?: ""
-                            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_SHORT).show()
-                            result.success(true)
-                        }
-
-                        "swipe" -> {
-                            val startX = call.argument<Double>("startX")?.toFloat() ?: 0f
-                            val startY = call.argument<Double>("startY")?.toFloat() ?: 0f
-                            val endX = call.argument<Double>("endX")?.toFloat() ?: 0f
-                            val endY = call.argument<Double>("endY")?.toFloat() ?: 0f
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                            } else {
-                                result.success(service.swipe(startX, startY, endX, endY))
-                            }
-                        }
-
-                        "pressBack" -> {
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                            } else {
-                                result.success(service.pressBack())
-                            }
-                        }
-
-                        "pressHome" -> {
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                            } else {
-                                result.success(service.pressHome())
-                            }
-                        }
-
-                        "openNotifications" -> {
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                            } else {
-                                result.success(service.openNotifications())
-                            }
-                        }
-
-                        "getCurrentPackage" -> {
-                            val service = AgentAccessibilityService.instance
-                            if (service == null) {
-                                result.error("SERVICE_NOT_RUNNING", "Accessibility service is not running", null)
-                            } else {
-                                result.success(service.getCurrentPackage())
-                            }
-                        }
-
-                        else -> result.notImplemented()
+                    } else {
+                        isFinished = true
+                        removeInAppDownload(downloadId)
+                        emitProgress(safeName, 0, 0, 0.0, "Download cancelled")
                     }
+                } ?: run {
+                    isFinished = true
                 }
+            }
+            monitoredInAppDownloads.remove(downloadId)
         }
     }
-}
 
-class BackgroundEngineReceiver : android.content.BroadcastReceiver() {
-    override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
-        val engine = io.flutter.embedding.engine.FlutterEngineCache
-            .getInstance()
-            .get("myCachedEngine")
-        if (engine == null) {
-            android.util.Log.e("PrivateAgent", "Background engine myCachedEngine was not found")
+    private fun finalizeInAppDownload(
+        downloadId: Long,
+        safeName: String,
+        modelsDir: String,
+        downloaded: Long,
+        total: Long,
+    ) {
+        val destFile = File(File(getExternalFilesDir(null), "temp_downloads"), safeName)
+        try {
+            emitProgress(safeName, downloaded, total, 0.0, "Importing to app storage...")
+            val targetFile = File(modelsDir, safeName)
+            targetFile.parentFile?.mkdirs()
+            val partFile = File(targetFile.parentFile, "${targetFile.name}.part")
+            if (partFile.exists()) partFile.delete()
+            if (!destFile.exists()) {
+                if (targetFile.exists() && targetFile.length() > 0L) {
+                    removeInAppDownload(downloadId)
+                    emitProgress(safeName, total, total, 0.0, "Download complete")
+                    return
+                }
+                throw IllegalStateException("Downloaded temporary file is missing.")
+            }
+            destFile.copyTo(partFile, overwrite = true)
+            if (targetFile.exists()) targetFile.delete()
+            if (!partFile.renameTo(targetFile)) {
+                throw IllegalStateException("Unable to finalize downloaded model.")
+            }
+            destFile.delete()
+            removeInAppDownload(downloadId)
+            emitProgress(safeName, total, total, 0.0, "Download complete")
+        } catch (e: Exception) {
+            Log.e("MainActivity", "Failed to import downloaded model: ${e.message}", e)
+            emitProgress(safeName, downloaded, total, 0.0, "Download failed: import error")
+        }
+    }
+
+    private fun persistInAppDownload(downloadId: Long, filename: String, modelsDir: String) {
+        val record = JSONObject()
+            .put("filename", filename)
+            .put("modelsDir", modelsDir)
+        getSharedPreferences("in_app_downloads", Context.MODE_PRIVATE)
+            .edit()
+            .putString(downloadId.toString(), record.toString())
+            .apply()
+    }
+
+    private fun removeInAppDownload(downloadId: Long) {
+        getSharedPreferences("in_app_downloads", Context.MODE_PRIVATE)
+            .edit()
+            .remove(downloadId.toString())
+            .apply()
+    }
+
+    private fun reconcileInAppDownloads(): List<Map<String, Any>> {
+        val manager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        val preferences = getSharedPreferences("in_app_downloads", Context.MODE_PRIVATE)
+        val activeList = mutableListOf<Map<String, Any>>()
+        for ((idText, rawRecord) in preferences.all) {
+            val downloadId = idText.toLongOrNull() ?: continue
+            val record = runCatching { JSONObject(rawRecord as String) }.getOrNull() ?: continue
+            val safeName = record.optString("filename")
+            val modelsDir = record.optString("modelsDir")
+            if (safeName.isBlank() || modelsDir.isBlank()) {
+                removeInAppDownload(downloadId)
+                continue
+            }
+            manager.query(DownloadManager.Query().setFilterById(downloadId))?.use { cursor ->
+                if (!cursor.moveToFirst()) {
+                    removeInAppDownload(downloadId)
+                    return@use
+                }
+                val status = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
+                val downloaded = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+                val total = cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+                when (status) {
+                    DownloadManager.STATUS_SUCCESSFUL ->
+                        finalizeInAppDownload(downloadId, safeName, modelsDir, downloaded, total)
+                    DownloadManager.STATUS_FAILED -> {
+                        removeInAppDownload(downloadId)
+                        emitProgress(safeName, downloaded, total, 0.0, "Download failed")
+                    }
+                    else -> {
+                        val statusText = when (status) {
+                            DownloadManager.STATUS_PAUSED -> "Paused"
+                            DownloadManager.STATUS_PENDING -> "Pending"
+                            else -> "Downloading..."
+                        }
+                        activeList.add(mapOf(
+                            "downloadId" to downloadId,
+                            "filename" to safeName,
+                            "downloaded" to downloaded,
+                            "total" to total,
+                            "status" to statusText,
+                        ))
+                        monitorInAppDownload(downloadId, safeName, modelsDir)
+                    }
+                }
+            }
+        }
+        return activeList
+    }
+
+    private fun openModelPicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+        }
+        startActivityForResult(intent, importRequestCode)
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != importRequestCode) return
+
+        if (resultCode != RESULT_OK || data?.data == null) {
+            finishImportSuccess(mapOf("cancelled" to true))
             return
         }
 
-        android.util.Log.d(
-            "PrivateAgent",
-            "Registering accessibility channel on myCachedEngine " +
-                "(engine=${System.identityHashCode(engine)}, " +
-                "dartExecuting=${engine.dartExecutor.isExecutingDart})"
-        )
-        MainActivity.registerAccessibilityChannel(engine, context.applicationContext)
+        val uri = data.data!!
+        try {
+            contentResolver.takePersistableUriPermission(
+                uri,
+                data.flags and Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        } catch (_: Exception) {
+            // Some providers do not allow persistable grants; the one-shot grant is enough here.
+        }
+
+        val filename = displayNameFor(uri)
+        val lower = filename.lowercase()
+        if (!lower.endsWith(".gguf") && !lower.endsWith(".litertlm") && !lower.endsWith(".safetensors")) {
+            finishImportError(
+                "UNSUPPORTED_MODEL",
+                "Only .gguf, .litertlm, and .safetensors files can be imported."
+            )
+            return
+        }
+
+        val size = sizeFor(uri)
+        if (size <= 0L) {
+            finishImportError("EMPTY_MODEL", "The selected file is empty or unreadable.")
+            return
+        }
+
+        val modelsDir = pendingModelsDir
+        if (modelsDir.isNullOrBlank()) {
+            finishImportError("INVALID_DIR", "Models directory is missing.")
+            return
+        }
+
+        val destination = File(modelsDir, sanitizeFilename(filename))
+        if (destination.exists()) {
+            AlertDialog.Builder(this)
+                .setTitle("Model already imported")
+                .setMessage("${destination.name} already exists in app storage. Replace it?")
+                .setNegativeButton("Cancel") { _, _ ->
+                    finishImportSuccess(mapOf("cancelled" to true))
+                }
+                .setPositiveButton("Replace") { _, _ ->
+                    copyUriToModel(uri, destination, size, true)
+                }
+                .show()
+        } else {
+            copyUriToModel(uri, destination, size, false)
+        }
+    }
+
+    private fun copyUriToModel(uri: Uri, destination: File, totalBytes: Long, replacing: Boolean) {
+        emitProgress(destination.name, 0L, totalBytes, 0.0, "Copying to app storage...")
+        thread(name = "model-import-${destination.name}") {
+            val partFile = File(destination.parentFile, "${destination.name}.part")
+            val startedAt = System.currentTimeMillis()
+            var copied = 0L
+            try {
+                destination.parentFile?.mkdirs()
+                if (partFile.exists()) partFile.delete()
+
+                contentResolver.openInputStream(uri).use { input ->
+                    if (input == null) {
+                        throw IllegalStateException("Unable to open selected file.")
+                    }
+                    partFile.outputStream().use { output ->
+                        val buffer = ByteArray(1024 * 1024)
+                        while (true) {
+                            val read = input.read(buffer)
+                            if (read <= 0) break
+                            output.write(buffer, 0, read)
+                            copied += read
+                            val elapsedSeconds =
+                                (System.currentTimeMillis() - startedAt).coerceAtLeast(1) / 1000.0
+                            emitProgress(
+                                destination.name,
+                                copied,
+                                totalBytes,
+                                copied / elapsedSeconds,
+                                "Copying to app storage..."
+                            )
+                        }
+                    }
+                }
+
+                if (replacing && destination.exists()) destination.delete()
+                if (!partFile.renameTo(destination)) {
+                    throw IllegalStateException("Unable to finalize imported model.")
+                }
+                emitProgress(destination.name, totalBytes, totalBytes, 0.0, "Import complete")
+                finishImportSuccess(
+                    mapOf(
+                        "cancelled" to false,
+                        "filename" to destination.name,
+                        "bytes" to totalBytes,
+                        "replaced" to replacing
+                    )
+                )
+            } catch (e: Exception) {
+                if (partFile.exists()) partFile.delete()
+                finishImportError("IMPORT_FAILED", e.message ?: e.toString())
+            }
+        }
+    }
+
+    private fun emitProgress(
+        filename: String,
+        copiedBytes: Long,
+        totalBytes: Long,
+        bytesPerSecond: Double,
+        status: String,
+    ) {
+        mainHandler.post {
+            importChannel?.invokeMethod(
+                "importProgress",
+                mapOf(
+                    "filename" to filename,
+                    "copiedBytes" to copiedBytes,
+                    "totalBytes" to totalBytes,
+                    "bytesPerSecond" to bytesPerSecond,
+                    "status" to status
+                )
+            )
+        }
+    }
+
+    private fun finishImportSuccess(payload: Map<String, Any?>) {
+        mainHandler.post {
+            pendingImportResult?.success(payload)
+            pendingImportResult = null
+            pendingModelsDir = null
+        }
+    }
+
+    private fun finishImportError(code: String, message: String) {
+        mainHandler.post {
+            pendingImportResult?.error(code, message, null)
+            pendingImportResult = null
+            pendingModelsDir = null
+        }
+    }
+
+    private fun displayNameFor(uri: Uri): String {
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (index >= 0) {
+                        val value = cursor.getString(index)
+                        if (!value.isNullOrBlank()) return value
+                    }
+                }
+            }
+        return uri.lastPathSegment?.substringAfterLast('/') ?: "model.gguf"
+    }
+
+    private fun sizeFor(uri: Uri): Long {
+        contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
+            ?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (index >= 0) return cursor.getLong(index)
+                }
+            }
+        return -1L
+    }
+
+    private fun sanitizeFilename(filename: String): String {
+        return filename.replace(Regex("""[\\/:*?"<>|]"""), "_")
     }
 }

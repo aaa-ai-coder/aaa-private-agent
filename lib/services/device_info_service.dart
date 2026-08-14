@@ -1,76 +1,108 @@
-import 'dart:io' show Platform;
-import 'package:battery_plus/battery_plus.dart';
-import 'package:device_info_plus/device_info_plus.dart';
+import 'package:get/get.dart';
 
-class DeviceInfoService {
-  final DeviceInfoPlugin _deviceInfo = DeviceInfoPlugin();
-  final Battery _battery = Battery();
+import 'device_info_native.dart' if (dart.library.html) 'device_info_web.dart'
+    as platform_info;
 
-  /// Get device model, manufacturer, OS version.
-  Future<String> getDeviceInfo() async {
-    try {
-      if (Platform.isAndroid) {
-        final info = await _deviceInfo.androidInfo;
-        return '${info.manufacturer} ${info.model}, Android ${info.version.release} (API ${info.version.sdkInt})';
-      } else if (Platform.isIOS) {
-        final info = await _deviceInfo.iosInfo;
-        return '${info.model}, iOS ${info.systemVersion}';
-      }
-      return 'Unknown device';
-    } catch (e) {
-      return 'Error reading device info: $e';
+/// Device capability detection — reads RAM to set safe inference limits.
+/// Cross-platform: works on Android/iOS natively, defaults on web.
+class DeviceInfoService extends GetxService {
+  final totalRamGB = 0.0.obs;
+  final availableRamGB = 0.0.obs;
+  final deviceTier = ''.obs; // 'low', 'mid', 'high', 'ultra'
+  final isTensorSoC = false.obs;
+  final socFamily = platform_info.SocFamily.unknown.obs;
+  final socHardware = ''.obs;
+
+  // Recommended limits based on device RAM
+  int get recommendedContextSize => _tierConfig['contextSize']!;
+  int get recommendedMaxTokens => _tierConfig['maxTokens']!;
+  int get maxSafeContextSize => _tierConfig['maxContextSize']!;
+  int get maxSafeTokens => _tierConfig['maxSafeTokens']!;
+
+  Map<String, int> get _tierConfig {
+    final ram = totalRamGB.value;
+    if (ram <= 4) {
+      return {
+        'contextSize': 1024,
+        'maxTokens': 256,
+        'maxContextSize': 2048,
+        'maxSafeTokens': 512,
+      };
+    } else if (ram <= 6) {
+      return {
+        'contextSize': 2048,
+        'maxTokens': 512,
+        'maxContextSize': 4096,
+        'maxSafeTokens': 1024,
+      };
+    } else if (ram <= 8) {
+      return {
+        'contextSize': 4096,
+        'maxTokens': 1024,
+        'maxContextSize': 8192,
+        'maxSafeTokens': 2048,
+      };
+    } else if (ram <= 12) {
+      return {
+        'contextSize': 4096,
+        'maxTokens': 2048,
+        'maxContextSize': 8192,
+        'maxSafeTokens': 4096,
+      };
+    } else {
+      return {
+        'contextSize': 8192,
+        'maxTokens': 4096,
+        'maxContextSize': 16384,
+        'maxSafeTokens': 4096,
+      };
     }
   }
 
-  /// Get battery level (0-100).
-  Future<String> getBatteryLevel() async {
-    try {
-      final level = await _battery.batteryLevel;
-      return '$level%';
-    } catch (e) {
-      return 'Error reading battery: $e';
+  Future<DeviceInfoService> init() async {
+    await refreshMemoryInfo();
+
+    // Classify device tier
+    final ram = totalRamGB.value;
+    if (ram <= 4) {
+      deviceTier.value = 'low';
+    } else if (ram <= 6) {
+      deviceTier.value = 'mid';
+    } else if (ram <= 8) {
+      deviceTier.value = 'high';
+    } else {
+      deviceTier.value = 'ultra';
     }
+
+    print('[DeviceInfo] RAM: ${totalRamGB.value.toStringAsFixed(1)}GB total, '
+        '${availableRamGB.value.toStringAsFixed(1)}GB available, '
+        'tier: ${deviceTier.value}, tensor: ${isTensorSoC.value}');
+    return this;
   }
 
-  /// Get storage info.
-  Future<String> getStorageInfo() async {
-    try {
-      if (Platform.isAndroid) {
-        final storage = await _deviceInfo.androidInfo;
-        final totalBytes = storage.totalDiskSize;
-        final freeBytes = storage.freeDiskSize;
-        if (totalBytes > 0) {
-          final usedBytes = totalBytes - freeBytes;
-          final usedGb = (usedBytes / (1024 * 1024 * 1024)).toStringAsFixed(1);
-          final totalGb = (totalBytes / (1024 * 1024 * 1024)).toStringAsFixed(1);
-          return '${usedGb}GB used / ${totalGb}GB total';
-        }
-        return 'Storage info not available';
-      }
-      return 'Storage info only available on Android';
-    } catch (e) {
-      return 'Error reading storage: $e';
-    }
+  Future<void> refreshMemoryInfo() async {
+    final info = await platform_info.getDeviceInfo();
+    totalRamGB.value = (info['totalRamGB'] as num).toDouble();
+    availableRamGB.value = (info['availableRamGB'] as num).toDouble();
+    isTensorSoC.value = (info['isTensorSoC'] as num? ?? 0.0) > 0.5;
+    final rawIndex = (info['socFamily'] as num? ?? 8).toInt();
+    final clamped = rawIndex < 0 ? 0 : (rawIndex > 8 ? 8 : rawIndex);
+    socFamily.value = platform_info.SocFamily.values[clamped];
+    socHardware.value = (info['socHardware'] as String?) ?? '';
   }
 
-  /// Get memory (RAM) info.
-  Future<String> getMemoryInfo() async {
-    try {
-      if (Platform.isAndroid) {
-        final info = await _deviceInfo.androidInfo;
-        // device_info_plus 13.x: physicalRamSize, availableRamSize (in MB)
-        final totalMb = info.physicalRamSize;
-        final freeMb = info.availableRamSize;
-        final totalGb = (totalMb / 1024).toStringAsFixed(1);
-        final freeGb = (freeMb / 1024).toStringAsFixed(1);
-        if (totalMb > 0) {
-          return '${freeGb}GB free / ${totalGb}GB total RAM';
-        }
-        return 'RAM info not available';
-      }
-      return 'RAM info only available on Android';
-    } catch (e) {
-      return 'Error reading memory: $e';
+  String get tierDescription {
+    switch (deviceTier.value) {
+      case 'low':
+        return '⚠️ Low RAM (${totalRamGB.value.toStringAsFixed(1)}GB) — Use small models only';
+      case 'mid':
+        return '📱 Mid-range (${totalRamGB.value.toStringAsFixed(1)}GB) — Good for 1-3B models';
+      case 'high':
+        return '💪 High-end (${totalRamGB.value.toStringAsFixed(1)}GB) — Can run 3-7B models';
+      case 'ultra':
+        return '🚀 Ultra (${totalRamGB.value.toStringAsFixed(1)}GB) — Full performance mode';
+      default:
+        return '📱 ${totalRamGB.value.toStringAsFixed(1)}GB RAM detected';
     }
   }
 }

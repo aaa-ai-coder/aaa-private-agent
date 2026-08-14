@@ -1,5 +1,3 @@
-.slim/deepwork/
-
 # Miscellaneous
 *.class
 *.log
@@ -20,9 +18,7 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
+# VS Code (optional — uncomment if you want to ignore)
 #.vscode/
 
 # Flutter/Dart/Pub related
@@ -46,25 +42,48 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 
-# Python model training pipeline
-*.py
-*.jsonl
-venv/
-__pycache__/
-training_tasks.md
-enrich_dataset_prompt.md
+# Keystores and signing
+*.jks
+*.keystore
+key.properties
+/android/key.properties
+
+# Firebase & API configs (safety)
 google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+lib/firebase_options.dart
 
-# Local credentials bundled only into developer test builds
-/assets/local_config/ai_test_config.json
-firebase-service-account.json
+# Local env / secrets
 .env
+.env.*
+*.secret
+secrets/
 
-# Bundled on-device LLM (650 MB GGUF) is downloaded by CI, never committed
-/assets/models/
+# iOS
+/ios/Pods/
+/ios/.symlinks/
+/ios/Flutter/Flutter.podspec
 
-# Never commit real credentials
-lib/config/credentials.dart
-workers/**/.dev.vars
-workers/**/.wrangler/
+# macOS
+/macos/Flutter/ephemeral/
+/macos/Pods/
 
+# Linux
+/linux/flutter/ephemeral/
+
+# Windows
+/windows/flutter/ephemeral/
+
+# Web
+/web/firebase-config.js
+
+# Firebase hosting cache
+.firebase/
+
+# Local plugin build artifacts / downloaded dependencies
+local_plugins/**/android/src/main/cpp/vulkan-headers/
+local_plugins/**/ios/sd_cpp_src/
+local_plugins/**/android/.cxx/
+local_plugins/**/android/build/
+reference_local_diffusion/

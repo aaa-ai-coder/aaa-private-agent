@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Set up Java JDK
         uses: actions/setup-java@v4
@@ -34,22 +36,9 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Generate local credentials file
-        run: |
-          cp lib/config/credentials.example.dart lib/config/credentials.dart
-          # If the repo owner has configured the corresponding GitHub secrets,
-          # substitute real values so the release APK is fully functional.
-          if [ -n "${{ secrets.R2_ACCOUNT_ID }}" ]; then
-            sed -i "s|your_cloudflare_account_id|${{ secrets.R2_ACCOUNT_ID }}|" lib/config/credentials.dart
-            sed -i "s|your_cloudflare_email|${{ secrets.R2_AUTH_EMAIL }}|" lib/config/credentials.dart
-            sed -i "s|your_cloudflare_api_key|${{ secrets.R2_GLOBAL_KEY }}|" lib/config/credentials.dart
-            sed -i "s|your_cloudflare_api_token|${{ secrets.R2_API_TOKEN }}|" lib/config/credentials.dart
-            sed -i "s|aaa-r2|${{ secrets.R2_BUCKET_NAME }}|" lib/config/credentials.dart
-          fi
-
       - name: Generate Release Keystore
         run: |
-          keytool -genkey -v -keystore android/app/release.keystore -alias release -keyalg RSA -keysize 2048 -validity 10000 -storepass privateagent123 -keypass privateagent123 -dname "CN=AAA Private Agent, OU=Agent, O=AAA, L=City, S=State, C=US"
+          keytool -genkey -v -keystore android/app/release.keystore -alias release -keyalg RSA -keysize 2048 -validity 10000 -storepass privateagent123 -keypass privateagent123 -dname "CN=Nova AI, OU=AI, O=Nova, L=City, S=State, C=US"
 
       - name: Ensure google-services.json exists
         run: |
@@ -62,13 +51,13 @@ jobs:
 
       - name: Rename APK
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/AAA-Private-Agent.apk
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/Nova-AI.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: AAA-Private-Agent-APK
-          path: build/app/outputs/flutter-apk/AAA-Private-Agent.apk
+          name: Nova-AI-APK
+          path: build/app/outputs/flutter-apk/Nova-AI.apk
 
       - name: Get current date for release tag
         id: date
@@ -77,24 +66,19 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: build/app/outputs/flutter-apk/AAA-Private-Agent.apk
-          name: "AAA Private Agent ${{ steps.date.outputs.tag }}"
+          files: build/app/outputs/flutter-apk/Nova-AI.apk
+          name: "Nova AI ${{ steps.date.outputs.tag }}"
           tag_name: ${{ steps.date.outputs.tag }}
           body: |
-            ## AAA Private Agent APK
+            ## Nova AI APK
 
-            Latest build from main branch.
+            Nova AI is a brand-new unified app: local on-device LLM (llama.cpp / LiteRT) + cloud AI (OpenAI, Anthropic, Gemini, Kimi, OpenRouter, DeepSeek, NVIDIA, Free AI) with voice input, tasks, image generation, document extraction and background services.
 
             📱 **How to install on your phone:**
             1. Download this APK from the release page
             2. Open the downloaded file on your Android phone
             3. Tap "Install Anyway" if Play Protect shows a warning
             4. Open the app and enjoy!
-
-            🧠 **Turn on Offline AI:**
-            1. Open Settings → Offline AI
-            2. Tap "Download model now" (Qwen 2.5, ~470–620 MB, one time)
-            3. The assistant runs fully offline when the network drops
 
             Release: ${{ steps.date.outputs.tag }}
           draft: false

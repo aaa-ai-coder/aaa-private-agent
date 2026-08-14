@@ -3,8 +3,11 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
-    id("com.google.gms.google-services")
-    id("com.google.firebase.crashlytics")
+}
+
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+    apply(plugin = "com.google.firebase.crashlytics")
 }
 
 android {
@@ -23,14 +26,12 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.aaa.privateagent"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 26
+        minSdk = 28
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+        multiDexEnabled = true
     }
 
     signingConfigs {
@@ -53,23 +54,16 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("release")
-            configure<com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension> {
-                mappingFileUploadEnabled = false
-            }
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
 
-flutter {
-    source = "../.."
-}
-
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
+}
 
-    // Firebase BOM
-    implementation(platform("com.google.firebase:firebase-bom:33.0.0"))
-    implementation("com.google.firebase:firebase-analytics")
-    implementation("com.google.firebase:firebase-crashlytics")
-    implementation("com.google.firebase:firebase-auth")
+flutter {
+    source = "../.."
 }

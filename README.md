@@ -1,124 +1,51 @@
-# AAA Private Agent
+# Nova AI
 
-AI-powered Android agent app with floating overlay, voice control, and full device automation.
+Nova AI is a brand-new, unified AI assistant for Android built from two projects merged into one:
 
-## Features
-- Floating overlay chat bubble for hands-free AI control
-- Voice-to-text (STT) and text-to-voice (TTS)
-- Full device automation (click, type, scroll, open apps, SMS, calls)
-- Google Sign-In with permanent device SHA persistence
-- Email + Password + Passkey authentication
-- Firebase Auth + Crashlytics + Analytics
-- Supabase backend for user data collection
-- Cloudflare R2 for heavy data storage (screenshots, files)
-- Multi-provider AI (Groq, NVIDIA, Ollama Cloud, DeepSeek, Puter.js, local)
-- Multi-turn conversation with streaming
-- Task history and analytics
-- Scheduled Tasks: run any device action automatically at a chosen time (once
-  or repeating every 30 min / hour / 6 hours / daily); persisted and re-armed
-  after restarts, with active-schedule management in Settings
-- One-tap "Summarize Conversation" in the drawer and quick commands
-- Redesigned Aurora chat: agent orb avatar, animated typing indicator, day
-  separators, per-message model labels, gradient user bubbles
-- Aurora design language v4.0: warm sunrise palette (coral, peach, rose, amber)
-  with creamy light surfaces and espresso dark surfaces, applied consistently
-  across every screen — chat, drawer, control panel, settings, onboarding and
-  login — with light/dark themes rebuilt from one central theme
-- Discover Capabilities hub: browse every feature in one place (voice, Wi-Fi,
-  calls & SMS, media, device controls, productivity, privacy recovery) and tap
-  any card to send it to the AI agent
-- App Permissions dashboard: live status for screen control, microphone,
-  overlay, notifications, contacts, calls, SMS, Shizuku and battery-optimization
-  exemption, with one-tap Grant / Open-settings for each; reachable from the
-  drawer and Settings
-- Custom Quick Commands: pin your own frequent requests as home-screen chips
-  (icon, label and AI command) right from the quick-command bar
-- Offline AI Assistant (v4.3/v4.4): two layers — a **real on-device LLM** via
-  Ollama (localhost OpenAI-compatible endpoint, fully offline, no key; test the
-  connection in Settings) and an instant intent-based fallback that controls the
-  phone (WiFi, Bluetooth, hotspot, mobile data, DND, brightness, volume, ringer,
-  media, alarms, timers, screenshots, open apps, lock/wake, home, system
-  settings, battery & device info) and chats. Both emit the same actions as the
-  cloud agent and speak via TTS. Enable in Settings > Offline AI & Memory.
-- New Aurora app logo: coral/peach/rose gradient with a white "A" monogram and
-  amber spark — adaptive (Android 8+), monochrome (Android 13 themed) and legacy
-  launcher icons regenerated
-- AI Memory (v4.3): the assistant remembers facts about you across
-  conversations ("my name is Alex", "remember that I like short answers").
-  Facts are stored on-device, injected into the AI system prompt, and
-  manageable in Settings > Offline AI & Memory > AI Memory.
-- Free AI first-open (v4.3): onboarding defaults to the keyless Free AI
-  provider and hides the API-key field for keyless options (Free AI, Puter,
-  Ollama, local) — you can start chatting immediately with no key.
-- Share any message to other apps straight from the long-press menu
-- Decluttered chat AppBar (7 -> 4 actions) with a reorganised drawer that groups
-  tools into a dedicated section (Control Panel, Discover, Permissions, Task
-  History, Export, Summarize, Clear, Settings)
-- Smarter AI replies: rewritten system prompts (cleaner action parsing, concise
-  chat style, same-language replies) and fenced-JSON (```json) action parsing
-- Long-press any message: Rewrite with AI (polish the text) or Translate with
-  AI (pick from 11 languages) — results stream in as a new assistant reply
-- Conversation search: find any message and jump to it with a highlight
-- Export conversations as Markdown or structured JSON (re-importable)
-- Automated data retention: auto-deletes chat history older than the
-  configured window from the device, Supabase and the Firebase mirror
-- API keys saved permanently to Supabase (synced on every add/update/delete)
-- Automated backup cleanup: the Cloudflare Worker drops R2 DB snapshots
-  older than 30 days on its daily schedule
-- Dark/Light theme with Material 3
-- Aurora design language: unified light/dark theme across the whole app
-- PIN App Lock: salted SHA-256 PIN, auto-locks when the app is backgrounded
-- Fingerprint / face unlock shortcut (Android BiometricPrompt) for the app lock
-- Home dashboard status bar: live AI provider + R2 + cloud-sync indicators with
-  one-tap access to Accounts & Cloud Health
-- Accounts & Cloud Health screen: live status for AI, Supabase, Firebase, FCM,
-  keep-alive Worker, R2 and Telegram with one-tap R2/Telegram configuration
-- Keyless free AI by default (Pollinations) with anonymous `X-User-ID` to beat
-  rate limits, plus ARI failover to your own keys when configured
-- Puter.js AI gateway (guest mode works with no key): free access to GPT-4o,
-  Claude, Gemini and Llama models via `api.puter.com` with a dedicated
-  streaming adapter; add a Puter token in Settings for higher limits
-- Long-press any chat message: copy, speak aloud, regenerate the AI response or
-  delete the message (history stays coherent after edits)
-- Phone Control Panel: one-tap grid for WiFi, Bluetooth, mobile data, airplane
-  mode, hotspot, DND, auto-rotate, volume/brightness, media, ringer, wake, lock,
-  screenshot, home, recent apps, clear notifications and WiFi scan - the same
-  action pipeline the AI agent uses
-- Expanded phone automation: wake screen, go home, recent apps, airplane mode,
-  hotspot, Do Not Disturb, auto-rotate, clear notifications, saved WiFi
-  password retrieval and arbitrary ADB shell commands (Shizuku/root)
-- Autonomous WiFi: `connect_best_wifi` scans in-range networks, matches them
-  against the phone's saved networks and connects to the best one — no password
-  needed from the user; `connect_saved_wifi` connects a specific saved network
-  by SSID via its stored config
-- Brand-new networks: `connect_available_wifi` goes fully hands-free — it
-  prefers a saved network in range, otherwise connects to the best OPEN
-  (password-less) network automatically; secured brand-new networks require
-  their password (password cracking is not supported)
-- WiFi password recovery from your own device: `reveal_wifi_password` tries the
-  saved config, `cmd wifi get-saved-network`, then Android's own Share-QR screen
-  (pure-Dart QR decode) and caches the result so the AI can auto-connect later
-- Self-setting Shizuku on rooted devices: `setup_shizuku` starts the Shizuku
-  server and grants this app permission via root automatically
-- New Aurora app icon (adaptive + monochrome themed icon) and Android 12 splash
-- Stop button halts streaming AI responses and running tasks immediately
+- **PrivateLM** (`cross-platform-llm-client`) — local on-device LLM inference (llama.cpp GGUF + LiteRT-LM), cloud AI, chat/task/model management, image generation, document extraction, background services.
+- **AAA Private Agent** — the previous app's power features: automatic cloud key backup to Supabase, Free AI (keyless), voice input + read-aloud.
 
-## Setup
+A single app that runs real AI **on your phone** with zero internet, and drops back to any cloud provider when you want more power.
 
-### 1. Firebase
-Place `google-services.json` in `android/app/` (gitignored). Get it from Firebase Console.
+---
 
-### 2. Supabase
-Update credentials in `lib/config/supabase_config.dart`.
+## What It Does
 
-### 3. Cloudflare R2
-Configure R2 settings in Settings → Storage.
+- **Local Inference on Android** — Download and run GGUF models (llama.cpp, GPU via Vulkan) or LiteRT-LM models directly on your phone. No internet required after download.
+- **Cloud API Fallback** — Switch between OpenAI, Anthropic, Google Gemini, Kimi (Moonshot AI), OpenRouter, DeepSeek, NVIDIA NIM, custom OpenAI-compatible endpoints, or **Free AI** (keyless, zero setup).
+- **Multimodal Chat** — Send text and images; vision works with local (Qwen2-VL) and cloud models.
+- **Voice** — Speech-to-text input button plus text-to-speech read-aloud on every assistant reply.
+- **Persistent Sessions** — All chats, tasks, and settings stored locally via Hive.
+- **Background Services** — Image generation notifications, boot persistence, and background task handling.
+- **Smart Auto-Configuration** — First launch detects device RAM and recommends context size / token limits.
+- **Task Management** — Structured AI-assisted workflows alongside free-form chat.
+- **Automatic Cloud Key Backup** — Point at your own Supabase project; every API key and provider/model setting syncs automatically and can be restored on any device.
+- **Document Extraction** — Read PDFs and documents in chat.
 
-### 4. Build
+## Stack
+
+- Flutter 3.x (Dart >=3.3.0), GetX, Hive, Dio + `package:http`
+- `llama_flutter_android` (llama.cpp) · `flutter_litert_lm` (LiteRT) · `sd_flutter_android` (Stable Diffusion)
+- Firebase Core / Messaging / Crashlytics, `flutter_background_service`, `flutter_local_notifications`
+
+## Build
+
 ```bash
 flutter pub get
 flutter build apk --release
 ```
 
-## Auto-Build (GitHub Actions)
-Push a tag `v*` or trigger `build-apk.yml` to build and upload APK artifacts.
+Release APKs are produced automatically by GitHub Actions on every push to `main` (see `.github/workflows/build-apk.yml`). The workflow checks out the repo **with submodules** (the Stable Diffusion native engine), generates a release keystore, and publishes a `Nova-AI.apk` release.
+
+### Submodules
+
+The Stable Diffusion native engine is a git submodule:
+
+```bash
+git submodule update --init --recursive --depth 1
+```
+
+## Notes
+
+- API keys never leave your device unless you configure cloud key backup, and even then they go only to the Supabase project you specify.
+- Free AI requires no key at all.

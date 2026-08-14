@@ -1,211 +1,222 @@
 import 'dart:async';
 import 'dart:ui';
+
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flutter_overlay_window/flutter_overlay_window.dart';
-import 'package:firebase_core/firebase_core.dart';
-import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
-import 'dart:developer';
-import 'config/feature_flags.dart';
-import 'config/supabase_config.dart';
-import 'theme/app_theme.dart';
-import 'services/app_lock_service.dart';
-import 'services/auth_service.dart';
-import 'services/cloudflare_service.dart';
-import 'services/firebase_service.dart';
-import 'services/retention_service.dart';
-import 'services/storage_service.dart';
-import 'screens/home_screen.dart';
-import 'screens/onboarding_screen.dart';
-import 'screens/login_screen.dart';
-import 'screens/app_lock_screen.dart';
-import 'overlay_main.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:get/get.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+// import 'firebase_options.dart';
+import 'controllers/settings_controller.dart';
+import 'controllers/cloud_model_controller.dart';
+import 'controllers/server_controller.dart';
+import 'controllers/model_controller.dart';
+import 'core/theme.dart';
+//////
+import 'core/routes.dart';
+import 'services/hive_service.dart';
+import 'services/inference_service.dart';
+import 'services/cloud_service.dart';
+import 'services/key_backup_service.dart';
+import 'services/download_service.dart';
+import 'services/device_info_service.dart';
+import 'services/local_image_service.dart';
+import 'services/app_log_service.dart';
+import 'services/crash_reporting_service.dart';
+import 'services/image_generation_notification_service.dart';
+import 'core/constants.dart';
 
-@pragma("vm:entry-point")
-void overlayMain() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.overlay(),
-      home: const OverlayApp(),
-    ),
-  );
-}
+void main() {
+  final appLogBuffer = <String>[];
 
-final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
 
-void Function(String task)? onOverlayTask;
+    // Register logger first so everything routes to it
+    final appLog = AppLogService();
+    Get.put(appLog);
 
-final AuthService authService = AuthService();
+    // Flush buffered prints
+    for (final line in appLogBuffer) {
+      appLog.info(line);
+    }
+    appLogBuffer.clear();
 
-void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
+    appLog.info('App started');
 
-  try {
-    // Register the FCM background handler BEFORE Firebase.initializeApp()
-    FirebaseMessaging.onBackgroundMessage(firebaseBackgroundHandler);
-    await Firebase.initializeApp();
+    // Initialize Firebase before any Firebase-dependent services
+    try {
+      // await Firebase.initializeApp(
+      //   options: DefaultFirebaseOptions.currentPlatform,
+      // );
+    } catch (e) {
+      appLog.error('[Firebase] Initialization failed', details: e);
+    }
 
-    FlutterError.onError = FirebaseCrashlytics.instance.recordFlutterFatalError;
+    // Support phones and tablets in portrait or landscape.
+    if (!kIsWeb) {
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.portraitUp,
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+    }
+
+    // Initialize Hive
+    await Hive.initFlutter();
+
+    // Register global services
+    await Get.putAsync(() => HiveService().init());
+    await Get.putAsync(() => DeviceInfoService().init());
+
+    // Settings controller must be initialized before runApp for theme support
+    final settingsController = Get.put(SettingsController());
+    Get.put(CloudModelController());
+
+    Get.put(InferenceService());
+    Get.put(CloudService());
+    Get.put(KeyBackupService());
+    Get.put(DownloadService());
+    Get.put(LocalImageService());
+    final crashReporting =
+        await Get.putAsync(() => CrashReportingService().init());
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      appLog.error(
+        details.exceptionAsString(),
+        details: details.stack?.toString() ?? 'No stack',
+      );
+      crashReporting.recordFlutterFatal(details);
+    };
     PlatformDispatcher.instance.onError = (error, stack) {
-      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      appLog.error(
+        error.toString(),
+        details: stack.toString(),
+      );
+      crashReporting.recordFatal(error, stack, reason: 'platform_dispatcher');
       return true;
     };
+    final imageNotifications = Get.put(ImageGenerationNotificationService());
+    await imageNotifications.init();
+    await imageNotifications.configureBackgroundService();
+    Get.put(ServerController(), permanent: true);
+    Get.put(ModelController());
 
-    // Initialize Firebase services (FCM, Firestore, Storage)
-    await FirebaseService.init();
-  } catch (e) {
-    log('Firebase initialization warning: $e');
-  }
+    // Auto-configure inference settings based on device RAM
+    _autoConfigureForDevice();
 
-  try {
-    await SupabaseConfig.init();
-  } catch (e) {
-    log('Supabase initialization warning: $e');
-  }
+    // Keep last model as a quick-load option, but do not auto-load on startup.
+    _validateLastModel();
 
-  // Load storage credentials and wake the Supabase project via the
-  // Cloudflare keep-alive worker (fire-and-forget).
-  try {
-    await StorageService.init();
-    unawaited(CloudflareService.pingKeepalive());
-  } catch (e) {
-    log('Storage/keepalive initialization warning: $e');
-  }
+    runApp(const NovaApp());
 
-  // Automated data lifecycle: prune chat history older than the retention
-  // window and ask the Worker to drop expired R2 snapshots (fire-and-forget).
-  unawaited(RetentionService.runAutomatedCleanup());
-
-  if (FeatureFlags.floatingOverlayEnabled) {
-    FlutterOverlayWindow.overlayListener.listen((event) {
-      log("Main app received from overlay: $event");
-      if (event is String && event.trim().isNotEmpty) {
-        if (onOverlayTask != null) {
-          onOverlayTask!(event.trim());
-        } else {
-          log("Warning: overlay task received but no handler registered yet");
-        }
-      }
+    // Apply system UI after frame is rendered so Get.mediaQuery is available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      settingsController.setThemeMode(settingsController.themeMode.value);
     });
-  }
-
-  final prefs = await SharedPreferences.getInstance();
-  final themeStr = prefs.getString('themeMode');
-  switch (themeStr) {
-    case 'dark':
-      themeNotifier.value = ThemeMode.dark;
-    case 'light':
-      themeNotifier.value = ThemeMode.light;
-    default:
-      themeNotifier.value = ThemeMode.system;
-  }
-  FeatureFlags.floatingIconEnabled =
-      prefs.getBool('floating_icon_enabled') ?? true;
-
-  runApp(const PrivateAgentApp());
-}
-
-class PrivateAgentApp extends StatefulWidget {
-  const PrivateAgentApp({super.key});
-
-  @override
-  State<PrivateAgentApp> createState() => _PrivateAgentAppState();
-}
-
-class _PrivateAgentAppState extends State<PrivateAgentApp>
-    with WidgetsBindingObserver {
-  bool _initialized = false;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    authService.addListener(_checkAuth);
-    _checkAuth();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    authService.removeListener(_checkAuth);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Auto-lock the app whenever it is backgrounded and the PIN lock is on.
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.hidden ||
-        state == AppLifecycleState.detached) {
-      unawaited(_lockIfEnabled());
-    }
-  }
-
-  Future<void> _lockIfEnabled() async {
-    if (await AppLockService.isEnabled()) {
-      AppLockService.lock();
-    }
-  }
-
-  void _checkAuth() {
-    if (mounted) setState(() => _initialized = true);
-  }
-
-  Future<({bool lockEnabled, bool onboarding})> _homeGate() async {
-    final prefs = await SharedPreferences.getInstance();
-    return (
-      lockEnabled: await AppLockService.isEnabled(),
-      onboarding: prefs.getBool('onboarding_completed') ?? false,
-    );
-  }
-
-  Widget _spinner() => const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+  }, (error, stack) async {
+    if (Get.isRegistered<AppLogService>()) {
+      Get.find<AppLogService>().error(
+        'Uncaught zone error: $error',
+        details: stack.toString(),
       );
+    }
+    if (Get.isRegistered<CrashReportingService>()) {
+      await Get.find<CrashReportingService>()
+          .recordFatal(error, stack, reason: 'run_zoned_guarded');
+    }
+  }, zoneSpecification: ZoneSpecification(
+    print: (self, parent, zone, line) {
+      if (Get.isRegistered<AppLogService>()) {
+        Get.find<AppLogService>().info(line);
+      } else {
+        appLogBuffer.add(line);
+      }
+      parent.print(zone, line);
+    },
+  ));
+}
+
+/// Validates that remembered models still exist on disk.
+/// Does NOT auto-load — the HomeView will ask the user on first launch.
+void _validateLastModel() async {
+  final hive = Get.find<HiveService>();
+  final downloadService = Get.find<DownloadService>();
+
+  // Validate last text/LLM model
+  final textModelName = hive.getSetting<String>(AppConstants.keyLocalModelName);
+  final textModelPath = hive.getSetting<String>(AppConstants.keyLocalModelPath);
+  if (textModelName != null &&
+      textModelName.isNotEmpty &&
+      textModelPath != null &&
+      textModelPath.isNotEmpty) {
+    if (!await downloadService.isModelDownloaded(textModelName)) {
+      await hive.setSetting(AppConstants.keyLocalModelPath, '');
+      await hive.setSetting(AppConstants.keyLocalModelName, '');
+    }
+  }
+
+  // Validate last image model
+  final imageModelName =
+      hive.getSetting<String>(AppConstants.keyImageModelName);
+  final imageModelPath =
+      hive.getSetting<String>(AppConstants.keyImageModelPath);
+  if (imageModelName != null &&
+      imageModelName.isNotEmpty &&
+      imageModelPath != null &&
+      imageModelPath.isNotEmpty) {
+    if (!await downloadService.isModelDownloaded(imageModelName)) {
+      await hive.setSetting(AppConstants.keyImageModelPath, '');
+      await hive.setSetting(AppConstants.keyImageModelName, '');
+    }
+  }
+}
+
+/// Auto-set optimized inference params based on device RAM (only on first launch).
+void _autoConfigureForDevice() {
+  final hive = Get.find<HiveService>();
+  final device = Get.find<DeviceInfoService>();
+
+  // Only auto-configure if user hasn't already set values (first launch)
+  final hasConfigured =
+      hive.getSetting<bool>('device_auto_configured') ?? false;
+  if (hasConfigured) return;
+
+  hive.setSetting(AppConstants.keyContextSize, device.recommendedContextSize);
+  hive.setSetting(AppConstants.keyMaxTokens, device.recommendedMaxTokens);
+  hive.setSetting(AppConstants.keyTemperature, 0.3);
+  hive.setSetting('device_auto_configured', true);
+
+  Get.find<AppLogService>().info(
+      '[AutoConfig] Set context=${device.recommendedContextSize}, '
+      'maxTokens=${device.recommendedMaxTokens} for ${device.totalRamGB.value.toStringAsFixed(1)}GB RAM');
+}
+
+class NovaApp extends StatelessWidget {
+  const NovaApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<ThemeMode>(
-      valueListenable: themeNotifier,
-      builder: (context, ThemeMode currentMode, child) {
-        return MaterialApp(
-          title: 'AAA Private Agent',
-          debugShowCheckedModeBanner: false,
-          themeMode: currentMode,
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
-          home: _buildGatedHome(),
-        );
-      },
-    );
-  }
-
-  Widget _buildGatedHome() {
-    if (!_initialized) return _spinner();
-    if (!authService.isLoggedIn) {
-      return LoginScreen(authService: authService);
-    }
-    return ValueListenableBuilder<bool>(
-      valueListenable: AppLockService.lockedNotifier,
-      builder: (context, locked, child) {
-        return FutureBuilder<({bool lockEnabled, bool onboarding})>(
-          future: _homeGate(),
-          builder: (context, snapshot) {
-            if (!snapshot.hasData) return _spinner();
-            final gate = snapshot.data!;
-            if (gate.lockEnabled && locked) {
-              return const AppLockScreen();
-            }
-            return gate.onboarding
-                ? const HomeScreen()
-                : const OnboardingScreen();
-          },
-        );
-      },
-    );
+    final settings = Get.find<SettingsController>();
+    return Obx(() {
+      final themeMode = settings.themeMode.value;
+      final scale = settings.fontScale.value; // read here → Obx tracks it
+      return GetMaterialApp(
+        title: 'Nova AI',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: themeMode,
+        initialRoute: AppRoutes.home,
+        getPages: AppPages.pages,
+        builder: (ctx, child) => MediaQuery(
+          data: MediaQuery.of(ctx).copyWith(
+            textScaler: TextScaler.linear(scale),
+          ),
+          child: child!,
+        ),
+      );
+    });
   }
 }

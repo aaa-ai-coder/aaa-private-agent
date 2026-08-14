@@ -1,7 +1,7 @@
 include: package:flutter_lints/flutter.yaml
 
-analyzer:
-  exclude:
-    # Vendored third-party plugin, not maintained in this repo.
-    - local_plugins/**
-
+linter:
+  rules:
+    prefer_const_constructors: true
+    prefer_const_declarations: true
+    avoid_print: false
